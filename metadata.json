@@ -1,0 +1,6 @@
+{
+  "name": "Чайный купаж - Cozy Tea Sort",
+  "description": "Медитативная головоломка сортировки слоев чая в уютной чайной комнате для Telegram Mini App.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
