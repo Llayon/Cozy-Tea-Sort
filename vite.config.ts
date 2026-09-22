@@ -8,6 +8,7 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(() => {
   return {
+    base: process.env.GITHUB_PAGES === 'true' ? '/Cozy-Tea-Sort/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
