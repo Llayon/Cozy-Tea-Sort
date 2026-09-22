@@ -1,35 +1,41 @@
 /**
  * Cozy Tea Sort / Чайный купаж - Telegram Mini App Main Component
  *
- * Архитектура:
- * - Кривая сложности «Дыхание» (Sawtooth: Разминка -> Вызов -> Пик -> Релакс)
- * - Мета-прогрессия: разблокировка рецептов в «Чайной книге» и сервизов посуды
- * - Механика «Таинственный настой» со скрытым слоем под пенкой
- * - Telegram Mini App тактильный отклик и Cozy звуковой синтезатор
+ * Ownership:
+ * - TeaSortLogic = puzzle truth
+ * - TeaSortView  = rendering/input
+ * - React App    = progression/meta UI (never decides puzzle legality)
+ *
+ * Progression semantics:
+ * - currentLevel         = the puzzle currently being played
+ * - highestUnlockedLevel = furthest progression legitimately earned
+ * - level N -> N+1 happens ONLY via the victory flow (no footer skip)
+ * - footer action reshuffles the SAME level ("Другой расклад")
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   RotateCcw,
   RotateCw,
   Volume2,
   VolumeX,
-  Sparkles,
   Info,
   X,
   BookOpen,
   Coffee,
   AlertCircle,
   HelpCircle,
+  Shuffle,
 } from 'lucide-react';
-import {
-  TeaSortLogic,
-  TeaSortView,
-  TEA_TYPES,
-  TeaId,
-  audioSynth,
-  telegram,
-} from './game/teaSortMonolith';
+import { TEA_TYPES, TeaId } from './game/types';
+import { TeaSortLogic } from './game/logic/teaSortLogic';
+import { TeaSortView } from './game/view/TeaSortView';
+import { audioSynth } from './game/audio/audioSynth';
+import { telegram } from './game/telegram/telegramHaptics';
+import { generateLevel } from './game/logic/generator';
+import { applyWin } from './game/logic/progression';
+import { loadProgress, saveProgress } from './game/storage';
+import { makeProductionSeed } from './game/logic/rng';
 import { TeaRoomBackground } from './components/TeaRoomBackground';
 import { getLevelConfig } from './utils/difficultyCurve';
 import { TEA_RECIPES, CUP_SKINS } from './data/teaRecipes';
@@ -48,39 +54,57 @@ export default function App() {
   const viewRef = useRef<TeaSortView | null>(null);
   const logicRef = useRef<TeaSortLogic | null>(null);
 
-  const [level, setLevel] = useState<number>(() => {
-    const saved = localStorage.getItem('cozy_tea_level');
-    return saved ? Math.max(1, parseInt(saved, 10)) : 1;
-  });
+  // Persisted progress is loaded once; refresh restarts the current puzzle
+  // (acceptable for Gauntlet 0) but never regresses earned progression.
+  const [initialProgress] = useState(loadProgress);
+
+  const [currentLevel, setCurrentLevel] = useState<number>(initialProgress.currentLevel);
+  const [highestUnlockedLevel, setHighestUnlockedLevel] = useState<number>(
+    initialProgress.highestUnlockedLevel,
+  );
   const [moves, setMoves] = useState<number>(0);
   const [canUndo, setCanUndo] = useState<boolean>(false);
   const [isWon, setIsWon] = useState<boolean>(false);
   const [isDeadlocked, setIsDeadlocked] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(audioSynth.muted);
+  const [isMuted, setIsMuted] = useState<boolean>(() => audioSynth.muted);
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [showRecipeBook, setShowRecipeBook] = useState<boolean>(false);
   const [selectedCupIndex, setSelectedCupIndex] = useState<number | null>(null);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
 
+  // --- P0: runtime level context that never goes stale ---
+  // The Pixi view is created once in useEffect([]). Its win callback must
+  // NOT close over the initial React `currentLevel`. The view calls
+  // onWin(boundLevel) with the level explicitly bound at startLevel time,
+  // and this ref mirrors the currently played level for any other handler.
+  const currentLevelRef = useRef<number>(initialProgress.currentLevel);
+  const highestUnlockedRef = useRef<number>(initialProgress.highestUnlockedLevel);
+  const equippedSkinRef = useRef<CupSkinId>(initialProgress.equippedSkin);
+  const seedRef = useRef<string>('');
+
+  const setCurrentLevelSafe = (lvl: number) => {
+    currentLevelRef.current = lvl;
+    setCurrentLevel(lvl);
+    saveProgress({ currentLevel: lvl });
+  };
+
+  const setHighestUnlockedSafe = (lvl: number) => {
+    highestUnlockedRef.current = lvl;
+    setHighestUnlockedLevel(lvl);
+    saveProgress({ highestUnlockedLevel: lvl });
+  };
+
   // Meta-Progression State
-  const [unlockedRecipeIds, setUnlockedRecipeIds] = useState<TeaId[]>(() => {
-    const saved = localStorage.getItem('cozy_tea_unlocked_recipes');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return ['matcha'];
-  });
+  const [unlockedRecipeIds, setUnlockedRecipeIds] = useState<TeaId[]>(
+    initialProgress.unlockedRecipes,
+  );
+  const [unlockedSkinIds, setUnlockedSkinIds] = useState<CupSkinId[]>(
+    initialProgress.unlockedSkins,
+  );
 
-  const [equippedSkin, setEquippedSkin] = useState<CupSkinId>(() => {
-    const saved = localStorage.getItem('cozy_tea_equipped_skin') as CupSkinId;
-    return saved && ['glass', 'ceramic', 'porcelain'].includes(saved) ? saved : 'glass';
-  });
+  const [equippedSkin, setEquippedSkin] = useState<CupSkinId>(initialProgress.equippedSkin);
 
-  // Rewards achieved on current level completion
+  // Rewards achieved on current level completion (only when newly unlocked)
   const [justUnlockedRecipe, setJustUnlockedRecipe] = useState<TeaRecipe | undefined>();
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
@@ -88,32 +112,46 @@ export default function App() {
   const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [] });
   const hintTimerRef = useRef<number | null>(null);
 
-  const currentConfig: LevelConfig = getLevelConfig(level);
-  const nextConfig: LevelConfig = getLevelConfig(level + 1);
+  const currentConfig: LevelConfig = getLevelConfig(currentLevel);
+  const nextConfig: LevelConfig = getLevelConfig(currentLevel + 1);
 
-  const startLevel = (lvlNum: number) => {
+  // Refs mirroring collections for the single-lifetime Pixi win callback.
+  const unlockedRecipeIdsRef = useRef<TeaId[]>(initialProgress.unlockedRecipes);
+  const unlockedSkinIdsRef = useRef<CupSkinId[]>(initialProgress.unlockedSkins);
+
+  const buildLogicForLevel = (lvlNum: number, seed: string): TeaSortLogic => {
     const cfg = getLevelConfig(lvlNum);
-
-    const generated = TeaSortLogic.generateSolvableLevel(
-      cfg.numColors,
-      cfg.emptyCups,
-      cfg.colors,
-      cfg.hasMysteryLayer,
-      cfg.shuffleSteps
+    const generated = generateLevel(
+      {
+        numColors: cfg.numColors,
+        colors: cfg.colors,
+        emptyCups: cfg.emptyCups,
+        hasMysteryLayer: cfg.hasMysteryLayer,
+        phase: cfg.phase,
+      },
+      seed,
     );
+    seedRef.current = generated.seed;
 
-    // Deep clone for clean restart
     initialLevelStateRef.current = {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
     };
 
-    const logic = new TeaSortLogic(generated.cups, generated.hiddenCounts);
+    return new TeaSortLogic(generated.cups, generated.hiddenCounts);
+  };
+
+  const bindLogicToView = (logic: TeaSortLogic, lvlNum: number) => {
     logicRef.current = logic;
+    if (viewRef.current) {
+      viewRef.current.logic = logic;
+      viewRef.current.boundLevel = lvlNum;
+      viewRef.current.setSkin(equippedSkinRef.current);
+      viewRef.current.resetLevel();
+    }
+  };
 
-    setLevel(lvlNum);
-    localStorage.setItem('cozy_tea_level', lvlNum.toString());
-
+  const resetTransientUi = () => {
     setMoves(0);
     setCanUndo(false);
     setIsWon(false);
@@ -121,12 +159,22 @@ export default function App() {
     setSelectedCupIndex(null);
     setJustUnlockedRecipe(undefined);
     setJustUnlockedSkin(undefined);
+  };
 
-    if (viewRef.current) {
-      viewRef.current.logic = logic;
-      viewRef.current.setSkin(equippedSkin);
-      viewRef.current.resetLevel();
-    }
+  /** Start (or restart) an explicit level. Does NOT touch highestUnlocked. */
+  const startLevel = (lvlNum: number, seed?: string) => {
+    const logic = buildLogicForLevel(lvlNum, seed ?? makeProductionSeed(lvlNum));
+    setCurrentLevelSafe(lvlNum);
+    resetTransientUi();
+    bindLogicToView(logic, lvlNum);
+  };
+
+  /** Footer action: a fresh puzzle for the SAME level (never a skip). */
+  const reshuffleCurrentLevel = () => {
+    const lvl = currentLevelRef.current;
+    startLevel(lvl, makeProductionSeed(lvl));
+    audioSynth.playSelect();
+    telegram.hapticSelection();
   };
 
   useEffect(() => {
@@ -135,16 +183,24 @@ export default function App() {
     const container = canvasContainerRef.current;
     if (!container) return;
 
-    const initialLvl = level;
-    const cfg = getLevelConfig(initialLvl);
+    // Sync refs with the (already loaded) initial progress.
+    currentLevelRef.current = initialProgress.currentLevel;
+    highestUnlockedRef.current = initialProgress.highestUnlockedLevel;
+    equippedSkinRef.current = initialProgress.equippedSkin;
 
-    const generated = TeaSortLogic.generateSolvableLevel(
-      cfg.numColors,
-      cfg.emptyCups,
-      cfg.colors,
-      cfg.hasMysteryLayer,
-      cfg.shuffleSteps
+    const initialLvl = initialProgress.currentLevel;
+    const cfg = getLevelConfig(initialLvl);
+    const generated = generateLevel(
+      {
+        numColors: cfg.numColors,
+        colors: cfg.colors,
+        emptyCups: cfg.emptyCups,
+        hasMysteryLayer: cfg.hasMysteryLayer,
+        phase: cfg.phase,
+      },
+      makeProductionSeed(initialLvl),
     );
+    seedRef.current = generated.seed;
 
     initialLevelStateRef.current = {
       cups: generated.cups.map((c) => [...c]),
@@ -162,38 +218,45 @@ export default function App() {
         setMoves(logic.movesCount);
         setCanUndo(logic.canUndo);
       },
-      onWin: () => {
+      // completedLevel comes from view.boundLevel — immune to stale closures.
+      onWin: (completedLevel) => {
         if (isDisposed) return;
 
-        // Check meta-progression rewards
-        const currentCfg = getLevelConfig(logicRef.current ? level : initialLvl);
-        let newlyUnlockedRecipe: TeaRecipe | undefined;
-        let newlyUnlockedSkin: CupSkin | undefined;
+        const cfg = getLevelConfig(completedLevel);
+        const result = applyWin(
+          {
+            highestUnlockedLevel: highestUnlockedRef.current,
+            unlockedRecipes: unlockedRecipeIdsRef.current,
+            unlockedSkins: unlockedSkinIdsRef.current,
+          },
+          completedLevel,
+          { recipeId: cfg.rewardRecipeId, skinId: cfg.rewardSkinId },
+        );
 
-        if (currentCfg.rewardRecipeId) {
-          const recipe = TEA_RECIPES.find((r) => r.id === currentCfg.rewardRecipeId);
-          if (recipe) {
-            setUnlockedRecipeIds((prev) => {
-              if (!prev.includes(recipe.id)) {
-                const next = [...prev, recipe.id];
-                localStorage.setItem('cozy_tea_unlocked_recipes', JSON.stringify(next));
-                return next;
-              }
-              return prev;
-            });
-            newlyUnlockedRecipe = recipe;
-          }
+        // Persist progression intentionally (never regress on reload).
+        setHighestUnlockedSafe(result.highestUnlockedLevel);
+        if (result.isNewRecipe || result.unlockedRecipes !== unlockedRecipeIdsRef.current) {
+          unlockedRecipeIdsRef.current = result.unlockedRecipes;
+          setUnlockedRecipeIds(result.unlockedRecipes);
+          saveProgress({ unlockedRecipes: result.unlockedRecipes });
+        }
+        if (result.isNewSkin || result.unlockedSkins !== unlockedSkinIdsRef.current) {
+          unlockedSkinIdsRef.current = result.unlockedSkins;
+          setUnlockedSkinIds(result.unlockedSkins);
+          saveProgress({ unlockedSkins: result.unlockedSkins });
         }
 
-        if (currentCfg.rewardSkinId) {
-          const skin = CUP_SKINS.find((s) => s.id === currentCfg.rewardSkinId);
-          if (skin) {
-            newlyUnlockedSkin = skin;
-          }
-        }
-
-        setJustUnlockedRecipe(newlyUnlockedRecipe);
-        setJustUnlockedSkin(newlyUnlockedSkin);
+        // Only announce "new unlock" UI when the collection actually changed.
+        setJustUnlockedRecipe(
+          result.isNewRecipe && cfg.rewardRecipeId
+            ? TEA_RECIPES.find((r) => r.id === cfg.rewardRecipeId)
+            : undefined,
+        );
+        setJustUnlockedSkin(
+          result.isNewSkin && cfg.rewardSkinId
+            ? CUP_SKINS.find((s) => s.id === cfg.rewardSkinId)
+            : undefined,
+        );
         setIsWon(true);
         setIsDeadlocked(false);
         setCanUndo(false);
@@ -218,6 +281,7 @@ export default function App() {
         }, 3500);
       },
     });
+    view.boundLevel = initialLvl;
 
     view.init().then(() => {
       if (isDisposed) {
@@ -225,7 +289,7 @@ export default function App() {
         return;
       }
       viewRef.current = view;
-      view.setSkin(equippedSkin);
+      view.setSkin(equippedSkinRef.current);
       view.layoutCups();
       view.renderAllCups();
     }).catch((err) => {
@@ -238,8 +302,11 @@ export default function App() {
       view.destroy();
       viewRef.current = null;
     };
+    // Single Pixi lifetime: progression flows through refs + boundLevel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refs mirroring collections for the stable win callback (declared above).
   const handleUndo = () => {
     if (!viewRef.current || !logicRef.current || !canUndo) return;
     viewRef.current.undoMove();
@@ -256,7 +323,7 @@ export default function App() {
 
     logicRef.current.initFromState(restoredCups, restoredHidden);
     viewRef.current.logic = logicRef.current;
-    viewRef.current.setSkin(equippedSkin);
+    viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
 
     setMoves(0);
@@ -268,8 +335,11 @@ export default function App() {
     telegram.hapticSelection();
   };
 
+  /** The ONLY legitimate N -> N+1 transition: via the victory flow. */
   const handleNextLevel = () => {
-    startLevel(level + 1);
+    const completed = currentLevelRef.current;
+    const next = completed + 1;
+    startLevel(next, makeProductionSeed(next));
     audioSynth.playSelect();
     telegram.hapticSelection();
   };
@@ -277,12 +347,16 @@ export default function App() {
   const toggleSound = () => {
     const muted = audioSynth.toggleMute();
     setIsMuted(muted);
+    saveProgress({ muted });
     telegram.hapticSelection();
   };
 
   const handleSelectSkin = (skinId: CupSkinId) => {
+    // Skins unlock via progression; ignore locked picks defensively.
+    if (!unlockedSkinIds.includes(skinId)) return;
+    equippedSkinRef.current = skinId;
     setEquippedSkin(skinId);
-    localStorage.setItem('cozy_tea_equipped_skin', skinId);
+    saveProgress({ equippedSkin: skinId });
     if (viewRef.current) {
       viewRef.current.setSkin(skinId);
     }
@@ -290,12 +364,8 @@ export default function App() {
     telegram.hapticSelection();
   };
 
-  const selectedTea =
-    selectedCupIndex !== null && logicRef.current?.cups[selectedCupIndex]
-      ? logicRef.current.cups[selectedCupIndex].topLayer
-        ? TEA_TYPES[logicRef.current.cups[selectedCupIndex].topLayer!]
-        : null
-      : null;
+  const selectedCup = selectedCupIndex !== null ? logicRef.current?.cups[selectedCupIndex] : undefined;
+  const selectedTea = selectedCup?.topLayer ? TEA_TYPES[selectedCup.topLayer] : null;
 
   return (
     <div
@@ -316,7 +386,7 @@ export default function App() {
               <h1 className="text-xs sm:text-sm font-semibold tracking-wide text-[#F8EFE4] leading-tight">
                 Чайный купаж
               </h1>
-              <span className="text-[10px] sm:text-[11px] text-[#A68F80]">#{level}</span>
+              <span className="text-[10px] sm:text-[11px] text-[#A68F80]">#{currentLevel}</span>
             </div>
             <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-[#A68F80]">
               <span>Ходов: {moves}</span>
@@ -490,19 +560,20 @@ export default function App() {
         </button>
 
         <button
-          id="new-level-btn"
-          onClick={handleNextLevel}
+          id="reshuffle-btn"
+          onClick={reshuffleCurrentLevel}
+          title="Новый расклад того же уровня — прогрессия открывается только победой"
           className="min-h-[44px] flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-3 rounded-xl bg-[#523A25] hover:bg-[#63462E] border border-[#7D5A3C] text-[#FFE8CD] text-xs font-medium shadow-sm active:scale-[0.98] transition-all"
         >
-          <Sparkles className="w-3.5 h-3.5 text-[#F4A460] shrink-0" />
-          <span className="truncate">Новый купаж</span>
+          <Shuffle className="w-3.5 h-3.5 text-[#F4A460] shrink-0" />
+          <span className="truncate">Другой расклад</span>
         </button>
       </footer>
 
       {/* Victory Modal with Meta-Progression & Next Rhythm Phase */}
       <VictoryModal
         isOpen={isWon}
-        level={level}
+        level={currentLevelRef.current}
         moves={moves}
         unlockedRecipe={justUnlockedRecipe}
         unlockedSkin={justUnlockedSkin}
@@ -520,8 +591,9 @@ export default function App() {
         isOpen={showRecipeBook}
         onClose={() => setShowRecipeBook(false)}
         unlockedRecipeIds={unlockedRecipeIds}
-        currentLevel={level}
+        currentLevel={highestUnlockedLevel}
         activeSkinId={equippedSkin}
+        unlockedSkinIds={unlockedSkinIds}
         onSelectSkin={handleSelectSkin}
       />
 
@@ -612,4 +684,3 @@ export default function App() {
     </div>
   );
 }
-

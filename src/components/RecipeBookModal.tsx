@@ -21,6 +21,7 @@ interface RecipeBookModalProps {
   unlockedRecipeIds: TeaId[];
   currentLevel: number;
   activeSkinId: CupSkinId;
+  unlockedSkinIds: CupSkinId[];
   onSelectSkin: (skinId: CupSkinId) => void;
 }
 
@@ -30,6 +31,7 @@ export function RecipeBookModal({
   unlockedRecipeIds,
   currentLevel,
   activeSkinId,
+  unlockedSkinIds,
   onSelectSkin,
 }: RecipeBookModalProps) {
   const [activeTab, setActiveTab] = useState<'recipes' | 'service' | 'breath'>('recipes');
@@ -272,7 +274,9 @@ export function RecipeBookModal({
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {CUP_SKINS.map((skin) => {
-                  const isUnlocked = currentLevel >= skin.unlockLevel;
+                  // Skin unlocks are earned via victory progression and persisted;
+                  // `currentLevel` here is the highest unlocked level (display only).
+                  const isUnlocked = unlockedSkinIds.includes(skin.id);
                   const isEquipped = activeSkinId === skin.id;
 
                   return (

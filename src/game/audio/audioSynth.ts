@@ -1,26 +1,31 @@
 /**
- * Cozy Web Audio ASMR Synthesizer
- * Generates organic liquid pouring/bubbling sounds, warm glass chimes,
- * pentatonic completion chords, and haptic feedback triggers.
+ * Authoritative Web Audio synth (moved from the monolith unchanged
+ * in behavior). Short procedural effects only — no background music.
+ *
+ * Guarantees: mute actually mutes + persists, context initializes only
+ * after interaction, interrupted pour nodes are cleaned up.
  */
 
-class CozyAudioSynthesizer {
+export class CozyAudioSynthesizer {
   private ctx: AudioContext | null = null;
-  private isMuted: boolean = false;
+  private isMuted = false;
   private activePourNodes: { stop: () => void } | null = null;
 
   constructor() {
-    // Read mute preference from localStorage if available
     try {
-      this.isMuted = localStorage.getItem('cozy_tea_muted') === 'true';
+      this.isMuted =
+        typeof localStorage !== 'undefined' && localStorage.getItem('cozy_tea_muted') === 'true';
     } catch {
       this.isMuted = false;
     }
   }
 
   private initContext() {
+    // AudioContext is created lazily on first user-gesture-driven call.
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }
@@ -52,9 +57,18 @@ class CozyAudioSynthesizer {
     return this.isMuted;
   }
 
-  /**
-   * Sound of touching/selecting a glass mug (soft delicate bell-like ping)
-   */
+  /** Stop any in-flight pour sound (level change / mute / unmount). */
+  stopPour() {
+    if (this.activePourNodes) {
+      try {
+        this.activePourNodes.stop();
+      } catch {
+        // ignore
+      }
+      this.activePourNodes = null;
+    }
+  }
+
   playSelect() {
     if (this.isMuted) return;
     this.initContext();
@@ -77,11 +91,12 @@ class CozyAudioSynthesizer {
 
     osc.start(t);
     osc.stop(t + 0.25);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   }
 
-  /**
-   * Sound of invalid move (soft, warm ceramic clunk)
-   */
   playInvalid() {
     if (this.isMuted) return;
     this.initContext();
@@ -103,13 +118,13 @@ class CozyAudioSynthesizer {
 
     osc.start(t);
     osc.stop(t + 0.16);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   }
 
-  /**
-   * Procedural ASMR tea pouring and bubbling sound
-   * Generates bandpass-filtered noise + randomized liquid droplet sines
-   */
-  playPour(durationSec: number = 0.8) {
+  playPour(durationSec = 0.42) {
     if (this.isMuted) return;
     this.initContext();
     if (!this.ctx) return;
@@ -119,55 +134,58 @@ class CozyAudioSynthesizer {
       this.activePourNodes = null;
     }
 
-    const t = this.ctx.currentTime;
-    const sampleRate = this.ctx.sampleRate;
-    const bufferSize = Math.floor(sampleRate * durationSec);
-    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const sampleRate = ctx.sampleRate;
+    const bufferSize = Math.max(1, Math.floor(sampleRate * durationSec));
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, sampleRate);
     const data = noiseBuffer.getChannelData(0);
 
-    // Filtered pink-ish noise for water flow
-    let b0 = 0, b1 = 0, b2 = 0;
+    let b0 = 0;
+    let b1 = 0;
+    let b2 = 0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
       b0 = 0.99765 * b0 + white * 0.05;
-      b1 = 0.96300 * b1 + white * 0.11;
-      b2 = 0.57000 * b2 + white * 0.25;
-      data[i] = (b0 + b1 + b2) * 0.4;
+      b1 = 0.963 * b1 + white * 0.11;
+      b2 = 0.57 * b2 + white * 0.25;
+      data[i] = (b0 + b1 + b2) * 0.35;
     }
 
-    const noiseSource = this.ctx.createBufferSource();
+    const noiseSource = ctx.createBufferSource();
     noiseSource.buffer = noiseBuffer;
 
-    const filter = this.ctx.createBiquadFilter();
+    const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(650, t);
     filter.frequency.linearRampToValueAtTime(1100, t + durationSec);
     filter.Q.setValueAtTime(3.5, t);
 
-    const noiseGain = this.ctx.createGain();
+    const noiseGain = ctx.createGain();
     noiseGain.gain.setValueAtTime(0.001, t);
-    noiseGain.gain.linearRampToValueAtTime(0.18, t + 0.08);
-    noiseGain.gain.setValueAtTime(0.18, t + durationSec - 0.1);
+    noiseGain.gain.linearRampToValueAtTime(0.16, t + 0.08);
+    noiseGain.gain.setValueAtTime(0.16, Math.max(t + 0.08, t + durationSec - 0.08));
     noiseGain.gain.exponentialRampToValueAtTime(0.001, t + durationSec);
 
     noiseSource.connect(filter);
     filter.connect(noiseGain);
-    noiseGain.connect(this.ctx.destination);
+    noiseGain.connect(ctx.destination);
 
     noiseSource.start(t);
     noiseSource.stop(t + durationSec);
 
-    // Add 4-7 tiny droplet bubbles during the pour
+    // Droplet bubbles
     const bubbleCount = Math.floor(durationSec * 7);
     const bubbleOscs: OscillatorNode[] = [];
 
     for (let i = 0; i < bubbleCount; i++) {
-      const dropTime = t + 0.05 + (i / bubbleCount) * (durationSec - 0.1) + (Math.random() * 0.03 - 0.015);
-      const bOsc = this.ctx.createOscillator();
-      const bGain = this.ctx.createGain();
+      const dropTime =
+        t + 0.05 + (i / Math.max(1, bubbleCount)) * Math.max(0, durationSec - 0.1) + (Math.random() * 0.03 - 0.015);
+      const bOsc = ctx.createOscillator();
+      const bGain = ctx.createGain();
 
-      const startFreq = 700 + Math.random() * 600;
-      const endFreq = startFreq + 250 + Math.random() * 300;
+      const startFreq = 720 + Math.random() * 550;
+      const endFreq = startFreq + 220 + Math.random() * 280;
 
       bOsc.type = 'sine';
       bOsc.frequency.setValueAtTime(startFreq, dropTime);
@@ -178,30 +196,42 @@ class CozyAudioSynthesizer {
       bGain.gain.exponentialRampToValueAtTime(0.0001, dropTime + 0.045);
 
       bOsc.connect(bGain);
-      bGain.connect(this.ctx.destination);
+      bGain.connect(ctx.destination);
 
       bOsc.start(dropTime);
       bOsc.stop(dropTime + 0.05);
+      bOsc.onended = () => {
+        bOsc.disconnect();
+        bGain.disconnect();
+      };
       bubbleOscs.push(bOsc);
     }
 
-    this.activePourNodes = {
-      stop: () => {
-        try {
-          noiseSource.stop();
-          bubbleOscs.forEach((o) => {
-            try { o.stop(); } catch { /* ignore */ }
-          });
-        } catch {
-          // ignore
-        }
-      },
+    noiseSource.onended = () => {
+      noiseSource.disconnect();
+      filter.disconnect();
+      noiseGain.disconnect();
+      if (this.activePourNodes?.stop === stopFn) {
+        this.activePourNodes = null;
+      }
     };
+    const stopFn = () => {
+      try {
+        noiseSource.stop();
+        bubbleOscs.forEach((o) => {
+          try {
+            o.stop();
+          } catch {
+            /* ignore */
+          }
+        });
+      } catch {
+        // ignore
+      }
+    };
+    this.activePourNodes = { stop: stopFn };
   }
 
-  /**
-   * Sound of undoing a move
-   */
   playUndo() {
     if (this.isMuted) return;
     this.initContext();
@@ -212,7 +242,7 @@ class CozyAudioSynthesizer {
     const gain = this.ctx.createGain();
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.setValueAtTime(640, t);
     osc.frequency.exponentialRampToValueAtTime(320, t + 0.18);
 
     gain.gain.setValueAtTime(0.001, t);
@@ -224,19 +254,54 @@ class CozyAudioSynthesizer {
 
     osc.start(t);
     osc.stop(t + 0.22);
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   }
 
-  /**
-   * Cozy pentatonic celebration chord upon puzzle completion
-   */
+  playReveal() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const t = this.ctx.currentTime;
+    const osc1 = this.ctx.createOscillator();
+    const osc2 = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    osc1.frequency.setValueAtTime(1046.5, t); // C6
+    osc1.frequency.exponentialRampToValueAtTime(1567.98, t + 0.16); // G6
+    osc2.frequency.setValueAtTime(2093.0, t + 0.05); // C7
+
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.14, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc1.start(t);
+    osc2.start(t + 0.05);
+    osc1.stop(t + 0.48);
+    osc2.stop(t + 0.48);
+    osc2.onended = () => {
+      osc1.disconnect();
+      osc2.disconnect();
+      gain.disconnect();
+    };
+  }
+
   playWin() {
     if (this.isMuted) return;
     this.initContext();
     if (!this.ctx) return;
 
     const t = this.ctx.currentTime;
-    // Pentatonic notes: C5 (523Hz), E5 (659Hz), G5 (784Hz), A5 (880Hz), C6 (1046Hz), E6 (1318Hz)
-    const notes = [523.25, 659.25, 783.99, 880.00, 1046.50, 1318.51];
+    const notes = [523.25, 659.25, 783.99, 880.0, 1046.5, 1318.51];
 
     notes.forEach((freq, index) => {
       if (!this.ctx) return;
@@ -256,6 +321,10 @@ class CozyAudioSynthesizer {
 
       osc.start(noteTime);
       osc.stop(noteTime + 0.65);
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+      };
     });
   }
 }

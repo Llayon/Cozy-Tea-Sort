@@ -1,13 +1,11 @@
-export type TeaId =
-  | 'matcha'
-  | 'sea_buckthorn'
-  | 'karkade'
-  | 'milk_oolong'
-  | 'lavender'
-  | 'saffron'
-  | 'buckwheat';
+/**
+ * UI-facing types. `TeaId` / `CupSkinId` / `TeaType` are re-exported from
+ * the single authoritative palette in `src/game/types.ts` — do not
+ * redefine them here.
+ */
 
-export type CupSkinId = 'glass' | 'ceramic' | 'porcelain';
+export type { TeaId, CupSkinId, TeaType } from '../game/types';
+import type { CupSkinId, TeaId } from '../game/types';
 
 export interface CupSkin {
   id: CupSkinId;
@@ -18,18 +16,6 @@ export interface CupSkin {
   borderColor: string;
   fillColor: string;
   accentColor: string;
-}
-
-export interface TeaType {
-  id: TeaId;
-  name: string;
-  nameRu: string;
-  colorHex: string;
-  colorNum: number;
-  textColor: string;
-  steamColor: string;
-  description: string;
-  flavorNotes: string[];
 }
 
 export interface TeaRecipe {
@@ -59,6 +45,13 @@ export interface LevelConfig {
   emptyCups: number;
   totalCups: number;
   colors: TeaId[];
+  /**
+   * Legacy shuffle-count proxy for difficulty (kept for compatibility).
+   * Difficulty is determined by solver-derived minimum solution depth,
+   * NOT by this number.
+   *
+   * @deprecated Do not use for difficulty decisions.
+   */
   shuffleSteps: number;
   hasMysteryLayer: boolean;
   rewardRecipeId?: TeaId;
