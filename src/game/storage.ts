@@ -102,7 +102,13 @@ export function loadProgress(): PersistedProgress {
 
   const unlockedRecipes = parseRecipeList(safeGet(KEYS.unlockedRecipes), ['matcha']);
   const unlockedSkins = parseSkinList(safeGet(KEYS.unlockedSkins), ['glass']);
-  const equippedSkin = parseSkinId(safeGet(KEYS.equippedSkin), 'glass');
+  // Equipped skin must be BOTH known AND actually unlocked. A locked (or
+  // manually edited) value falls back to the first unlocked skin so the UI
+  // can never boot with an unearned cup skin equipped.
+  const parsedSkin = parseSkinId(safeGet(KEYS.equippedSkin), 'glass');
+  const equippedSkin = unlockedSkins.includes(parsedSkin)
+    ? parsedSkin
+    : ((unlockedSkins[0] ?? 'glass') as CupSkinId);
   const muted = safeGet(KEYS.muted) === 'true';
 
   // Clamp current into the legitimately unlocked range so a stale stored

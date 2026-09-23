@@ -213,10 +213,15 @@ export default function App() {
     let isDisposed = false;
 
     const view = new TeaSortView(container, logic, {
+      // P0: the view outlives every level (single Pixi lifetime), so ALL
+      // callbacks needing the gameplay model MUST read logicRef.current.
+      // Never close over the mount-time `logic` instance here.
       onMoveComplete: () => {
         if (isDisposed) return;
-        setMoves(logic.movesCount);
-        setCanUndo(logic.canUndo);
+        const activeLogic = logicRef.current;
+        if (!activeLogic) return;
+        setMoves(activeLogic.movesCount);
+        setCanUndo(activeLogic.canUndo);
       },
       // completedLevel comes from view.boundLevel — immune to stale closures.
       onWin: (completedLevel) => {

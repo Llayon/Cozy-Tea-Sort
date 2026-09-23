@@ -6,6 +6,7 @@ import {
   type GenerateRequest,
 } from '../src/game/logic/generator';
 import { solvePuzzle } from '../src/game/logic/solver';
+import { depthAccepted } from '../src/game/logic/difficulty';
 import { isWonState } from '../src/game/logic/rules';
 
 const CONFIGS: Array<{ name: string; req: GenerateRequest; seeds: number }> = [
@@ -87,6 +88,9 @@ describe('generator property tests (deterministic seeds)', () => {
         const solved = solvePuzzle(level.cups);
         expect(solved.solvable).toBe(true);
         expect(level.minMoves).toBeGreaterThan(0);
+
+        // Hard acceptance band: every production level is in-band.
+        expect(depthAccepted(level.minMoves, cfg.req.phase)).toBe(true);
 
         // Structural validator agrees.
         const check = validateLevelStructure(level, cfg.req);
