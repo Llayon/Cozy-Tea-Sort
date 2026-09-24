@@ -5,7 +5,7 @@
  * solver-derived minimum solution depth plus light sanity metrics.
  */
 
-import { TeaId } from '../types';
+import { CupConstraint, TeaId } from '../types';
 import { listLegalMoves } from './rules';
 import { solvePuzzle } from './solver';
 
@@ -42,9 +42,9 @@ export const SOLVER_DEPTH_ACCEPTANCE: Record<RhythmPhase, { min: number; max: nu
   relax: { min: 3, max: 9 },
 };
 
-export function analyzeDifficulty(cups: TeaId[][]): DifficultyReport {
-  const solved = solvePuzzle(cups);
-  const initialMoves = listLegalMoves(cups, true).length;
+export function analyzeDifficulty(cups: TeaId[][], cupConstraints?: readonly CupConstraint[]): DifficultyReport {
+  const solved = solvePuzzle(cups, cupConstraints ? { cupConstraints } : {});
+  const initialMoves = listLegalMoves(cups, true, cupConstraints).length;
   return {
     minMoves: solved.minMoves ?? -1,
     solvable: solved.solvable,

@@ -112,3 +112,59 @@ export const ALL_TEA_IDS: readonly TeaId[] = [
 ];
 
 export const MAX_CUP_CAPACITY = 4;
+
+/**
+ * Per-vessel behavioral constraint (puzzle/domain data, never UI data).
+ *
+ * - `normal`      : ordinary Water Sort vessel (may give and receive).
+ * - `source-only` : teapot — may GIVE tea but can never RECEIVE tea.
+ *
+ * The shape is intentionally extensible for future modes
+ * (`sink-only`, `targetTeaId`, …) without behavioral code for them yet.
+ * No Pixi/React types may ever appear in this module.
+ */
+export type CupMode = 'normal' | 'source-only';
+
+export interface CupConstraint {
+  mode: CupMode;
+}
+
+/** Canonical normal-vessel constraint (frozen). */
+export const NORMAL_CUP_CONSTRAINT: CupConstraint = Object.freeze({
+  mode: 'normal',
+}) as CupConstraint;
+
+/** Canonical source-only (teapot) constraint (frozen). */
+export const SOURCE_ONLY_CUP_CONSTRAINT: CupConstraint = Object.freeze({
+  mode: 'source-only',
+}) as CupConstraint;
+
+/** Build `count` default (normal) constraints. */
+export function defaultCupConstraints(count: number): CupConstraint[] {
+  return Array.from({ length: count }, () => ({ mode: 'normal' as CupMode }));
+}
+
+/**
+ * Backwards-compatible normalization: old callers that only pass
+ * `TeaId[][]` synthesize all-normal constraints. Every cup has exactly
+ * one constraint; default = normal.
+ */
+export function normalizeCupConstraints(
+  constraints: readonly CupConstraint[] | undefined,
+  count: number,
+): CupConstraint[] {
+  if (!constraints) return defaultCupConstraints(count);
+  if (constraints.length === count) return constraints.map((c) => ({ mode: c.mode }));
+  // Length mismatch: pad/truncate defensively with normal (validators reject).
+  const out: CupConstraint[] = [];
+  for (let i = 0; i < count; i++) {
+    const c = constraints[i];
+    out.push({ mode: c?.mode ?? 'normal' });
+  }
+  return out;
+}
+
+/** Stable one-letter signature for canonicalization grouping. */
+export function cupConstraintSignature(c: CupConstraint): string {
+  return c.mode === 'source-only' ? 'S' : 'N';
+}
