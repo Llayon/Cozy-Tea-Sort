@@ -100,3 +100,5 @@ Exactly one bottom layer may be hidden (`hiddenCount = 1`) in a cup with ≥ 3 l
 ## Quality gate
 
 CI (`.github/workflows/quality.yml`, Bun, single `bun.lock`) runs `install → typecheck → test → build`.
+
+`bun run test` executes `scripts/run-tests.mjs`: the 20 files run as sequential batches (one vitest process each) because a single 20-file parallel run deterministically trips vitest's own worker RPC (`Timeout calling "onTaskUpdate"` after all tests pass) under this suite's BFS CPU load. Each batch shape was verified clean repeatedly; batches fail fast, and each gets one retry — sound because every test is fully deterministic (seeded), so a real failure reproduces identically and still fails the gate. `bun run test:all-at-once` keeps the raw single invocation for reference.
