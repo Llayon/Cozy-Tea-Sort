@@ -59,11 +59,15 @@ Any level is reproducible from its seed (`seed` is stored on the generated level
 
 BFS over the exact shared rule table. State key is canonical (cups are unlabeled, so cup encodings are sorted — collapses empty/identical-cup permutations). Constructive moves only (homogeneous-stack → empty relocations are pruned, which also keeps deadlock detection consistent by construction). Supports the maximum puzzle (5 colors, 7 cups, capacity 4). Used at generation time and in tests, not per-frame.
 
-Asymmetric vessels: `CupConstraint` (`normal` | `source-only`) travels with every puzzle. Canonicalization groups cups by identical constraint signature and sorts contents only *within* each group — a normal empty cup and a source-only empty teapot never collapse to the same identity. The homogeneous→empty prune likewise applies only within identical-constraint groups (emptying a uniform teapot into a normal cup is constructive and is never pruned). Win requires source-only vessels to be EMPTY (a full uniform teapot is not a win).
+Asymmetric vessels: `CupConstraint` (`normal` | `source-only`, plus optional `targetTeaId`) travels with every puzzle. Canonicalization groups cups by identical full signature (`N:_`, `N:<tea>`, `S:_`) and sorts contents only *within* each group — normal, teapot, lavender-target and karkade-target cups never collapse into each other. The homogeneous→empty prune likewise applies only within identical-signature groups AND only when a full stack is already in its final state (emptying a wrongly-filled target or a teapot is real progress, never pruned). Win requires source-only vessels to be EMPTY (a full uniform teapot is not a win) and target cups to hold exactly full homogeneous `targetTeaId` (empty/wrong/partial targets are not wins).
 
 ## Source-only teapot
 
 One filled vessel may be a teapot: it can GIVE tea but can never RECEIVE (`target-source-only` rejection, UI shows «В чайник нельзя наливать — он только раздаёт настой»). Total vessels unchanged (replaces one filled cup, max 7), starts full + mixed (≥ 2 TeaIds) at index 0, stays empty once emptied. Mystery is never hidden inside the teapot. Rollout: L6 challenge teapot, L7 peak teapot + mystery (normal cup), later challenge/peak cycles repeat the pattern; warmup/relax stay clean.
+
+## Named serving (target cups)
+
+Some normal cups carry a visual destination (`targetTeaId`): at victory they must contain exactly that tea, full homogeneous. During play they pour exactly like ordinary cups — temporary wrong colors, working-space use and mistakes are all legal; only the final state is constrained. `mode` (pour behavior) and `targetTeaId` (final destination) are orthogonal: a teapot never carries a target. Rollout: L10 challenge 2 targets, L11 peak 2 targets + mystery (untargeted cup), L14 challenge teapot + 2 targets, L15 peak teapot + mystery; never teapot + mystery + targets together (max 2 specials per level); warmup/relax always clean. Target pairs are deterministic per level (`pickTargetPair`, reshuffles keep the same goals); target cups start filled, full, never pre-solved, in stable slots (0,1 — or 1,2 behind the teapot).
 
 ## Difficulty rhythm ("Breathing")
 

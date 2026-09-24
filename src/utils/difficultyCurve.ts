@@ -8,13 +8,85 @@ import { LevelConfig, LevelRhythmPhase, TeaId } from '../types/tea';
  * 3. Пик / «Задачка» (5 цветов, 7 чашек, 1 скрытый слой «Таинственный настой»)
  * 4. Релакс-награда (Спад сложности: 3 цвета, 5 чашек, новый эстетичный цвет чая)
  *
- * Gauntlet 1 rollout (source-only teapot, total vessels unchanged, max 7):
- * 1 warmup standard · 2 challenge standard · 3 peak mystery-only ·
- * 4 relax standard · 5 warmup standard · 6 challenge FIRST TEAPOT (no mystery) ·
- * 7 peak TEAPOT + mystery on a NORMAL cup · 8 relax standard.
- * Later cycles: challenge → teapot, peak → teapot + mystery,
+ * Special-mechanic rollout (max 7 vessels, NEVER three specials at once —
+ * specials are: teapot, mystery, target serving):
+ * 1 warmup clean · 2 challenge clean · 3 peak mystery · 4 relax clean ·
+ * 5 warmup clean · 6 challenge TEAPOT · 7 peak TEAPOT+mystery · 8 relax clean ·
+ * 9 warmup clean · 10 challenge 2 TARGETS · 11 peak 2 TARGETS+mystery ·
+ * 12 relax clean · 13 warmup clean · 14 challenge TEAPOT+2 TARGETS ·
+ * 15 peak TEAPOT+mystery · 16 relax clean.
+ * Later cycles rotate challenge/peak through ≤2-special combos;
  * warmup/relax stay clean decompression levels.
  */
+
+/**
+ * Deterministic named-serving pair for a palette: prefers aesthetically
+ * recognizable distinct teas (lavender + karkade, then lavender + saffron),
+ * falls back to two spaced palette entries. Same LEVEL always yields the
+ * same pair, so reshuffling changes arrangement but keeps serving goals.
+ */
+export function pickTargetPair(palette: TeaId[]): TeaId[] {
+  const prefs: Array<[TeaId, TeaId]> = [
+    ['lavender', 'karkade'],
+    ['lavender', 'saffron'],
+    ['karkade', 'saffron'],
+  ];
+  for (const [a, b] of prefs) {
+    if (palette.includes(a) && palette.includes(b)) return [a, b];
+  }
+  const a = (palette[1] ?? palette[0]) as TeaId;
+  const b = ((palette[3] ?? palette[0]) === a ? palette[2] : (palette[3] ?? palette[0])) as TeaId;
+  if (a !== b) return [a, b];
+  return [palette[0] as TeaId, palette[2] as TeaId];
+}
+
+interface MechanicPlan {
+  teapot: boolean;
+  targets: boolean;
+}
+
+const PINNED_ROLLOUT_1_16: Record<number, MechanicPlan> = {
+  1: { teapot: false, targets: false },
+  2: { teapot: false, targets: false },
+  3: { teapot: false, targets: false },
+  4: { teapot: false, targets: false },
+  5: { teapot: false, targets: false },
+  6: { teapot: true, targets: false },
+  7: { teapot: true, targets: false },
+  8: { teapot: false, targets: false },
+  9: { teapot: false, targets: false },
+  10: { teapot: false, targets: true },
+  11: { teapot: false, targets: true },
+  12: { teapot: false, targets: false },
+  13: { teapot: false, targets: false },
+  14: { teapot: true, targets: true },
+  15: { teapot: true, targets: false },
+  16: { teapot: false, targets: false },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–16, then a deterministic
+ * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
+ * combos, never teapot + mystery + targets together).
+ */
+export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
+  const pinned = PINNED_ROLLOUT_1_16[levelNum];
+  if (pinned) return { ...pinned };
+  const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
+  const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
+  if (cycleIndex === 0 || cycleIndex === 3) return { teapot: false, targets: false };
+  const step = cycleNumber % 3;
+  if (cycleIndex === 1) {
+    // challenge (no mystery): teapot → targets → teapot+targets.
+    if (step === 0) return { teapot: true, targets: false };
+    if (step === 1) return { teapot: false, targets: true };
+    return { teapot: true, targets: true };
+  }
+  // peak (mystery always on): teapot+mystery → targets+mystery → mystery-only.
+  if (step === 0) return { teapot: true, targets: false };
+  if (step === 1) return { teapot: false, targets: true };
+  return { teapot: false, targets: false };
+}
 export function getLevelConfig(levelNum: number): LevelConfig {
   const cycleIndex = (levelNum - 1) % 4; // 0, 1, 2, 3
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
@@ -61,12 +133,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
       colors = ['saffron', 'lavender', 'karkade', 'milk_oolong'];
     }
 
-    // Gauntlet 1: cycle 1 challenge (level 2) is standard;
-    // cycle 2+ challenges (levels 6, 10, 14, …) carry the teapot.
-    hasSourceOnlyTeapot = cycleNumber >= 2;
-    if (hasSourceOnlyTeapot) {
-      phaseSubtitle = 'Чайник-раздатчик • 6 сосудов';
-    }
+    // Special mechanics come from mechanicPlanForLevel below (pinned
+    // 1–16, rotation afterwards); subtitles are set in the overlay too.
   } else if (cycleIndex === 2) {
     // Фаза 3: Пик / «Задачка» (Peak)
     phase = 'peak';
@@ -83,12 +151,9 @@ export function getLevelConfig(levelNum: number): LevelConfig {
       colors = ['saffron', 'buckwheat', 'matcha', 'karkade', 'lavender'];
     }
 
-    // Level 3 (cycle 1 peak): mystery-only, no teapot.
-    // Cycle 2+ peaks (levels 7, 11, 15, …): teapot + mystery on a NORMAL cup.
-    hasSourceOnlyTeapot = cycleNumber >= 2;
-    if (hasSourceOnlyTeapot) {
-      phaseSubtitle = 'Чайник и таинственный настой • 7 сосудов';
-    }
+    // Special mechanics (teapot/targets) come from mechanicPlanForLevel
+    // below; mystery stays a pure phase property (peak always hides one
+    // layer on an untargeted normal cup).
   } else {
     // Фаза 4: Релакс-награда (Relax / Reward) — always clean.
     phase = 'relax';
@@ -110,6 +175,23 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
 
 
+
+  // Special-mechanic overlay: single source of truth for teapot/targets.
+  const plan = mechanicPlanForLevel(levelNum);
+  hasSourceOnlyTeapot = plan.teapot;
+  const targetTeaIds: TeaId[] = plan.targets ? pickTargetPair(colors) : [];
+  if (plan.teapot && plan.targets) {
+    phaseSubtitle =
+      phase === 'challenge' ? 'Чайник и сервировка • 6 сосудов' : 'Чайник и сервировка • 7 сосудов';
+  } else if (plan.targets) {
+    phaseSubtitle =
+      phase === 'challenge'
+        ? 'Именная сервировка • 6 сосудов'
+        : 'Сервировка и таинственный настой • 7 сосудов';
+  } else if (plan.teapot) {
+    phaseSubtitle =
+      phase === 'challenge' ? 'Чайник-раздатчик • 6 сосудов' : 'Чайник и таинственный настой • 7 сосудов';
+  }
 
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
@@ -137,6 +219,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     shuffleSteps,
     hasMysteryLayer,
     hasSourceOnlyTeapot,
+    targetTeaIds,
     rewardRecipeId,
     rewardSkinId,
   };

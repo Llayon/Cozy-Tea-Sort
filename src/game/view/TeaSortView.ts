@@ -13,8 +13,9 @@
  */
 
 import { Application, Container, Graphics, Rectangle } from 'pixi.js';
-import { CupSkinId, TEA_TYPES, TeaId } from '../types';
+import { CupConstraint, CupSkinId, TEA_TYPES, TeaId, cloneCupConstraint } from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
+import { targetCupState } from '../logic/rules';
 import { audioSynth } from '../audio/audioSynth';
 import { telegram } from '../telegram/telegramHaptics';
 import { POUR_ANIMATION, POUR_DURATION_SEC } from './animation';
@@ -70,6 +71,18 @@ export class CupView {
   liquidMask: Graphics;
   glassOverlay: Graphics;
   glowGraphics: Graphics;
+  /**
+   * Target-motif layer (gold medallion), above liquid so the destination
+   * stays readable even when the cup holds another tea. Separate graphics
+   * object so skin redraws (glassOverlay) never erase it.
+   */
+  targetGraphics: Graphics;
+  /**
+   * Authoritative vessel role, cloned from the logic Cup at setup.
+   * Rendering derives EVERYTHING (teapot shape, target motif) from here —
+   * no parallel isTeapot/isTarget booleans.
+   */
+  readonly constraint: CupConstraint;
 
   homeX = 0;
   homeY = 0;
@@ -92,8 +105,16 @@ export class CupView {
   readonly width: number;
   readonly height = 142;
   readonly cornerRadius = 18;
+
   /** Source-only teapot: wider body + spout + handle, same skin language. */
-  readonly isTeapot: boolean;
+  get isTeapot(): boolean {
+    return this.constraint.mode === 'source-only';
+  }
+
+  /** Named-serving destination, if this cup is a target cup. */
+  get targetTeaId(): TeaId | undefined {
+    return this.constraint.mode === 'normal' ? this.constraint.targetTeaId : undefined;
+  }
 
   skinId: CupSkinId = 'glass';
   lastCup: Cup | null = null;
@@ -112,12 +133,12 @@ export class CupView {
     this.container.scale.set(scale);
   }
 
-  constructor(index: number, isTeapot = false) {
+  constructor(index: number, constraint?: CupConstraint) {
     this.index = index;
-    this.isTeapot = isTeapot;
+    this.constraint = cloneCupConstraint(constraint ?? { mode: 'normal' });
     // Teapot reads as a teapot: a restrained wider belly (72 vs 64).
     // Spout/handle overflow into the inter-cup gap padding, so rows stay clean.
-    this.width = isTeapot ? 72 : 64;
+    this.width = this.constraint.mode === 'source-only' ? 72 : 64;
     this.container = new Container();
 
     this.shadowGraphics = new Graphics();
@@ -140,6 +161,9 @@ export class CupView {
     this.glassOverlay = new Graphics();
     this.cupBodyContainer.addChild(this.glassOverlay);
 
+    this.targetGraphics = new Graphics();
+    this.cupBodyContainer.addChild(this.targetGraphics);
+
     this.cupBodyContainer.pivot.set(this.width / 2, 10);
 
     this.drawCupFrame();
@@ -151,6 +175,8 @@ export class CupView {
     this.drawCupFrame();
     if (this.lastCup) {
       this.renderLiquid(this.lastCup);
+    } else {
+      this.renderTargetMotif(null);
     }
   }
 
@@ -388,8 +414,45 @@ export class CupView {
     g.circle(w / 2, 0, 4).stroke({ width: 1.4, color: trimColor, alpha: 0.85 });
   }
 
+  /**
+   * Named-serving destination motif (Gauntlet 2): a small restrained gold
+   * porcelain-style medallion near the cup base with an accent dot in the
+   * target tea's color. Rendered from the authoritative CupConstraint
+   * (never inferred from contents), above the liquid so it stays readable
+   * even when the cup temporarily holds another tea. State comes from the
+   * pure domain helper `targetCupState` — the view decides nothing.
+   */
+  renderTargetMotif(cup: Cup | null) {
+    const g = this.targetGraphics;
+    g.clear();
+    const target = this.targetTeaId;
+    if (target === undefined || !cup) return;
+    const tea = TEA_TYPES[target];
+    const state = targetCupState(cup.layers, this.constraint);
+    const w = this.width;
+    const h = this.height;
+    const cx = w / 2;
+    const cy = h - 18;
+
+    if (state === 'correct') {
+      // Soft gold-green confirmation glow behind the medallion.
+      g.circle(cx, cy, 13).fill({ color: 0x9fc46a, alpha: 0.35 });
+      g.circle(cx, cy, 10.5).fill({ color: 0xffe9a8, alpha: 0.5 });
+    }
+    // Medallion body.
+    g.circle(cx, cy, 7.5).fill({ color: 0x2a1d12, alpha: 0.72 });
+    const ringColor = state === 'wrong-full' ? 0xe08a3c : 0xd4af37;
+    const ringAlpha = state === 'working' ? 0.9 : 1;
+    g.circle(cx, cy, 7.5).stroke({ width: 2, color: ringColor, alpha: ringAlpha });
+    // Target-tea accent dot: the restrained symbolic system — the wanted
+    // tea's own color, readable at mobile size, no text baked in canvas.
+    g.circle(cx, cy, 4.2).fill({ color: tea.colorNum, alpha: 1 });
+    g.circle(cx - 1.2, cy - 1.2, 1.4).fill({ color: 0xffffff, alpha: 0.55 });
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
+    this.renderTargetMotif(cup);
     const g = this.liquidGraphics;
     g.clear();
 
@@ -722,7 +785,7 @@ export class TeaSortView {
     this.cupViews = [];
 
     this.logic.cups.forEach((cup, index) => {
-      const view = new CupView(index, cup.isSourceOnly);
+      const view = new CupView(index, cup.constraint);
       view.setSkin(this.currentSkin);
 
       view.container.eventMode = 'static';
@@ -923,6 +986,13 @@ export class TeaSortView {
       audioSynth.playSelect();
       telegram.hapticSelection();
       this.callbacks.onSelectCup?.(clickedIdx);
+      // Gentle informational hint (not a rejection): selecting a target
+      // cup that is full of the WRONG homogeneous tea tells the player
+      // which tea belongs here. No state mutation, no move counted.
+      if (targetCupState(clickedCup.layers, clickedCup.constraint) === 'wrong-full') {
+        const want = clickedCup.targetTeaId ? TEA_TYPES[clickedCup.targetTeaId].nameRu : 'свой чай';
+        this.callbacks.onInvalidMove?.(`Эта чашка ждёт «${want}»`);
+      }
       return;
     }
 
@@ -1122,6 +1192,19 @@ export class TeaSortView {
       audioSynth.playWin();
       telegram.hapticSuccess();
       this.triggerWinConfetti();
+      // Restrained serving polish: correctly served target cups glow
+      // briefly with a simultaneous sparkle each. VictoryModal is untouched.
+      this.logic.cups.forEach((cup, idx) => {
+        if (targetCupState(cup.layers, cup.constraint) === 'correct') {
+          const view = this.cupViews[idx];
+          if (view) {
+            this.triggerRevealSparkles(
+              view.homeX + view.visualWidth / 2,
+              view.homeY + view.visualHeight / 2,
+            );
+          }
+        }
+      });
       this.callbacks.onWin?.(this.boundLevel);
     } else if (this.logic.isDeadlocked()) {
       audioSynth.playInvalid();

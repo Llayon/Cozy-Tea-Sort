@@ -56,6 +56,11 @@ export interface LevelConfig {
   hasMysteryLayer: boolean;
   /** True when this level includes the source-only teapot (Gauntlet 1). */
   hasSourceOnlyTeapot: boolean;
+  /**
+   * Named-serving destinations for this level (Gauntlet 2). Empty = none.
+   * Deterministic per level: reshuffling keeps the same serving goals.
+   */
+  targetTeaIds: TeaId[];
   rewardRecipeId?: TeaId;
   rewardSkinId?: CupSkinId;
 }

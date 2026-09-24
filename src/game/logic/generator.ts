@@ -33,8 +33,14 @@
  * Deterministic for a given (request, seed).
  */
 
-import { CupConstraint, MAX_CUP_CAPACITY, TeaId, defaultCupConstraints } from '../types';
-import { isHomogeneous, isWonState } from './rules';
+import {
+  CupConstraint,
+  MAX_CUP_CAPACITY,
+  TeaId,
+  cloneCupConstraint,
+  defaultCupConstraints,
+} from '../types';
+import { isHomogeneous, isInFinalState, isWonState } from './rules';
 import { createRng, SeedInput, shuffleInPlace } from './rng';
 import { solvePuzzle } from './solver';
 import {
@@ -55,6 +61,15 @@ export interface GenerateRequest {
    * vessel: total cup count stays `numColors + emptyCups`.
    */
   sourceOnlyCount?: number;
+  /**
+   * Named-serving destinations (Gauntlet 2). Explicit TeaIds — not just a
+   * count — so reshuffling the SAME level preserves its destination
+   * identity, the validator can prove every requested target exists, and
+   * future authored levels stay possible. Requirements: unique, each in
+   * the active palette, each receiving exactly ONE normal target cup.
+   * Target count never changes the total cup count.
+   */
+  targetTeaIds?: TeaId[];
 }
 
 export interface GeneratedLevel {
@@ -85,6 +100,41 @@ export function requestedSourceOnlyCount(req: GenerateRequest): number {
   return Math.max(0, Math.floor(v));
 }
 
+/** Requested named-serving destinations, in stable slot order (default []). */
+export function requestedTargetTeas(req: GenerateRequest): TeaId[] {
+  return [...(req.targetTeaIds ?? [])];
+}
+
+/**
+ * Fail-fast request validation for target serving (programming errors,
+ * not generation luck): duplicates, teas outside the active palette, or
+ * more targets than available filled normal vessels. Called at the top
+ * of generateLevel/fallbackLevel so bad requests throw loudly instead of
+ * silently producing weaker puzzles.
+ */
+export function validateTargetRequest(req: GenerateRequest): void {
+  const teas = requestedTargetTeas(req);
+  const seen = new Set<TeaId>();
+  for (const t of teas) {
+    if (seen.has(t)) {
+      throw new Error(`validateTargetRequest: duplicate targetTeaId ${t}`);
+    }
+    seen.add(t);
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  for (const t of teas) {
+    if (!palette.includes(t)) {
+      throw new Error(`validateTargetRequest: targetTeaId ${t} not in active palette`);
+    }
+  }
+  const filledNormals = req.numColors - requestedSourceOnlyCount(req);
+  if (teas.length > filledNormals) {
+    throw new Error(
+      `validateTargetRequest: ${teas.length} targets exceed ${filledNormals} filled normal vessels`,
+    );
+  }
+}
+
 /** Count source-only vessels in a constraints array. */
 export function countSourceOnly(constraints: readonly CupConstraint[]): number {
   return constraints.filter((c) => c.mode === 'source-only').length;
@@ -100,12 +150,12 @@ export function isMixedFullCup(cup: TeaId[]): boolean {
 
 /**
  * Mystery selection rule (meaningful reveal):
- * hide exactly one bottom layer in a NORMAL cup with >= 3 layers where the
- * hidden layer DIFFERS from the immediately adjacent visible layer.
- * That way removing the visible top group always exposes a DIFFERENT
- * tea instead of silently pouring away one long mono block.
- * The teapot is NEVER a mystery candidate (first combined Peak teaches
- * two mechanics without hiding the special vessel's own information).
+ * hide exactly one bottom layer in an UNTARGETED NORMAL cup with >= 3
+ * layers where the hidden layer DIFFERS from the immediately adjacent
+ * visible layer. That way removing the visible top group always exposes
+ * a DIFFERENT tea instead of silently pouring away one long mono block.
+ * Neither the teapot NOR a target cup is ever a mystery candidate — the
+ * target motif and hidden-bottom information must not visually compete.
  */
 export function selectMysteryCup(
   cups: TeaId[][],
@@ -114,7 +164,8 @@ export function selectMysteryCup(
 ): number | null {
   const candidates: number[] = [];
   cups.forEach((cup, idx) => {
-    if (cupConstraints && (cupConstraints[idx]?.mode ?? 'normal') !== 'normal') return;
+    const c = cupConstraints?.[idx];
+    if (c && (c.mode !== 'normal' || c.targetTeaId !== undefined)) return;
     if (cup.length >= 3 && cup[0] !== cup[1]) candidates.push(idx);
   });
   if (candidates.length === 0) return null;
@@ -126,12 +177,79 @@ interface DealResult {
   cupConstraints: CupConstraint[];
 }
 
+/**
+ * Assign named-serving roles onto an already-dealt board (teapot already
+ * placed at slot 0 when requested). Each requested tea receives exactly
+ * one filled FULL normal cup that is NOT already complete with its own
+ * tea (a pre-solved target would teach nothing), preferably mixed;
+ * chosen cups are swapped into stable visual slots right after any
+ * source-only slot (indices 0,1 without teapot; 1,2 with teapot).
+ * Identity lives in the returned constraints, never in contents alone.
+ * Returns null when this deal cannot host the requested targets.
+ */
+function assignTargetConstraints(
+  cups: TeaId[][],
+  baseConstraints: CupConstraint[],
+  targetTeas: TeaId[],
+  hasTeapot: boolean,
+  pick: (candidates: number[]) => number,
+): CupConstraint[] | null {
+  const constraints = baseConstraints.map(cloneCupConstraint);
+  const used = new Set<number>();
+  // Reserve role slots so targets never land on the teapot.
+  for (let i = 0; i < constraints.length; i++) {
+    if (constraints[i]?.mode === 'source-only') used.add(i);
+  }
+  const base = hasTeapot ? 1 : 0;
+  for (let k = 0; k < targetTeas.length; k++) {
+    const tea = targetTeas[k] as TeaId;
+    const eligible: number[] = [];
+    const mixedEligible: number[] = [];
+    cups.forEach((cup, idx) => {
+      if (used.has(idx)) return;
+      if (constraints[idx]?.mode !== 'normal') return;
+      if (cup.length !== MAX_CUP_CAPACITY) return; // targets start FILLED
+      // Reject pre-solved targets: full homogeneous of its own tea.
+      if (isInFinalState(cup, { mode: 'normal', targetTeaId: tea })) return;
+      eligible.push(idx);
+      if (isMixedFullCup(cup)) mixedEligible.push(idx);
+    });
+    // Prefer mixed cups (rearrangement required), accept homogeneous-wrong.
+    const pool = mixedEligible.length > 0 ? mixedEligible : eligible;
+    if (pool.length === 0) return null;
+    // Same pick contract as selectMysteryCup: returns the chosen cup index.
+    const raw = pick(pool);
+    const chosen = (pool.includes(raw) ? raw : pool[0]) as number;
+    used.add(chosen);
+    const slot = base + k;
+    if (chosen !== slot && !used.has(slot)) {
+      // Swap contents into the stable slot. The slot cup is a plain
+      // filled normal (teapot/used slots are reserved above), so no role
+      // data moves — only arrangement changes.
+      const tmp = cups[slot] as TeaId[];
+      cups[slot] = cups[chosen] as TeaId[];
+      cups[chosen] = tmp;
+      used.delete(chosen);
+      used.add(slot);
+      constraints[slot] = { mode: 'normal', targetTeaId: tea };
+    } else if (chosen !== slot && used.has(slot)) {
+      // Stable slot already taken (should not happen with unique targets
+      // and enough vessels) — assign in place to stay sound.
+      constraints[chosen] = { mode: 'normal', targetTeaId: tea };
+    } else {
+      constraints[slot] = { mode: 'normal', targetTeaId: tea };
+    }
+  }
+  return constraints;
+}
+
 function dealCandidate(
   rng: () => number,
   numColors: number,
   colors: TeaId[],
   emptyCups: number,
   sourceOnlyCount = 0,
+  targetTeas: TeaId[] = [],
 ): DealResult | null {
   const pool: TeaId[] = [];
   for (let c = 0; c < numColors; c++) {
@@ -151,7 +269,17 @@ function dealCandidate(
   shuffleInPlace(rng, cups);
 
   if (sourceOnlyCount <= 0) {
-    return { cups, cupConstraints: defaultCupConstraints(cups.length) };
+    const base = defaultCupConstraints(cups.length);
+    if (targetTeas.length === 0) return { cups, cupConstraints: base };
+    const withTargets = assignTargetConstraints(
+      cups,
+      base,
+      targetTeas,
+      false,
+      (candidates) => candidates[Math.floor(rng() * candidates.length)] as number,
+    );
+    if (!withTargets) return null;
+    return { cups, cupConstraints: withTargets };
   }
 
   // Gauntlet 1: exactly one teapot. It replaces one ordinary filled vessel
@@ -177,13 +305,22 @@ function dealCandidate(
   }
   const cupConstraints = defaultCupConstraints(cups.length);
   cupConstraints[0] = { mode: 'source-only' };
-  return { cups, cupConstraints };
+  if (targetTeas.length === 0) return { cups, cupConstraints };
+  const withTargets = assignTargetConstraints(
+    cups,
+    cupConstraints,
+    targetTeas,
+    true,
+    (candidates) => candidates[Math.floor(rng() * candidates.length)] as number,
+  );
+  if (!withTargets) return null;
+  return { cups, cupConstraints: withTargets };
 }
 
 /**
  * Single production gate shared by EVERY return path (normal candidates,
  * retry fallback, safety-net scan). Returns the level only when the full
- * contract A–M holds, otherwise null (caller rejects / moves on).
+ * contract A–U holds, otherwise null (caller rejects / moves on).
  */
 function finalizeCandidate(
   req: GenerateRequest,
@@ -192,7 +329,7 @@ function finalizeCandidate(
   seed: string,
   cupConstraints: readonly CupConstraint[],
 ): GeneratedLevel | null {
-  const normalized: CupConstraint[] = cupConstraints.map((c) => ({ mode: c.mode }));
+  const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
   if (countSourceOnly(normalized) !== requestedSourceOnlyCount(req)) return null; // L
   // M: source-only initial-state invariant.
@@ -203,6 +340,38 @@ function finalizeCandidate(
       if (cup.length !== MAX_CUP_CAPACITY) return null;
       if (!isMixedFullCup(cup)) return null;
       if ((hiddenCounts[i] ?? 0) !== 0) return null; // never hide inside teapot
+      if (normalized[i]?.targetTeaId !== undefined) return null; // R
+    }
+  }
+  // N–T: named-serving invariant.
+  const wantTargets = requestedTargetTeas(req);
+  const actualTargets = normalized
+    .filter((c) => c.targetTeaId !== undefined)
+    .map((c) => c.targetTeaId as TeaId);
+  if (new Set(actualTargets).size !== actualTargets.length) return null; // O
+  if (actualTargets.length !== wantTargets.length) return null; // N
+  for (const t of wantTargets) {
+    if (!actualTargets.includes(t)) return null; // N
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  for (const t of actualTargets) {
+    if (!palette.includes(t)) return null; // P
+  }
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized[i] as CupConstraint;
+    if (c.targetTeaId !== undefined) {
+      if (c.mode !== 'normal') return null; // Q
+      const cup = cups[i] as TeaId[];
+      if (!cup || cup.length !== MAX_CUP_CAPACITY) return null; // S
+      if (isInFinalState(cup, c)) return null; // T: pre-solved target
+      if ((hiddenCounts[i] ?? 0) !== 0) return null; // U: never hide in target
+    }
+  }
+  // U: mystery cup is neither teapot nor target.
+  for (let i = 0; i < hiddenCounts.length; i++) {
+    if ((hiddenCounts[i] ?? 0) > 0) {
+      const c = normalized[i] as CupConstraint | undefined;
+      if (!c || c.mode !== 'normal' || c.targetTeaId !== undefined) return null;
     }
   }
   if (isWonState(cups, normalized)) return null; // D
@@ -221,7 +390,7 @@ function finalizeCandidate(
     minMoves: solved.minMoves,
     visitedStates: solved.visitedStates,
   };
-  if (!validateLevelStructure(level, req).ok) return null; // A, B, C, E, F, K–M
+  if (!validateLevelStructure(level, req).ok) return null; // A–F, K–U
   return level;
 }
 
@@ -336,6 +505,85 @@ function sourceOnlyRotationCups(req: GenerateRequest): TeaId[][] {
   return cups;
 }
 
+/**
+ * Dedicated named-serving fallback shapes (Gauntlet 2), written relative
+ * to the requested target teas (t0/t1) and the remaining palette (o…).
+ * Solver depth is invariant under tea renaming, so one measured depth
+ * holds for ANY palette requesting two targets:
+ * - 4c challenge, 2 targets, no teapot → depth 10 (band 5–13, target 7–10).
+ * - 4c challenge, teapot + 2 targets → depth 10.
+ * - 5c peak, 2 targets, no teapot → depth 11 (band 8–18, target 10–14),
+ *   mystery-capable at cup 2 ([o0,o1,o1,o1] bottom always differs).
+ * Targets sit in stable slots (0,1 without teapot; 1,2 with teapot);
+ * every target starts full + mixed (never pre-solved). The production
+ * gate re-verifies everything at runtime — these are candidates, not
+ * trusted layouts.
+ */
+function primaryTargetFallback(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[] } | null {
+  const wantTargets = requestedTargetTeas(req);
+  if (wantTargets.length !== 2) return null;
+  const [t0, t1] = wantTargets as [TeaId, TeaId];
+  const palette = req.colors.slice(0, req.numColors);
+  const others = palette.filter((c) => c !== t0 && c !== t1);
+  const wantTeapot = requestedSourceOnlyCount(req) > 0;
+  const plain = (): CupConstraint => ({ mode: 'normal' });
+  const target = (tea: TeaId): CupConstraint => ({ mode: 'normal', targetTeaId: tea });
+
+  if (req.numColors === 4 && others.length === 2 && !wantTeapot && !req.hasMysteryLayer) {
+    const [o0, o1] = others as [TeaId, TeaId];
+    return {
+      cups: [
+        [t0, o0, o1, t1],
+        [t1, o0, o0, t0],
+        [o1, o1, t0, t0],
+        [t1, t1, o0, o1],
+        [],
+        [],
+      ],
+      constraints: [target(t0), target(t1), plain(), plain(), plain(), plain()],
+    };
+  }
+  if (req.numColors === 4 && others.length === 2 && wantTeapot && !req.hasMysteryLayer) {
+    const [o0, o1] = others as [TeaId, TeaId];
+    return {
+      cups: [
+        [t0, o0, t1, o1],
+        [t0, t1, t1, o0],
+        [t1, o0, o0, o1],
+        [t0, t0, o1, o1],
+        [],
+        [],
+      ],
+      constraints: [
+        { mode: 'source-only' },
+        target(t0),
+        target(t1),
+        plain(),
+        plain(),
+        plain(),
+      ],
+    };
+  }
+  if (req.numColors === 5 && others.length === 3 && !wantTeapot && req.hasMysteryLayer) {
+    const [o0, o1, o2] = others as [TeaId, TeaId, TeaId];
+    return {
+      cups: [
+        [t0, o2, o0, o1],
+        [t1, o0, o0, t0],
+        [o0, o1, o1, o1],
+        [o2, o2, t1, t1],
+        [t0, t0, o2, t1],
+        [],
+        [],
+      ],
+      constraints: [target(t0), target(t1), plain(), plain(), plain(), plain(), plain()],
+    };
+  }
+  return null;
+}
+
 function constraintsForShape(totalCups: number, sourceOnlyCount: number): CupConstraint[] {
   const out = defaultCupConstraints(totalCups);
   for (let i = 0; i < sourceOnlyCount && i < totalCups; i++) {
@@ -358,8 +606,12 @@ function constraintsForShape(totalCups: number, sourceOnlyCount: number): CupCon
  * lying about difficulty is worse than failing fast in dev/tests.
  */
 export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
+  validateTargetRequest(req);
   const wantSourceOnly = requestedSourceOnlyCount(req);
-  const tag = `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}${req.hasMysteryLayer ? ':mystery' : ''}`;
+  const wantTargets = requestedTargetTeas(req);
+  const tag =
+    `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
+    `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
   if (wantSourceOnly > 0) {
@@ -378,14 +630,43 @@ export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
     });
   }
 
+  // Dedicated named-serving shapes go first (1 solve when they hit).
+  if (wantTargets.length > 0) {
+    const dedicated = primaryTargetFallback(req);
+    if (dedicated) shapeEntries.unshift(dedicated);
+  }
+
   for (let s = 0; s < shapeEntries.length; s++) {
     const entry = shapeEntries[s] as { cups: TeaId[][]; constraints: CupConstraint[] };
     const cups = entry.cups;
-    const constraints = entry.constraints;
+    let constraints = entry.constraints;
+    // Named serving roles are assigned deterministically (first eligible
+    // cup per tea); failure rejects this shape, never forces a bad role.
+    // Shapes that already carry exactly the requested targets skip this.
+    const alreadyHave = constraints
+      .filter((c) => c.targetTeaId !== undefined)
+      .map((c) => c.targetTeaId as TeaId);
+    const needsAssign =
+      wantTargets.length > 0 &&
+      !(
+        alreadyHave.length === wantTargets.length &&
+        wantTargets.every((t) => alreadyHave.includes(t))
+      );
+    if (needsAssign) {
+      const assigned = assignTargetConstraints(
+        cups,
+        constraints,
+        wantTargets,
+        wantSourceOnly > 0,
+        (candidates) => candidates[0] as number,
+      );
+      if (!assigned) continue;
+      constraints = assigned;
+    }
     const hiddenCounts = cups.map(() => 0);
     if (req.hasMysteryLayer) {
       // Deterministic first-candidate pick; null => layout rejected, never forced.
-      // Never inside the teapot (constraints-aware selection).
+      // Never inside the teapot or a target cup (constraints-aware selection).
       const idx = selectMysteryCup(
         cups,
         (candidates) => candidates[0] ?? null,
@@ -401,7 +682,14 @@ export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
   // Safety net for exotic configs: bounded, seeded, still fully gated.
   const rng = createRng(tag);
   for (let i = 0; i < FALLBACK_SCAN_ATTEMPTS; i++) {
-    const deal = dealCandidate(rng, req.numColors, req.colors, req.emptyCups, wantSourceOnly);
+    const deal = dealCandidate(
+      rng,
+      req.numColors,
+      req.colors,
+      req.emptyCups,
+      wantSourceOnly,
+      wantTargets,
+    );
     if (!deal) continue;
     const hiddenCounts = deal.cups.map(() => 0);
     if (req.hasMysteryLayer) {
@@ -423,7 +711,7 @@ export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
   throw new Error(
     `fallbackLevel: no validated layout for phase=${req.phase} ` +
       `numColors=${req.numColors} emptyCups=${req.emptyCups} mystery=${req.hasMysteryLayer} ` +
-      `sourceOnly=${wantSourceOnly}`,
+      `sourceOnly=${wantSourceOnly} targets=[${wantTargets.join(',')}]`,
   );
 }
 
@@ -432,10 +720,12 @@ export function generateLevel(
   seed: SeedInput,
   opts: GenerateOptions = {},
 ): GeneratedLevel {
+  validateTargetRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const seedStr = String(seed);
   const rng = createRng(seedStr);
   const wantSourceOnly = requestedSourceOnlyCount(req);
+  const wantTargets = requestedTargetTeas(req);
 
   // Closest-to-TARGET among ACCEPTED candidates only. Out-of-band deals
   // are rejected outright and never remembered.
@@ -443,12 +733,19 @@ export function generateLevel(
   let bestAcceptedDistance = Number.POSITIVE_INFINITY;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const deal = dealCandidate(rng, req.numColors, req.colors, req.emptyCups, wantSourceOnly);
+    const deal = dealCandidate(
+      rng,
+      req.numColors,
+      req.colors,
+      req.emptyCups,
+      wantSourceOnly,
+      wantTargets,
+    );
     if (!deal) continue;
     if (isWonState(deal.cups, deal.cupConstraints)) continue;
 
     // Mystery placement uses the same rng stream (deterministic).
-    // Never inside the teapot.
+    // Never inside the teapot or a target cup.
     const hiddenCounts = deal.cups.map(() => 0);
     if (req.hasMysteryLayer) {
       const idx = selectMysteryCup(
@@ -486,12 +783,15 @@ export function generateLevel(
 
 /**
  * Validate a produced level's structural invariants (production gate AND
- * test helper). Covers contract items A–F + K–M:
+ * test helper). Covers contract items A–F + K–U:
  * A. correct number of cups; B. capacity; C. 4 units per color;
  * D. not already solved; E. hiddenCounts length + exactly-one-hidden iff
  * mystery; F. mystery cup: length >= 3, cup[0] !== cup[1], hiddenCount == 1,
- * hidden cup is NORMAL; K. cupConstraints length; L. exact source-only
- * count; M. source-only cups full + mixed + unhidden.
+ * hidden cup is an untargeted NORMAL (never teapot/target); K. constraints
+ * length; L. exact source-only count; M. teapot full + mixed + unhidden;
+ * N. exact requested target TeaIds; O. no duplicate targets; P. targets in
+ * palette; Q. target cups are normal; R. teapot carries no target;
+ * S. targets start full; T. targets not pre-solved; U. mystery role check.
  * Solver items G–J are enforced by finalizeCandidate, not here.
  */
 export function validateLevelStructure(
@@ -528,6 +828,12 @@ export function validateLevelStructure(
     if (c?.mode !== 'normal' && c?.mode !== 'source-only') {
       reasons.push(`cup ${i} has unknown mode`);
     }
+    if (c?.mode === 'source-only' && c?.targetTeaId !== undefined) {
+      reasons.push(`teapot ${i} must not carry a target (R)`);
+    }
+    if (c?.targetTeaId !== undefined && c?.mode !== 'normal') {
+      reasons.push(`target cup ${i} must be normal (Q)`);
+    }
   });
   level.cups.forEach((cup, i) => {
     if (constraints[i]?.mode === 'source-only') {
@@ -538,7 +844,35 @@ export function validateLevelStructure(
       }
       if ((level.hiddenCounts[i] ?? 0) !== 0) reasons.push(`teapot ${i} must not hide mystery`);
     }
+    const target = constraints[i]?.targetTeaId;
+    if (target !== undefined) {
+      if (cup.length !== MAX_CUP_CAPACITY) reasons.push(`target cup ${i} must start full (S)`);
+      if (cup.length === MAX_CUP_CAPACITY && isInFinalState(cup, constraints[i])) {
+        reasons.push(`target cup ${i} starts already complete (T)`);
+      }
+      if ((level.hiddenCounts[i] ?? 0) !== 0) {
+        reasons.push(`target cup ${i} must not hide mystery (U)`);
+      }
+    }
   });
+  // N/O/P: exact requested target identities, unique, in palette.
+  const wantTargets = requestedTargetTeas(req);
+  const actualTargets = constraints
+    .filter((c) => c?.targetTeaId !== undefined)
+    .map((c) => c?.targetTeaId as TeaId);
+  if (new Set(actualTargets).size !== actualTargets.length) {
+    reasons.push(`duplicate targetTeaIds (O): ${actualTargets.join(',')}`);
+  }
+  if (
+    actualTargets.length !== wantTargets.length ||
+    !wantTargets.every((t) => actualTargets.includes(t))
+  ) {
+    reasons.push(`expected targets [${wantTargets.join(',')}], got [${actualTargets.join(',')}] (N)`);
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  for (const t of actualTargets) {
+    if (!palette.includes(t)) reasons.push(`targetTeaId ${t} not in palette (P)`);
+  }
   if (isWonState(level.cups, constraints.length > 0 ? constraints : undefined)) {
     reasons.push('level is already solved');
   }
@@ -559,6 +893,9 @@ export function validateLevelStructure(
         if ((level.hiddenCounts[hiddenIdx] as number) !== 1) reasons.push('hiddenCount must be 1');
         if (constraints[hiddenIdx]?.mode !== 'normal') {
           reasons.push('mystery must be on a normal cup, never the teapot');
+        }
+        if (constraints[hiddenIdx]?.targetTeaId !== undefined) {
+          reasons.push('mystery must not be on a target cup (U)');
         }
       }
     } else if (hiddenIndices.length !== 0) {

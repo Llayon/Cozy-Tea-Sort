@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CupConstraint, TEA_TYPES, TeaId } from './game/types';
+import { CupConstraint, TEA_TYPES, TeaId, cloneCupConstraint } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { TeaSortView } from './game/view/TeaSortView';
 import { audioSynth } from './game/audio/audioSynth';
@@ -129,6 +129,7 @@ export default function App() {
         emptyCups: cfg.emptyCups,
         hasMysteryLayer: cfg.hasMysteryLayer,
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
+        targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
       seed,
@@ -138,7 +139,7 @@ export default function App() {
     initialLevelStateRef.current = {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
-      cupConstraints: generated.cupConstraints.map((c) => ({ ...c })),
+      cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
     };
 
     return new TeaSortLogic(generated.cups, generated.hiddenCounts, generated.cupConstraints);
@@ -200,6 +201,7 @@ export default function App() {
         emptyCups: cfg.emptyCups,
         hasMysteryLayer: cfg.hasMysteryLayer,
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
+        targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
       makeProductionSeed(initialLvl),
@@ -209,7 +211,7 @@ export default function App() {
     initialLevelStateRef.current = {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
-      cupConstraints: generated.cupConstraints.map((c) => ({ ...c })),
+      cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
     };
 
     const logic = new TeaSortLogic(
@@ -334,7 +336,7 @@ export default function App() {
     const backup = initialLevelStateRef.current;
     const restoredCups = backup.cups.map((c) => [...c]);
     const restoredHidden = [...backup.hiddenCounts];
-    const restoredConstraints = (backup.cupConstraints ?? []).map((c) => ({ ...c }));
+    const restoredConstraints = (backup.cupConstraints ?? []).map(cloneCupConstraint);
 
     logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints);
     viewRef.current.logic = logicRef.current;
@@ -499,6 +501,20 @@ export default function App() {
         >
           <Coffee className="w-3.5 h-3.5 text-[#E8B878] shrink-0" />
           <span>Новый сосуд — чайник. Из него можно только разливать чай. Налить обратно нельзя.</span>
+        </div>
+      )}
+
+      {/* Named-serving first-encounter onboarding (Level 10): compact, never blocking. */}
+      {currentConfig.targetTeaIds.length > 0 && moves === 0 && !isWon && (
+        <div
+          id="target-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#252015]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8D9A0] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8C878] shrink-0" />
+          <span>
+            Именная сервировка: чашки с золотым знаком ждут свой чай. Их можно использовать как обычно, но в
+            конце нужный сорт должен оказаться именно в своей чашке.
+          </span>
         </div>
       )}
 
@@ -672,6 +688,13 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8B878] font-bold">🫖</span>
                 <span>Из чайника можно только разливать чай. Налить чай обратно в него нельзя.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8C878] font-bold">🏵️</span>
+                <span>
+                  Именная сервировка: чашка с золотым знаком должна в конце содержать именно свой чай. Во
+                  время игры её можно использовать как обычную чашку.
+                </span>
               </div>
               <div className="flex items-start gap-1.5 pt-1 text-[#E8985E]">
                 <span className="font-bold">✨</span>
