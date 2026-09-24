@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { TEA_TYPES, TeaId } from './game/types';
+import { CupConstraint, TEA_TYPES, TeaId } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { TeaSortView } from './game/view/TeaSortView';
 import { audioSynth } from './game/audio/audioSynth';
@@ -47,6 +47,7 @@ import { RhythmBadge } from './components/RhythmBadge';
 interface LevelBackupState {
   cups: TeaId[][];
   hiddenCounts: number[];
+  cupConstraints: CupConstraint[];
 }
 
 export default function App() {
@@ -109,7 +110,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [] });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [] });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -127,6 +128,7 @@ export default function App() {
         colors: cfg.colors,
         emptyCups: cfg.emptyCups,
         hasMysteryLayer: cfg.hasMysteryLayer,
+        sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
         phase: cfg.phase,
       },
       seed,
@@ -136,9 +138,10 @@ export default function App() {
     initialLevelStateRef.current = {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
+      cupConstraints: generated.cupConstraints.map((c) => ({ ...c })),
     };
 
-    return new TeaSortLogic(generated.cups, generated.hiddenCounts);
+    return new TeaSortLogic(generated.cups, generated.hiddenCounts, generated.cupConstraints);
   };
 
   const bindLogicToView = (logic: TeaSortLogic, lvlNum: number) => {
@@ -196,6 +199,7 @@ export default function App() {
         colors: cfg.colors,
         emptyCups: cfg.emptyCups,
         hasMysteryLayer: cfg.hasMysteryLayer,
+        sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
         phase: cfg.phase,
       },
       makeProductionSeed(initialLvl),
@@ -205,9 +209,14 @@ export default function App() {
     initialLevelStateRef.current = {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
+      cupConstraints: generated.cupConstraints.map((c) => ({ ...c })),
     };
 
-    const logic = new TeaSortLogic(generated.cups, generated.hiddenCounts);
+    const logic = new TeaSortLogic(
+      generated.cups,
+      generated.hiddenCounts,
+      generated.cupConstraints,
+    );
     logicRef.current = logic;
 
     let isDisposed = false;
@@ -325,8 +334,9 @@ export default function App() {
     const backup = initialLevelStateRef.current;
     const restoredCups = backup.cups.map((c) => [...c]);
     const restoredHidden = [...backup.hiddenCounts];
+    const restoredConstraints = (backup.cupConstraints ?? []).map((c) => ({ ...c }));
 
-    logicRef.current.initFromState(restoredCups, restoredHidden);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -480,6 +490,17 @@ export default function App() {
           </>
         )}
       </div>
+
+      {/* Teapot first-encounter onboarding (Level 6): one compact cozy hint, never blocking. */}
+      {currentConfig.hasSourceOnlyTeapot && moves === 0 && !isWon && (
+        <div
+          id="teapot-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2B2115]/95 border-b border-[#5A4426] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8C98A] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8B878] shrink-0" />
+          <span>Новый сосуд — чайник. Из него можно только разливать чай. Налить обратно нельзя.</span>
+        </div>
+      )}
 
       {/* Mystery Layer Notice Banner */}
       {currentConfig.hasMysteryLayer && !selectedTea && !hintMessage && (
@@ -647,6 +668,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#87A96B] font-bold">4.</span>
                 <span>Цель — собрать в каждом стакане напиток одного чистого купажа.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8B878] font-bold">🫖</span>
+                <span>Из чайника можно только разливать чай. Налить чай обратно в него нельзя.</span>
               </div>
               <div className="flex items-start gap-1.5 pt-1 text-[#E8985E]">
                 <span className="font-bold">✨</span>

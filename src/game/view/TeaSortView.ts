@@ -89,9 +89,11 @@ export class CupView {
   drainingCount = 0;
   fillingCount = 0;
 
-  readonly width = 64;
+  readonly width: number;
   readonly height = 142;
   readonly cornerRadius = 18;
+  /** Source-only teapot: wider body + spout + handle, same skin language. */
+  readonly isTeapot: boolean;
 
   skinId: CupSkinId = 'glass';
   lastCup: Cup | null = null;
@@ -110,8 +112,12 @@ export class CupView {
     this.container.scale.set(scale);
   }
 
-  constructor(index: number) {
+  constructor(index: number, isTeapot = false) {
     this.index = index;
+    this.isTeapot = isTeapot;
+    // Teapot reads as a teapot: a restrained wider belly (72 vs 64).
+    // Spout/handle overflow into the inter-cup gap padding, so rows stay clean.
+    this.width = isTeapot ? 72 : 64;
     this.container = new Container();
 
     this.shadowGraphics = new Graphics();
@@ -172,6 +178,14 @@ export class CupView {
     this.liquidMask.roundRect(2, 4, w - 4, h - 6, r).fill({ color: 0xffffff });
 
     this.glassOverlay.clear();
+
+    // Source-only teapot: wider belly + lid/knob + spout (left) + handle
+    // (right), drawn in the active skin's material language. Tea layers
+    // reuse the same liquid renderer so readability is unchanged.
+    if (this.isTeapot) {
+      this.drawTeapotFrame(w, h, r);
+      return;
+    }
 
     if (this.skinId === 'ceramic') {
       this.glassOverlay.beginPath();
@@ -284,6 +298,94 @@ export class CupView {
       this.glassOverlay.roundRect(12, 16, 2.5, h - 46, 1.2).fill({ color: 0xffffff, alpha: 0.22 });
       this.glassOverlay.roundRect(w - 9, 14, 3, h - 38, 1.5).fill({ color: 0xffffff, alpha: 0.28 });
     }
+  }
+
+  /**
+   * Restrained procedural teapot: wider belly body, lid + knob, a small
+   * left spout and a right handle. Inherits the active skin palette
+   * (glass / ceramic / porcelain) so the service language stays coherent.
+   * No text is baked into the canvas; the hit area stays >= normal cups.
+   */
+  private drawTeapotFrame(w: number, h: number, r: number) {
+    const g = this.glassOverlay;
+    const bellyR = Math.min(24, r + 4);
+    // Skin palette.
+    let bodyFill = 0xffffff;
+    let bodyFillAlpha = 0.12;
+    let edgeColor = 0xffffff;
+    let edgeAlpha = 0.85;
+    let lidColor = 0xffffff;
+    let lidAlpha = 0.55;
+    let trimColor = 0xffffff;
+    if (this.skinId === 'ceramic') {
+      bodyFill = 0x5a3d2b;
+      bodyFillAlpha = 0.28;
+      edgeColor = 0xc49a75;
+      edgeAlpha = 0.95;
+      lidColor = 0xd8ab85;
+      lidAlpha = 0.9;
+      trimColor = 0x7a543a;
+    } else if (this.skinId === 'porcelain') {
+      bodyFill = 0xfffaea;
+      bodyFillAlpha = 0.26;
+      edgeColor = 0xffffff;
+      edgeAlpha = 0.92;
+      lidColor = 0xd4af37;
+      lidAlpha = 0.95;
+      trimColor = 0xffe680;
+    }
+
+    // Spout (left): short tapered pourer from the upper belly.
+    g.beginPath();
+    g.moveTo(3, 30);
+    g.lineTo(-11, 12);
+    g.lineTo(-8, 8);
+    g.lineTo(8, 24);
+    g.closePath();
+    g.fill({ color: edgeColor, alpha: Math.min(1, edgeAlpha) });
+    g.beginPath();
+    g.moveTo(2, 28);
+    g.lineTo(-8, 13);
+    g.stroke({ width: 2, color: trimColor, alpha: 0.6 });
+
+    // Handle (right): cozy C-curve, same language as normal-cup handles.
+    g.beginPath();
+    g.moveTo(w - 1, 30);
+    g.bezierCurveTo(w + 24, 38, w + 24, 92, w - 1, 100);
+    g.stroke({ width: 5.5, color: edgeColor, alpha: edgeAlpha });
+    g.beginPath();
+    g.moveTo(w - 1, 36);
+    g.bezierCurveTo(w + 14, 42, w + 14, 86, w - 1, 94);
+    g.stroke({ width: 2, color: trimColor, alpha: 0.7 });
+
+    // Belly body.
+    g.beginPath();
+    g.moveTo(0, 10);
+    g.lineTo(w, 10);
+    g.lineTo(w, h - bellyR);
+    g.quadraticCurveTo(w, h, w - bellyR, h);
+    g.lineTo(bellyR, h);
+    g.quadraticCurveTo(0, h, 0, h - bellyR);
+    g.closePath();
+    g.fill({ color: bodyFill, alpha: bodyFillAlpha });
+    g.beginPath();
+    g.moveTo(0, 10);
+    g.lineTo(0, h - bellyR);
+    g.quadraticCurveTo(0, h, bellyR, h);
+    g.lineTo(w - bellyR, h);
+    g.quadraticCurveTo(w, h, w, h - bellyR);
+    g.lineTo(w, 10);
+    g.stroke({ width: 3, color: edgeColor, alpha: edgeAlpha });
+
+    // Base shade + highlight (keeps tea layers readable, not cluttered).
+    g.roundRect(5, h - 11, w - 10, 9, 3).fill({ color: 0x000000, alpha: 0.18 });
+    g.roundRect(8, 18, 4, h - 44, 2).fill({ color: 0xffffff, alpha: 0.28 });
+
+    // Lid + knob.
+    g.roundRect(-3, 2, w + 6, 9, 4).fill({ color: lidColor, alpha: lidAlpha });
+    g.ellipse(w / 2, 6.5, w / 2, 3.2).stroke({ width: 1.8, color: trimColor, alpha: 0.9 });
+    g.circle(w / 2, 0, 4).fill({ color: lidColor, alpha: lidAlpha });
+    g.circle(w / 2, 0, 4).stroke({ width: 1.4, color: trimColor, alpha: 0.85 });
   }
 
   renderLiquid(cup: Cup) {
@@ -619,13 +721,16 @@ export class TeaSortView {
     this.cupsContainer.removeChildren();
     this.cupViews = [];
 
-    this.logic.cups.forEach((_, index) => {
-      const view = new CupView(index);
+    this.logic.cups.forEach((cup, index) => {
+      const view = new CupView(index, cup.isSourceOnly);
       view.setSkin(this.currentSkin);
 
       view.container.eventMode = 'static';
       view.container.cursor = 'pointer';
-      view.container.hitArea = new Rectangle(-16, -16, view.width + 32, view.height + 32);
+      // Teapot spout/handle overflow slightly: keep the touch target at
+      // least as usable as a normal vessel with a wider padded hit area.
+      const padX = view.isTeapot ? 22 : 16;
+      view.container.hitArea = new Rectangle(-padX, -16, view.width + padX * 2, view.height + 32);
 
       view.container.on('pointerdown', (e) => {
         e.stopPropagation();
@@ -648,7 +753,9 @@ export class TeaSortView {
     if (width === 0 || height === 0) return;
 
     const count = this.cupViews.length;
-    const baseCupW = 64;
+    // Teapot vessels are slightly wider (72 vs 64): lay out on the max
+    // cell width and center narrower cups so rows stay clean on 360–430px.
+    const baseCupW = Math.max(64, ...this.cupViews.map((v) => v.width));
     const baseCupH = 142;
 
     let rows: number[][] = [];
@@ -704,7 +811,10 @@ export class TeaSortView {
       rowIndices.forEach((cupIdx, colIndex) => {
         const view = this.cupViews[cupIdx];
         if (view) {
-          const x = startX + colIndex * spacing;
+          // Center narrower vessels inside the uniform cell so the teapot
+          // never overlaps neighbors or clips its spout/handle.
+          const cellX = startX + colIndex * spacing;
+          const x = cellX + (scaledCupW - view.visualWidth) / 2;
           view.setHomePosition(x, rowY);
         }
       });
@@ -769,7 +879,9 @@ export class TeaSortView {
         const view = this.cupViews[i] as CupView;
         const x = view.container.x;
         const y = view.container.y;
-        const touchPadding = 20;
+        // Teapot spout/handle extend beyond the body: widen the touch
+        // padding so the special vessel stays at least as tappable.
+        const touchPadding = view.isTeapot ? 26 : 20;
 
         if (
           clickPos.x >= x - touchPadding &&
@@ -857,6 +969,11 @@ export class TeaSortView {
   }
 
   private getInvalidPourReason(sourceCup: Cup, targetCup: Cup): string {
+    // Source-only teapot can never receive — no state mutation, no
+    // move-count increment; the caller already plays invalid haptics/audio.
+    if (targetCup.isSourceOnly) {
+      return 'В чайник нельзя наливать — он только раздаёт настой';
+    }
     if (targetCup.isFull) {
       return 'Стакан полон (4/4)! Выберите другой сосуд или пустой стакан.';
     }

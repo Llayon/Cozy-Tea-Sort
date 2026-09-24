@@ -54,6 +54,8 @@ export interface LevelConfig {
    */
   shuffleSteps: number;
   hasMysteryLayer: boolean;
+  /** True when this level includes the source-only teapot (Gauntlet 1). */
+  hasSourceOnlyTeapot: boolean;
   rewardRecipeId?: TeaId;
   rewardSkinId?: CupSkinId;
 }
