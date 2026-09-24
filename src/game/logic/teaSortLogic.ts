@@ -10,7 +10,13 @@
  * legality delegates to the shared `rules.ts` table.
  */
 
-import { CupConstraint, MAX_CUP_CAPACITY, TeaId, normalizeCupConstraints } from '../types';
+import {
+  CupConstraint,
+  MAX_CUP_CAPACITY,
+  TeaId,
+  cloneCupConstraint,
+  normalizeCupConstraints,
+} from '../types';
 import {
   applyPour,
   canPourBetween,
@@ -27,18 +33,22 @@ export class Cup {
   layers: TeaId[];
   /** Number of bottom layers hidden under foam ("mystery tea"). Presentation only. */
   hiddenCount = 0;
-  /** Immutable behavioral role. Default = normal (backwards compatible). */
+  /**
+   * Immutable vessel role: pour behavior (`mode`) + named-serving
+   * destination (`targetTeaId`, if any). Default = normal, no target
+   * (backwards compatible). Never mutated by moves/undo/restart.
+   */
   constraint: CupConstraint = { mode: 'normal' };
 
   constructor(id: number, initialLayers: TeaId[] = [], hiddenCount = 0, constraint?: CupConstraint) {
     this.id = id;
     this.layers = [...initialLayers];
     this.hiddenCount = Math.min(hiddenCount, Math.max(0, this.layers.length - 1));
-    if (constraint) this.constraint = { mode: constraint.mode };
+    if (constraint) this.constraint = cloneCupConstraint(constraint);
   }
 
   clone(): Cup {
-    return new Cup(this.id, [...this.layers], this.hiddenCount, { mode: this.constraint.mode });
+    return new Cup(this.id, [...this.layers], this.hiddenCount, cloneCupConstraint(this.constraint));
   }
 
   get mode(): 'normal' | 'source-only' {
@@ -47,6 +57,15 @@ export class Cup {
 
   get isSourceOnly(): boolean {
     return this.constraint.mode === 'source-only';
+  }
+
+  /** Named-serving destination, if this cup is a target cup. */
+  get targetTeaId(): TeaId | undefined {
+    return this.constraint.targetTeaId;
+  }
+
+  get isTargetCup(): boolean {
+    return this.constraint.mode === 'normal' && this.constraint.targetTeaId !== undefined;
   }
 
   isLayerHidden(index: number): boolean {
@@ -167,7 +186,7 @@ export class TeaSortLogic {
 
   /** Immutable per-vessel constraints for the current puzzle (defensive copies). */
   get cupConstraints(): CupConstraint[] {
-    return this.cups.map((c) => ({ mode: c.constraint.mode }));
+    return this.cups.map((c) => cloneCupConstraint(c.constraint));
   }
 
   /** Current board as plain arrays (defensive copies). */

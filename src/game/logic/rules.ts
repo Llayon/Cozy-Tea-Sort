@@ -16,6 +16,11 @@
  * - A uniform full teapot is NOT a completed destination: source-only
  *   vessels must be EMPTY for victory.
  *
+ * Named serving (Gauntlet 2 — target cups):
+ * - a `normal` cup with `targetTeaId` pours EXACTLY like an ordinary cup
+ *   during play (temporary wrong colors are legal);
+ * - at victory it MUST hold exactly full homogeneous `targetTeaId`.
+ *
  * `Cup.canPourInto`, the solver, the generator and deadlock detection
  * must ALL delegate to this module so the rules cannot diverge.
  *
@@ -29,6 +34,8 @@ import {
   cupConstraintSignature,
   normalizeCupConstraints,
 } from '../types';
+
+const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
 /** Machine-readable rejection reason (UI maps codes to localized strings). */
 export type PourRejectCode =
@@ -74,6 +81,41 @@ function modeOf(constraints: readonly CupConstraint[] | undefined, idx: number):
 }
 
 /**
+ * True when a full homogeneous cup already satisfies its own end-state
+ * rule: an ordinary complete cup, or a target cup filled with exactly its
+ * targetTeaId. A teapot is never "complete" (it must end empty), and a
+ * target cup holding the WRONG homogeneous tea is not complete either —
+ * emptying it is real progress, not a loop.
+ */
+export function isInFinalState(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  if (layers.length !== MAX_CUP_CAPACITY || !isHomogeneous(layers)) return false;
+  if ((c?.mode ?? 'normal') === 'source-only') return false;
+  if (c?.targetTeaId !== undefined) return layers[0] === c.targetTeaId;
+  return true;
+}
+
+/**
+ * Homogeneous-stack → empty relocation pruning (shared by legality and
+ * constructive-move classification so they can never diverge).
+ * Prunes ONLY within one identical constraint signature group, and a FULL
+ * stack only when the source is already in its final state. Moving tea
+ * OUT OF a wrongly-filled target cup or OUT OF a teapot changes which
+ * behavioral/end-state group holds the tea, so it stays legal.
+ */
+function isPrunableHomogeneousToEmpty(
+  source: TeaId[],
+  fromC: CupConstraint | undefined,
+  toC: CupConstraint | undefined,
+): boolean {
+  if (!isHomogeneous(source)) return false;
+  const fromSig = cupConstraintSignature(fromC ?? PLAIN_NORMAL_CONSTRAINT);
+  const toSig = cupConstraintSignature(toC ?? PLAIN_NORMAL_CONSTRAINT);
+  if (fromSig !== toSig) return false;
+  if (source.length === MAX_CUP_CAPACITY) return isInFinalState(source, fromC);
+  return true;
+}
+
+/**
  * Full legality reason shared by UI, solver and generator.
  * Returns 'ok' when the pour is legal.
  */
@@ -93,15 +135,18 @@ export function pourRejectCodeBetween(
   const target = cups[toIdx] as TeaId[];
   if (source.length === 0) return 'source-empty';
   if (target.length >= MAX_CUP_CAPACITY) return 'target-full';
-  // Meaningless loop: moving a finished mono cup into an empty cup.
-  // Valid ONLY among behaviorally equivalent vessels. A full homogeneous
-  // teapot is NOT complete (it must end EMPTY for victory), so emptying
-  // it into a normal cup is meaningful and must stay legal.
+  // Meaningless loop: moving a FULL homogeneous cup that already satisfies
+  // its own end-state rule into an empty cup of the same identical
+  // constraint group. Partial homogeneous stacks are ALWAYS legal here
+  // (only the constructive-move classification prunes them). Target cups
+  // pour exactly like ordinary cups during play (temporary wrong colors
+  // are legal) — the target binds ONLY the final state, so no
+  // target-specific rejection exists here. Emptying a wrongly-filled
+  // target or a teapot is real progress and stays legal.
   if (
-    source.length === MAX_CUP_CAPACITY &&
-    isHomogeneous(source) &&
     target.length === 0 &&
-    modeOf(constraints, fromIdx) === modeOf(constraints, toIdx)
+    source.length === MAX_CUP_CAPACITY &&
+    isPrunableHomogeneousToEmpty(source, constraints?.[fromIdx], constraints?.[toIdx])
   ) {
     return 'complete-to-empty';
   }
@@ -139,15 +184,16 @@ export function pourCountBetween(
 
 /**
  * A move is "constructive" when it can change the partition structure.
- * Relocating a fully homogeneous stack into an empty cup only permutes
- * identical cups, so deadlock detection and the solver both ignore it.
- * This keeps `isDeadlocked == (no solver moves available && !won)`.
+ * Relocating a homogeneous stack into an empty cup of the same identical
+ * constraint group only permutes interchangeable cups, so deadlock
+ * detection and the solver both ignore it. This keeps
+ * `isDeadlocked == (no solver moves available && !won)`.
  *
- * Constraint-aware correction (Gauntlet 1): the permutation argument is
- * valid ONLY among vessels with equivalent constraints. Moving a
- * homogeneous stack OUT OF a source-only teapot into a normal empty cup
- * changes which behavioral group holds the tea (and is required to empty
- * the teapot for victory), so it IS constructive and must not be pruned.
+ * The permutation argument is valid ONLY within one identical signature
+ * group (Gauntlets 1–2): moving tea OUT OF a teapot or OUT OF a
+ * wrongly-filled target cup into a normal empty changes which
+ * behavioral/end-state group holds the tea, so it IS constructive.
+ * Uses the same predicate as legality so the two can never diverge.
  */
 export function isConstructiveMove(
   cups: readonly TeaId[][],
@@ -158,14 +204,11 @@ export function isConstructiveMove(
   if (!canPourBetween(cups, fromIdx, toIdx, constraints)) return false;
   const source = cups[fromIdx] as TeaId[];
   const target = cups[toIdx] as TeaId[];
-  if (target.length === 0 && isHomogeneous(source)) {
-    // Only prune when source and destination are behaviorally identical.
-    // With no constraints (legacy) both are normal → prune as before.
-    if (!constraints) return false;
-    const fromMode = modeOf(constraints, fromIdx);
-    const toMode = modeOf(constraints, toIdx);
-    if (fromMode === toMode) return false;
-    return true;
+  if (
+    target.length === 0 &&
+    isPrunableHomogeneousToEmpty(source, constraints?.[fromIdx], constraints?.[toIdx])
+  ) {
+    return false;
   }
   return true;
 }
@@ -210,9 +253,35 @@ export function applyPour(
 }
 
 /**
- * Win semantics with asymmetric vessels:
- * - NORMAL: same existing rule (empty, or full uniform).
+ * Per-cup target presentation state (pure domain helper so the view never
+ * decides target semantics itself):
+ * - `no-target`  : ordinary cup or teapot (their own visuals apply).
+ * - `working`    : target cup, not yet correctly served (any non-final content).
+ * - `correct`    : full homogeneous targetTeaId — soft confirmation glow.
+ * - `wrong-full` : full homogeneous WRONG tea — gentle mismatch indication.
+ */
+export type TargetCupState = 'no-target' | 'working' | 'correct' | 'wrong-full';
+
+export function targetCupState(
+  layers: TeaId[],
+  constraint: CupConstraint | undefined,
+): TargetCupState {
+  const target = constraint?.targetTeaId;
+  if (target === undefined || constraint?.mode !== 'normal') return 'no-target';
+  if (layers.length === MAX_CUP_CAPACITY && isHomogeneous(layers)) {
+    return layers[0] === target ? 'correct' : 'wrong-full';
+  }
+  return 'working';
+}
+
+/**
+ * Win semantics with asymmetric vessels and named serving:
  * - SOURCE-ONLY: must be EMPTY. A uniform full teapot is NOT a win.
+ * - NORMAL WITHOUT target: same existing rule (empty, or full uniform).
+ * - NORMAL WITH targetTeaId: MUST be exactly full homogeneous of its
+ *   target tea. Empty, partial, or wrong-homogeneous targets are NOT wins.
+ * The target binds ONLY the final state — during play the cup pours
+ * exactly like an ordinary cup.
  * When `constraints` is omitted, all vessels are normal (legacy).
  */
 export function isWonState(
@@ -222,9 +291,17 @@ export function isWonState(
   let completed = 0;
   for (let i = 0; i < cups.length; i++) {
     const cup = cups[i] as TeaId[];
-    const mode = modeOf(constraints, i);
+    const c = constraints?.[i];
+    const mode = c?.mode ?? 'normal';
     if (mode === 'source-only') {
       if (cup.length !== 0) return false;
+      continue;
+    }
+    const target = c?.targetTeaId;
+    if (target !== undefined) {
+      if (cup.length !== MAX_CUP_CAPACITY) return false;
+      if (!cup.every((l) => l === target)) return false;
+      completed++;
       continue;
     }
     if (cup.length === 0) continue;
@@ -254,11 +331,12 @@ export function isDeadlockedState(
  * This collapses permutations of empty / identical cups and keeps
  * BFS visited sets small.
  *
- * Constraint-aware rule (Gauntlet 1): symmetry reduction is valid ONLY
- * among vessels with identical behavioral constraints. A normal empty
- * cup and a source-only empty teapot MUST NOT collapse to the same
- * identity. Cups are grouped by constraint signature; contents are
- * sorted WITHIN each group, groups stay distinct in signature order.
+ * Constraint-aware rule (Gauntlets 1–2): symmetry reduction is valid
+ * ONLY among vessels with identical behavioral + end-state constraints.
+ * A normal empty cup, a source-only empty teapot, a lavender target and
+ * a karkade target MUST NOT collapse to the same identity. Cups are
+ * grouped by full constraint signature (`N:_`, `N:<tea>`, `S:_`);
+ * contents are sorted WITHIN each group, groups stay distinct.
  *
  * When `constraints` is omitted (or all normal), this is exactly the
  * legacy key (all encodings sorted together).

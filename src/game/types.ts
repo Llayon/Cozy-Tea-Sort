@@ -114,19 +114,31 @@ export const ALL_TEA_IDS: readonly TeaId[] = [
 export const MAX_CUP_CAPACITY = 4;
 
 /**
- * Per-vessel behavioral constraint (puzzle/domain data, never UI data).
+ * Per-vessel constraint (puzzle/domain data, never UI data).
  *
- * - `normal`      : ordinary Water Sort vessel (may give and receive).
- * - `source-only` : teapot — may GIVE tea but can never RECEIVE tea.
+ * Two ORTHOGONAL concepts share one small immutable record:
  *
- * The shape is intentionally extensible for future modes
- * (`sink-only`, `targetTeaId`, …) without behavioral code for them yet.
+ * - `mode` controls POUR BEHAVIOR:
+ *   - `normal`      : ordinary Water Sort vessel (may give and receive).
+ *   - `source-only` : teapot — may GIVE tea but can never RECEIVE tea.
+ * - `targetTeaId` controls FINAL DESTINATION (named serving):
+ *   - absent        : ordinary end-state rule (empty, or full homogeneous).
+ *   - present       : at victory this cup MUST be full homogeneous of
+ *     exactly `targetTeaId`. Only valid with `mode: 'normal'`; a
+ *     source-only vessel MUST NOT carry a target (rejected in production
+ *     generation — flow restriction and destination identity stay separate).
+ *
+ * Target is NOT a pouring mode: during play a target cup pours exactly
+ * like a normal cup (any legal tea in or out, mistakes allowed). The
+ * constraint binds ONLY the final solved state.
+ *
  * No Pixi/React types may ever appear in this module.
  */
 export type CupMode = 'normal' | 'source-only';
 
 export interface CupConstraint {
   mode: CupMode;
+  targetTeaId?: TeaId;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -147,24 +159,43 @@ export function defaultCupConstraints(count: number): CupConstraint[] {
 /**
  * Backwards-compatible normalization: old callers that only pass
  * `TeaId[][]` synthesize all-normal constraints. Every cup has exactly
- * one constraint; default = normal.
+ * one constraint; default = normal with no target.
  */
 export function normalizeCupConstraints(
   constraints: readonly CupConstraint[] | undefined,
   count: number,
 ): CupConstraint[] {
   if (!constraints) return defaultCupConstraints(count);
-  if (constraints.length === count) return constraints.map((c) => ({ mode: c.mode }));
+  const clone = (c: CupConstraint | undefined): CupConstraint => {
+    if (!c) return { mode: 'normal' };
+    return c.targetTeaId !== undefined
+      ? { mode: c.mode, targetTeaId: c.targetTeaId }
+      : { mode: c.mode };
+  };
+  if (constraints.length === count) return constraints.map(clone);
   // Length mismatch: pad/truncate defensively with normal (validators reject).
   const out: CupConstraint[] = [];
   for (let i = 0; i < count; i++) {
-    const c = constraints[i];
-    out.push({ mode: c?.mode ?? 'normal' });
+    out.push(clone(constraints[i]));
   }
   return out;
 }
 
-/** Stable one-letter signature for canonicalization grouping. */
+/** Defensive copy of one constraint (keeps mode + target identity together). */
+export function cloneCupConstraint(c: CupConstraint): CupConstraint {
+  return c.targetTeaId !== undefined
+    ? { mode: c.mode, targetTeaId: c.targetTeaId }
+    : { mode: c.mode };
+}
+
+/**
+ * Stable signature for canonicalization grouping. Cups collapse ONLY
+ * when their complete behavioral + end-state signature is identical:
+ * `N:_` (ordinary), `N:<tea>` (named target), `S:_` (teapot).
+ * A source-only vessel with a target would be `S:<tea>` — rejected by
+ * production validation, but kept distinct here by construction.
+ */
 export function cupConstraintSignature(c: CupConstraint): string {
-  return c.mode === 'source-only' ? 'S' : 'N';
+  const modeSig = c.mode === 'source-only' ? 'S' : 'N';
+  return `${modeSig}:${c.targetTeaId ?? '_'}`;
 }
