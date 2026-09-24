@@ -61,16 +61,11 @@ export function getLevelConfig(levelNum: number): LevelConfig {
       colors = ['saffron', 'lavender', 'karkade', 'milk_oolong'];
     }
 
-    // First teapot appears on level 6 (cycle 2 challenge); later
-    // challenge cycles keep it. Cycle 1 challenge stays standard.
-    if (levelNum === 6 || cycleNumber > 2 || (cycleNumber === 2 && levelNum > 2)) {
-      // Cycle 2+ challenge (levels 6, 10, 14, …) uses the teapot.
-      // Level 2 (cycle 1) is explicitly excluded by the cycleNumber check.
-      hasSourceOnlyTeapot = cycleNumber >= 2;
-      if (levelNum === 2) hasSourceOnlyTeapot = false;
-      if (hasSourceOnlyTeapot) {
-        phaseSubtitle = 'Чайник-раздатчик • 6 сосудов';
-      }
+    // Gauntlet 1: cycle 1 challenge (level 2) is standard;
+    // cycle 2+ challenges (levels 6, 10, 14, …) carry the teapot.
+    hasSourceOnlyTeapot = cycleNumber >= 2;
+    if (hasSourceOnlyTeapot) {
+      phaseSubtitle = 'Чайник-раздатчик • 6 сосудов';
     }
   } else if (cycleIndex === 2) {
     // Фаза 3: Пик / «Задачка» (Peak)
@@ -89,9 +84,9 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
 
     // Level 3 (cycle 1 peak): mystery-only, no teapot.
-    // Level 7+ (cycle 2+ peak): teapot + mystery on a NORMAL cup.
-    if (levelNum >= 7) {
-      hasSourceOnlyTeapot = true;
+    // Cycle 2+ peaks (levels 7, 11, 15, …): teapot + mystery on a NORMAL cup.
+    hasSourceOnlyTeapot = cycleNumber >= 2;
+    if (hasSourceOnlyTeapot) {
       phaseSubtitle = 'Чайник и таинственный настой • 7 сосудов';
     }
   } else {
@@ -114,23 +109,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
   }
 
-  // Explicit Gauntlet 1 guard: levels 1–5 and 8 never carry a teapot,
-  // even if cycle math above drifts.
-  if (levelNum <= 5 || levelNum === 8) {
-    hasSourceOnlyTeapot = false;
-    if (levelNum === 6) {
-      hasSourceOnlyTeapot = true;
-    }
-  }
-  if (levelNum === 6) {
-    hasSourceOnlyTeapot = true;
-    phaseSubtitle = 'Чайник-раздатчик • 6 сосудов';
-  }
-  if (levelNum === 7) {
-    hasSourceOnlyTeapot = true;
-    hasMysteryLayer = true;
-    phaseSubtitle = 'Чайник и таинственный настой • 7 сосудов';
-  }
+
 
   // Reward checks
   let rewardRecipeId: TeaId | undefined;

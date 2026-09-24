@@ -264,8 +264,75 @@ describe('H. pruning: teapot never treated as equivalent empty destination', () 
     const cons: CupConstraint[] = [{ ...N }, { ...S }];
     const moves = listLegalMoves(cups, false, cons);
     expect(moves.filter((m) => m.to === 1)).toHaveLength(0);
-    // Deadlock check does not see an escape via the teapot.
-    expect(isDeadlockedState(cups, cons)).toBe(isDeadlockedState(cups, cons));
+  });
+
+  it('empty teapot is never an escape: deadlocked among normals stays deadlocked', () => {
+    // Only homogeneous partial stacks plus one empty — but the empty is
+    // the teapot, so no same-group homogeneous→empty relocation exists
+    // and pouring into the teapot is illegal: no constructive moves.
+    const cups: TeaId[][] = [
+      ['matcha', 'matcha'],
+      ['karkade', 'karkade'],
+      [],
+    ];
+    const cons: CupConstraint[] = [{ ...N }, { ...N }, { ...S }];
+    expect(isDeadlockedState(cups, cons)).toBe(true);
+    // Sanity: the same shape with an all-normal empty is also deadlocked
+    // (legacy homogeneous→empty pruning), so the teapot changes nothing here.
+    expect(isDeadlockedState(cups)).toBe(true);
+  });
+
+  it('teapot that can pour out is not deadlocked (incl. full homogeneous teapot)', () => {
+    const cups: TeaId[][] = [
+      ['matcha', 'matcha', 'matcha', 'matcha'],
+      [],
+    ];
+    const cons: CupConstraint[] = [{ ...S }, { ...N }];
+    expect(canPourBetween(cups, 0, 1, cons)).toBe(true);
+    expect(isDeadlockedState(cups, cons)).toBe(false);
+  });
+});
+
+describe('H1. complete-to-empty pruning is group-scoped (Gauntlet 1.1)', () => {
+  it('full normal AAAA -> empty normal stays forbidden', () => {
+    const cups: TeaId[][] = [
+      ['matcha', 'matcha', 'matcha', 'matcha'],
+      [],
+    ];
+    const cons: CupConstraint[] = [{ ...N }, { ...N }];
+    expect(pourRejectCodeBetween(cups, 0, 1, cons)).toBe('complete-to-empty');
+    expect(canPourBetween(cups, 0, 1, cons)).toBe(false);
+    // Legacy path without constraints is unchanged.
+    expect(canPourBetween(cups, 0, 1)).toBe(false);
+  });
+
+  it('full teapot AAAA -> empty normal is ALLOWED (must empty for victory)', () => {
+    const cups: TeaId[][] = [
+      ['matcha', 'matcha', 'matcha', 'matcha'],
+      [],
+    ];
+    const cons: CupConstraint[] = [{ ...S }, { ...N }];
+    expect(pourRejectCodeBetween(cups, 0, 1, cons)).toBe('ok');
+    expect(canPourBetween(cups, 0, 1, cons)).toBe(true);
+    expect(isConstructiveMove(cups, 0, 1, cons)).toBe(true);
+  });
+
+  it('such a teapot state can actually reach a win', () => {
+    const l = new TeaSortLogic(
+      [
+        ['matcha', 'matcha', 'matcha', 'matcha'],
+        ['karkade', 'karkade', 'karkade', 'karkade'],
+        [],
+      ],
+      [0, 0, 0],
+      [{ ...S }, { ...N }, { ...N }],
+    );
+    expect(l.isWon()).toBe(false);
+    const res = l.makeMove(0, 2);
+    expect(res).not.toBeNull();
+    expect(res?.move.count).toBe(4);
+    expect(l.cups[0]?.layers).toEqual([]);
+    expect(l.isWon()).toBe(true);
   });
 });
 

@@ -94,7 +94,15 @@ export function pourRejectCodeBetween(
   if (source.length === 0) return 'source-empty';
   if (target.length >= MAX_CUP_CAPACITY) return 'target-full';
   // Meaningless loop: moving a finished mono cup into an empty cup.
-  if (source.length === MAX_CUP_CAPACITY && isHomogeneous(source) && target.length === 0) {
+  // Valid ONLY among behaviorally equivalent vessels. A full homogeneous
+  // teapot is NOT complete (it must end EMPTY for victory), so emptying
+  // it into a normal cup is meaningful and must stay legal.
+  if (
+    source.length === MAX_CUP_CAPACITY &&
+    isHomogeneous(source) &&
+    target.length === 0 &&
+    modeOf(constraints, fromIdx) === modeOf(constraints, toIdx)
+  ) {
     return 'complete-to-empty';
   }
   if (target.length === 0) return 'ok';
