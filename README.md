@@ -16,7 +16,7 @@ Cozy Water Sort-style puzzle as a Telegram Mini App: sort tea layers between cup
 bun install
 bun run dev        # local dev server
 bun run typecheck  # tsc --noEmit (strict)
-bun run test       # vitest run
+bun run test       # authoritative batched quality gate (scripts/run-tests.mjs)
 bun run build      # vite build
 ```
 
@@ -55,15 +55,29 @@ The old "100% solvable via reverse shuffle" claim was false: arbitrary single-la
 
 Any level is reproducible from its seed (`seed` is stored on the generated level for bug reports).
 
+Canonical target and sink production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts` — topologies discovered offline with the production solver, palette-relative) serve each level with ~1 solver validation (`TARGET_TEMPLATE_ATTEMPTS` / `SINK_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it.
+
 ## Solver
 
 BFS over the exact shared rule table. State key is canonical (cups are unlabeled, so cup encodings are sorted — collapses empty/identical-cup permutations). Constructive moves only (homogeneous-stack → empty relocations are pruned, which also keeps deadlock detection consistent by construction). Supports the maximum puzzle (5 colors, 7 cups, capacity 4). Used at generation time and in tests, not per-frame.
 
-Asymmetric vessels: `CupConstraint` (`normal` | `source-only`, plus optional `targetTeaId`) travels with every puzzle. Canonicalization groups cups by identical full signature (`N:_`, `N:<tea>`, `S:_`) and sorts contents only *within* each group — normal, teapot, lavender-target and karkade-target cups never collapse into each other. The homogeneous→empty prune likewise applies only within identical-signature groups AND only when a full stack is already in its final state (emptying a wrongly-filled target or a teapot is real progress, never pruned). Win requires source-only vessels to be EMPTY (a full uniform teapot is not a win) and target cups to hold exactly full homogeneous `targetTeaId` (empty/wrong/partial targets are not wins).
+Asymmetric vessels: `CupConstraint` (`normal` | `source-only` | `sink-only`, plus optional `targetTeaId`) travels with every puzzle. Canonicalization groups cups by identical full signature (`N:_`, `N:<tea>`, `SRC:_`, `SNK:_`) and sorts contents only *within* each group — normal, teapot, guest, lavender-target and karkade-target cups never collapse into each other. The homogeneous→empty prune likewise applies only within identical-signature groups AND only when a full stack is already in its final state (emptying a wrongly-filled target or a teapot is real progress, never pruned; moving a finished tea into an empty guest cup changes role groups, so it stays legal and constructive). Win requires source-only vessels to be EMPTY (a full uniform teapot is not a win), sink-only vessels to be FULL + HOMOGENEOUS (any tea; empty/partial/mixed guests are not wins), and target cups to hold exactly full homogeneous `targetTeaId` (empty/wrong/partial targets are not wins).
 
 ## Source-only teapot
 
 One filled vessel may be a teapot: it can GIVE tea but can never RECEIVE (`target-source-only` rejection, UI shows «В чайник нельзя наливать — он только раздаёт настой»). Total vessels unchanged (replaces one filled cup, max 7), starts full + mixed (≥ 2 TeaIds) at index 0, stays empty once emptied. Mystery is never hidden inside the teapot. Rollout: L6 challenge teapot, L7 peak teapot + mystery (normal cup), later challenge/peak cycles repeat the pattern; warmup/relax stay clean.
+
+## Sink-only guest cup («Чашка гостя»)
+
+Flow table (`mode` = pour behavior, `targetTeaId` = final destination — orthogonal):
+
+| mode        | give (pour out) | receive (pour in) |
+|-------------|-----------------|-------------------|
+| normal      | yes             | yes               |
+| source-only | yes             | no                |
+| sink-only   | no              | yes (ordinary Water Sort target rules) |
+
+One empty vessel may be a guest cup: it RECEIVES tea but tea can NEVER be poured back out (`source-sink-only` rejection, UI shows «Из чашки гостя нельзя переливать — можно отменить ход.»). Total vessels unchanged (replaces one empty cup, max 7), starts empty at the stable last slot with at least one ordinary empty buffer beside it, must finish full + homogeneous (any tea — no named target, no Mystery inside). Undo is unlimited timeline reversal and restores exact previous layers, so every commitment is recoverable. The first pour into the empty guest effectively chooses which tea is served. Rollout: L18 challenge sink, L19 peak sink + mystery (normal cup), L22 challenge teapot + sink (teapot may pour directly into the guest); later challenge/peak cycles rotate sink / teapot+sink / targets / teapot+targets and sink+mystery / targets+mystery / teapot+mystery / mystery-only; NEVER sink + targets, NEVER three specials (max 2 per level); warmup/relax always clean.
 
 ## Named serving (target cups)
 
