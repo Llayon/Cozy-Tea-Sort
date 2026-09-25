@@ -8,6 +8,7 @@ import { solvePuzzle } from '../src/game/logic/solver';
 import { isWonState } from '../src/game/logic/rules';
 import {
   createGenerateStats,
+  fallbackLevel,
   generateLevel,
   sinkTemplateKindFor,
   validateLevelStructure,
@@ -177,6 +178,42 @@ describe('sink fallback exhaustion (maxRetries=0)', () => {
     expect(solved.solvable).toBe(true);
     expect(solved.minMoves).toBe(lvl.minMoves);
     expect(flags).toBeDefined();
+  });
+});
+
+describe('sink fallback branch (direct fallbackLevel, Gauntlet 3.1)', () => {
+  // The maxRetries=0 tests above prove generateLevel stays valid without
+  // the random scan, but canonical requests resolve via the template bank
+  // before maxRetries is even consulted — so they do NOT exercise the
+  // fallback ladder. These tests call fallbackLevel directly and pin the
+  // real fallback depths (deterministic: fixed fallback tag seed).
+  it.each([
+    // [name, request, expectedDepth, { mystery, teapot }]
+    ['sink-challenge', SINK_CHALLENGE, 6, { mystery: false, teapot: false }],
+    ['sink-mystery-peak', SINK_MYSTERY_PEAK, 16, { mystery: true, teapot: false }],
+    ['teapot-sink-challenge', TEAPOT_SINK_CHALLENGE, 7, { mystery: false, teapot: true }],
+  ])('%s fallback is solver-validated with REAL depth %i', (name, req, depth, flags) => {
+    const stats = createGenerateStats();
+    const lvl = fallbackLevel(req, { stats });
+    // This IS the fallback branch (not the template bank).
+    expect(stats.usedFallback).toBe(true);
+    expect(stats.candidatesTried).toBe(0);
+    expect(validateLevelStructure(lvl, req).ok).toBe(true);
+    // Pinned real fallback depth (in acceptance band by construction).
+    expect(lvl.minMoves).toBe(depth);
+    const solved = solvePuzzle(lvl.cups, { cupConstraints: lvl.cupConstraints });
+    expect(solved.solvable).toBe(true);
+    expect(solved.truncated).not.toBe(true);
+    expect(solved.minMoves).toBe(lvl.minMoves);
+    const sinkIdx = lvl.cupConstraints.findIndex((c) => c.mode === 'sink-only');
+    expect(sinkIdx).toBe(lvl.cups.length - 1);
+    for (const m of solved.solution ?? []) expect(m.from).not.toBe(sinkIdx);
+    if (flags.mystery) {
+      const midx = lvl.hiddenCounts.findIndex((h) => h > 0);
+      expect(midx).not.toBe(sinkIdx);
+    }
+    if (flags.teapot) expect(lvl.cupConstraints[0]?.mode).toBe('source-only');
+    expect(name).toBeDefined();
   });
 });
 

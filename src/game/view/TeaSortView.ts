@@ -29,6 +29,30 @@ export interface ViewCallbacks {
   onInvalidMove?: (reason: string) => void;
 }
 
+/** UX copy when the player tries to pour OUT of the guest cup (Gauntlet 3 §39). */
+export const GUEST_SINK_HINT = 'Из чашки гостя нельзя переливать — можно отменить ход.';
+
+export type SecondTapDecision = 'switch-source' | 'reject-sink-source' | 'invalid-target';
+
+/**
+ * Second-tap source-switch policy (Gauntlet 3.1, pure and unit-tested):
+ * tapping the same invalid target twice re-targets selection onto it —
+ * EXCEPT a sink-only guest cup, which can never act as a source and must
+ * stay unselected ("tap-as-source refused, never selected"). Legality
+ * itself stays in rules.ts (`canActAsSource` reads the authoritative
+ * constraint; this helper duplicates no movement rules).
+ */
+export function decideSecondTap(
+  clickedConstraint: CupConstraint,
+  clickedIsEmpty: boolean,
+  isRepeatTap: boolean,
+): SecondTapDecision {
+  if (isRepeatTap && !clickedIsEmpty) {
+    return canActAsSource(clickedConstraint) ? 'switch-source' : 'reject-sink-source';
+  }
+  return 'invalid-target';
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -1110,7 +1134,7 @@ export class TeaSortView {
         audioSynth.playInvalid();
         telegram.hapticError();
         clickedView.triggerShake();
-        this.callbacks.onInvalidMove?.('Из чашки гостя нельзя переливать — можно отменить ход.');
+        this.callbacks.onInvalidMove?.(GUEST_SINK_HINT);
         return;
       }
 
@@ -1151,7 +1175,12 @@ export class TeaSortView {
         this.animatePour(sourceIdx, clickedIdx, res.move.layer, res.move.count, res.sourceUncovered);
       }
     } else {
-      if (!clickedCup.isEmpty && this.lastInvalidTargetIndex === clickedIdx) {
+      const decision = decideSecondTap(
+        clickedCup.constraint,
+        clickedCup.isEmpty,
+        this.lastInvalidTargetIndex === clickedIdx,
+      );
+      if (decision === 'switch-source') {
         this.lastInvalidTargetIndex = null;
         sourceView.setSelection(false);
         this.selectedCupIndex = clickedIdx;
@@ -1159,6 +1188,16 @@ export class TeaSortView {
         audioSynth.playSelect();
         telegram.hapticSelection();
         this.callbacks.onSelectCup?.(clickedIdx);
+        return;
+      }
+      if (decision === 'reject-sink-source') {
+        // Gauntlet 3.1: a filled guest cup tapped twice still refuses
+        // source selection — invalid feedback + hint, no state mutation.
+        this.lastInvalidTargetIndex = null;
+        clickedView.triggerShake();
+        audioSynth.playInvalid();
+        telegram.hapticError();
+        this.callbacks.onInvalidMove?.(GUEST_SINK_HINT);
         return;
       }
 
@@ -1175,7 +1214,7 @@ export class TeaSortView {
     // Guest cup can never pour out (defensive: selection UX already
     // refuses to select it as a source) — Undo is the way back.
     if (sourceCup.isSinkOnly) {
-      return 'Из чашки гостя нельзя переливать — можно отменить ход.';
+      return GUEST_SINK_HINT;
     }
     // Source-only teapot can never receive — no state mutation, no
     // move-count increment; the caller already plays invalid haptics/audio.
