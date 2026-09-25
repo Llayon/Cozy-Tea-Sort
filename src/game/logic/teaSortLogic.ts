@@ -4,10 +4,12 @@
  * `TeaSortLogic` is the puzzle truth. `TeaSortView` renders it,
  * React owns progression/meta UI. Pixi never decides rewards.
  *
- * Asymmetric vessels (Gauntlet 1): each cup carries an immutable
- * `CupConstraint` (`normal` | `source-only`). The teapot role never
- * changes during a level; undo/restart preserve it exactly. All move
- * legality delegates to the shared `rules.ts` table.
+ * Asymmetric vessels (Gauntlets 1+3): each cup carries an immutable
+ * `CupConstraint` (`normal` | `source-only` | `sink-only`). Vessel roles
+ * never change during a level; undo/restart preserve them exactly. All
+ * move legality delegates to the shared `rules.ts` table. Undo is
+ * timeline reversal and restores exact previous layers even when forward
+ * rules forbid pouring out of a sink-only guest cup.
  */
 
 import {
@@ -51,12 +53,16 @@ export class Cup {
     return new Cup(this.id, [...this.layers], this.hiddenCount, cloneCupConstraint(this.constraint));
   }
 
-  get mode(): 'normal' | 'source-only' {
+  get mode(): 'normal' | 'source-only' | 'sink-only' {
     return this.constraint.mode;
   }
 
   get isSourceOnly(): boolean {
     return this.constraint.mode === 'source-only';
+  }
+
+  get isSinkOnly(): boolean {
+    return this.constraint.mode === 'sink-only';
   }
 
   /** Named-serving destination, if this cup is a target cup. */

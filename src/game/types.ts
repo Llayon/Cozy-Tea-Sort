@@ -121,12 +121,14 @@ export const MAX_CUP_CAPACITY = 4;
  * - `mode` controls POUR BEHAVIOR:
  *   - `normal`      : ordinary Water Sort vessel (may give and receive).
  *   - `source-only` : teapot — may GIVE tea but can never RECEIVE tea.
+ *   - `sink-only`   : guest cup — may RECEIVE tea but can never GIVE tea.
  * - `targetTeaId` controls FINAL DESTINATION (named serving):
  *   - absent        : ordinary end-state rule (empty, or full homogeneous).
  *   - present       : at victory this cup MUST be full homogeneous of
  *     exactly `targetTeaId`. Only valid with `mode: 'normal'`; a
- *     source-only vessel MUST NOT carry a target (rejected in production
- *     generation — flow restriction and destination identity stay separate).
+ *     source-only or sink-only vessel MUST NOT carry a target (rejected in
+ *     production generation — flow restriction and destination identity
+ *     stay separate).
  *
  * Target is NOT a pouring mode: during play a target cup pours exactly
  * like a normal cup (any legal tea in or out, mistakes allowed). The
@@ -134,7 +136,7 @@ export const MAX_CUP_CAPACITY = 4;
  *
  * No Pixi/React types may ever appear in this module.
  */
-export type CupMode = 'normal' | 'source-only';
+export type CupMode = 'normal' | 'source-only' | 'sink-only';
 
 export interface CupConstraint {
   mode: CupMode;
@@ -149,6 +151,11 @@ export const NORMAL_CUP_CONSTRAINT: CupConstraint = Object.freeze({
 /** Canonical source-only (teapot) constraint (frozen). */
 export const SOURCE_ONLY_CUP_CONSTRAINT: CupConstraint = Object.freeze({
   mode: 'source-only',
+}) as CupConstraint;
+
+/** Canonical sink-only (guest cup) constraint (frozen). */
+export const SINK_ONLY_CUP_CONSTRAINT: CupConstraint = Object.freeze({
+  mode: 'sink-only',
 }) as CupConstraint;
 
 /** Build `count` default (normal) constraints. */
@@ -191,11 +198,13 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
 /**
  * Stable signature for canonicalization grouping. Cups collapse ONLY
  * when their complete behavioral + end-state signature is identical:
- * `N:_` (ordinary), `N:<tea>` (named target), `S:_` (teapot).
- * A source-only vessel with a target would be `S:<tea>` — rejected by
- * production validation, but kept distinct here by construction.
+ * `N:_` (ordinary), `N:<tea>` (named target), `SRC:_` (teapot),
+ * `SNK:_` (guest cup). Source-only and sink-only never share a group.
+ * A special vessel with a target would be `SRC:<tea>` / `SNK:<tea>` —
+ * rejected by production validation, but kept distinct here by
+ * construction.
  */
 export function cupConstraintSignature(c: CupConstraint): string {
-  const modeSig = c.mode === 'source-only' ? 'S' : 'N';
+  const modeSig = c.mode === 'source-only' ? 'SRC' : c.mode === 'sink-only' ? 'SNK' : 'N';
   return `${modeSig}:${c.targetTeaId ?? '_'}`;
 }

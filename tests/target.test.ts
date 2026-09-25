@@ -86,7 +86,7 @@ describe('A. domain: target constraint normalization', () => {
     expect(cloneCupConstraint(c)).not.toBe(c);
     expect(cupConstraintSignature(c)).toBe('N:lavender');
     expect(cupConstraintSignature({ mode: 'normal' })).toBe('N:_');
-    expect(cupConstraintSignature({ mode: 'source-only' })).toBe('S:_');
+    expect(cupConstraintSignature({ mode: 'source-only' })).toBe('SRC:_');
   });
 
   it('target request helpers validate loudly, never silently', () => {
@@ -523,7 +523,7 @@ describe('P. level rollout 1–16', () => {
       expect(cfg.totalCups).toBeLessThanOrEqual(7);
     }
     expect(getLevelConfig(10).phaseSubtitle).toContain('сервировка');
-    expect(mechanicPlanForLevel(10)).toEqual({ teapot: false, targets: true });
+    expect(mechanicPlanForLevel(10)).toEqual({ teapot: false, targets: true, sink: false });
     expect(pickTargetPair(['saffron', 'lavender', 'karkade', 'milk_oolong'])).toEqual([
       'lavender',
       'karkade',

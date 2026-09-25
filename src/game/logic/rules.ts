@@ -16,6 +16,15 @@
  * - A uniform full teapot is NOT a completed destination: source-only
  *   vessels must be EMPTY for victory.
  *
+ * Sink-only guest cup (Gauntlet 3 — «Чашка гостя»):
+ * - `sink-only` may RECEIVE under ordinary Water Sort destination rules
+ *   but can NEVER act as a source (`source-sink-only` rejection).
+ * - Starts empty, must finish FULL + HOMOGENEOUS for victory (any tea —
+ *   no named target). Empty / partial / mixed-full sinks are NOT wins.
+ * - A full homogeneous NORMAL moved into an empty sink-only cup is LEGAL
+ *   and CONSTRUCTIVE (different constraint-signature groups) even though
+ *   the same relocation into an ordinary empty is pruned as meaningless.
+ *
  * Named serving (Gauntlet 2 — target cups):
  * - a `normal` cup with `targetTeaId` pours EXACTLY like an ordinary cup
  *   during play (temporary wrong colors are legal);
@@ -43,10 +52,20 @@ export type PourRejectCode =
   | 'same-cup'
   | 'out-of-range'
   | 'source-empty'
+  | 'source-sink-only'
   | 'target-full'
   | 'target-source-only'
   | 'complete-to-empty'
   | 'color-mismatch';
+
+/**
+ * Whether a vessel may ever act as a pour SOURCE under forward rules.
+ * Normal and source-only vessels may; sink-only (guest) cups never may.
+ * Undo is timeline reversal, not a forward move, so it bypasses this.
+ */
+export function canActAsSource(c: CupConstraint | undefined): boolean {
+  return (c?.mode ?? 'normal') !== 'sink-only';
+}
 
 export function topLayerOf(layers: TeaId[]): TeaId | null {
   if (layers.length === 0) return null;
@@ -75,21 +94,25 @@ export function isCompleteCup(layers: TeaId[]): boolean {
   return isHomogeneous(layers);
 }
 
-function modeOf(constraints: readonly CupConstraint[] | undefined, idx: number): 'normal' | 'source-only' {
+function modeOf(constraints: readonly CupConstraint[] | undefined, idx: number): 'normal' | 'source-only' | 'sink-only' {
   const c = constraints?.[idx];
   return c?.mode ?? 'normal';
 }
 
 /**
  * True when a full homogeneous cup already satisfies its own end-state
- * rule: an ordinary complete cup, or a target cup filled with exactly its
- * targetTeaId. A teapot is never "complete" (it must end empty), and a
- * target cup holding the WRONG homogeneous tea is not complete either —
- * emptying it is real progress, not a loop.
+ * rule: an ordinary complete cup, a sink-only guest cup filled with any
+ * single tea, or a target cup filled with exactly its targetTeaId. A
+ * teapot is never "complete" (it must end empty), and a target cup
+ * holding the WRONG homogeneous tea is not complete either — emptying
+ * it is real progress, not a loop. A malformed sink-only + target combo
+ * is never final (production validation rejects it outright).
  */
 export function isInFinalState(layers: TeaId[], c: CupConstraint | undefined): boolean {
   if (layers.length !== MAX_CUP_CAPACITY || !isHomogeneous(layers)) return false;
-  if ((c?.mode ?? 'normal') === 'source-only') return false;
+  const mode = c?.mode ?? 'normal';
+  if (mode === 'source-only') return false;
+  if (mode === 'sink-only') return c?.targetTeaId === undefined;
   if (c?.targetTeaId !== undefined) return layers[0] === c.targetTeaId;
   return true;
 }
@@ -128,8 +151,13 @@ export function pourRejectCodeBetween(
   if (fromIdx === toIdx) return 'same-cup';
   if (fromIdx < 0 || fromIdx >= cups.length) return 'out-of-range';
   if (toIdx < 0 || toIdx >= cups.length) return 'out-of-range';
-  // Destination role check FIRST: a teapot can never receive, even from
-  // another teapot. This keeps "source-only as destination" always illegal.
+  // Source role check FIRST: a guest cup can never pour out, even into a
+  // teapot. "Guest cannot source" outranks destination properties so
+  // sink → teapot explains the sink, not the teapot.
+  if (modeOf(constraints, fromIdx) === 'sink-only') return 'source-sink-only';
+  // Destination role check: a teapot can never receive, even from another
+  // teapot or from a (hypothetically sourcing) guest. Sink-only vessels
+  // receive under ordinary Water Sort target rules — no rejection here.
   if (modeOf(constraints, toIdx) === 'source-only') return 'target-source-only';
   const source = cups[fromIdx] as TeaId[];
   const target = cups[toIdx] as TeaId[];
@@ -277,6 +305,10 @@ export function targetCupState(
 /**
  * Win semantics with asymmetric vessels and named serving:
  * - SOURCE-ONLY: must be EMPTY. A uniform full teapot is NOT a win.
+ * - SINK-ONLY: must be FULL + HOMOGENEOUS (any tea, no named target).
+ *   Empty, partial, or mixed-full guest cups are NOT wins. A malformed
+ *   sink-only + targetTeaId combo is never a win (production validation
+ *   rejects it outright).
  * - NORMAL WITHOUT target: same existing rule (empty, or full uniform).
  * - NORMAL WITH targetTeaId: MUST be exactly full homogeneous of its
  *   target tea. Empty, partial, or wrong-homogeneous targets are NOT wins.
@@ -295,6 +327,13 @@ export function isWonState(
     const mode = c?.mode ?? 'normal';
     if (mode === 'source-only') {
       if (cup.length !== 0) return false;
+      continue;
+    }
+    if (mode === 'sink-only') {
+      if (c?.targetTeaId !== undefined) return false;
+      if (cup.length !== MAX_CUP_CAPACITY) return false;
+      if (!isHomogeneous(cup)) return false;
+      completed++;
       continue;
     }
     const target = c?.targetTeaId;
@@ -331,12 +370,15 @@ export function isDeadlockedState(
  * This collapses permutations of empty / identical cups and keeps
  * BFS visited sets small.
  *
- * Constraint-aware rule (Gauntlets 1–2): symmetry reduction is valid
+ * Constraint-aware rule (Gauntlets 1–3): symmetry reduction is valid
  * ONLY among vessels with identical behavioral + end-state constraints.
- * A normal empty cup, a source-only empty teapot, a lavender target and
- * a karkade target MUST NOT collapse to the same identity. Cups are
- * grouped by full constraint signature (`N:_`, `N:<tea>`, `S:_`);
- * contents are sorted WITHIN each group, groups stay distinct.
+ * A normal empty cup, a source-only empty teapot, a sink-only empty
+ * guest cup, a lavender target and a karkade target MUST NOT collapse to
+ * the same identity. Cups are grouped by full constraint signature
+ * (`N:_`, `N:<tea>`, `SRC:_`, `SNK:_`); contents are sorted WITHIN each
+ * group, groups stay distinct. A full homogeneous NORMAL moved into an
+ * empty SINK stays legal + constructive (different groups), while the
+ * same relocation into an ordinary empty is pruned.
  *
  * When `constraints` is omitted (or all normal), this is exactly the
  * legacy key (all encodings sorted together).
