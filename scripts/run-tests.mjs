@@ -56,6 +56,11 @@ const batches = [
   { name: 'teapot + target stress', files: ['tests/target-stress-teapot.test.ts'] },
   { name: 'target challenge stress', files: ['tests/target-stress-challenge.test.ts'] },
   { name: 'target peak stress', files: ['tests/target-stress-peak.test.ts'] },
+  { name: 'sink matrix + rollout', files: ['tests/sink.test.ts', 'tests/sink-rollout.test.ts'] },
+  { name: 'sink templates + fast path', files: ['tests/sink-templates.test.ts', 'tests/sink-fastpath.test.ts'] },
+  { name: 'sink stress challenge', files: ['tests/sink-stress-challenge.test.ts'] },
+  { name: 'sink stress peak', files: ['tests/sink-stress-peak.test.ts'] },
+  { name: 'teapot + sink stress', files: ['tests/sink-stress-teapot.test.ts'] },
 ];
 
 function runBatch(batch) {
