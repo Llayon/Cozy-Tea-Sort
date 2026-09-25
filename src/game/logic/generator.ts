@@ -24,6 +24,13 @@
  *   K. valid cupConstraints length
  *   L. exact requested count of source-only vessels
  *   M. source-only initial state: non-empty, full, mixed (>= 2 TeaIds)
+ *   V. exact requested sink-only count
+ *   W. sink starts empty
+ *   X. sink has no target
+ *   Y. sink has no Mystery
+ *   Z. sink occupies a valid empty-role configuration (originally-empty
+ *      slot, stable last index; total cup count unchanged)
+ *   AA. canonical production keeps at least one ordinary empty
  *
  * TARGET (desired sweet spot) and ACCEPTANCE (hard safety band) are kept
  * explicit: generation prefers candidates closest to target, but ONLY among
@@ -49,6 +56,12 @@ import {
   TargetTemplateKind,
   instantiateTargetTemplate,
 } from './targetTemplates';
+import {
+  SINK_TEMPLATE_ATTEMPTS,
+  SINK_TEMPLATE_BANK,
+  SinkTemplateKind,
+  instantiateSinkTemplate,
+} from './sinkTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -76,6 +89,14 @@ export interface GenerateRequest {
    * Target count never changes the total cup count.
    */
   targetTeaIds?: TeaId[];
+  /**
+   * Number of sink-only (guest cup) vessels requested. 0 = standard level.
+   * Gauntlet 3 uses exactly 1. The guest cup REPLACES one ordinary empty
+   * vessel: total cup count stays `numColors + emptyCups`. Starts empty at
+   * the stable last slot, must finish full + homogeneous (any tea).
+   * Production supports max 1; anything more is rejected loudly.
+   */
+  sinkOnlyCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -111,7 +132,7 @@ export interface GenerateStats {
   candidatesTried: number;
   /** Production solvePuzzle invocations across all paths. */
   solverCalls: number;
-  /** Target-template instantiations attempted (0 for non-target). */
+  /** Special-template instantiations attempted (target- or sink-bank; 0 otherwise). */
   templateAttempts: number;
   /** True when the returned level came from the fallback ladder. */
   usedFallback: boolean;
@@ -130,6 +151,13 @@ const FALLBACK_SCAN_ATTEMPTS = 25;
 /** Requested teapot count, normalized (default 0, clamped to >= 0). */
 export function requestedSourceOnlyCount(req: GenerateRequest): number {
   const v = req.sourceOnlyCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested guest-cup count, normalized (default 0, clamped to >= 0). */
+export function requestedSinkOnlyCount(req: GenerateRequest): number {
+  const v = req.sinkOnlyCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -172,6 +200,37 @@ export function validateTargetRequest(req: GenerateRequest): void {
 /** Count source-only vessels in a constraints array. */
 export function countSourceOnly(constraints: readonly CupConstraint[]): number {
   return constraints.filter((c) => c.mode === 'source-only').length;
+}
+
+/** Count sink-only vessels in a constraints array. */
+export function countSinkOnly(constraints: readonly CupConstraint[]): number {
+  return constraints.filter((c) => c.mode === 'sink-only').length;
+}
+
+/**
+ * Fail-fast request validation for sink-only guest cups (programming
+ * errors, not generation luck): production supports max 1, the sink
+ * needs an originally-empty slot, and sink + named targets is OUT OF
+ * SCOPE for Gauntlet 3 (rejected loudly — never silently degraded).
+ * Sink may combine with source-only (teapot + guest cup).
+ */
+export function validateSinkRequest(req: GenerateRequest): void {
+  const sink = requestedSinkOnlyCount(req);
+  if (sink === 0) return;
+  if (sink > 1) {
+    throw new Error(`validateSinkRequest: sinkOnlyCount ${sink} unsupported (production max 1)`);
+  }
+  if (sink > req.emptyCups) {
+    throw new Error(
+      `validateSinkRequest: sinkOnlyCount ${sink} exceeds emptyCups ${req.emptyCups}`,
+    );
+  }
+  const targets = requestedTargetTeas(req);
+  if (targets.length > 0) {
+    throw new Error(
+      `validateSinkRequest: sink-only + targets [${targets.join(',')}] is out of scope for Gauntlet 3`,
+    );
+  }
 }
 
 /** True when a cup qualifies as a starting teapot: full + mixed. */
@@ -284,7 +343,12 @@ function dealCandidate(
   emptyCups: number,
   sourceOnlyCount = 0,
   targetTeas: TeaId[] = [],
+  sinkOnlyCount = 0,
 ): DealResult | null {
+  // Gauntlet 3 product constraint: sink + targets never coexist.
+  if (sinkOnlyCount > 0 && targetTeas.length > 0) return null;
+  if (sinkOnlyCount > 1) return null;
+  if (sinkOnlyCount > emptyCups) return null;
   const pool: TeaId[] = [];
   for (let c = 0; c < numColors; c++) {
     const color = colors[c] as TeaId;
@@ -302,9 +366,46 @@ function dealCandidate(
   // the puzzle doesn't always group colors the same way.
   shuffleInPlace(rng, cups);
 
+  // Gauntlet 3 helper: the guest cup REPLACES one originally-empty vessel
+  // (total count unchanged) at the stable last slot. Returns null when no
+  // empty normal slot exists.
+  const placeSinkAtLastSlot = (constraints: CupConstraint[]): boolean => {
+    if (sinkOnlyCount !== 1) return false;
+    const last = cups.length - 1;
+    // Candidate empty slots: truly empty cups with a normal role (never
+    // the teapot slot, never a target slot).
+    const emptySlots: number[] = [];
+    cups.forEach((cup, idx) => {
+      if (cup.length === 0 && constraints[idx]?.mode === 'normal') emptySlots.push(idx);
+    });
+    if (emptySlots.length === 0) return false;
+    let slot = last;
+    if (!emptySlots.includes(last)) {
+      slot = emptySlots[Math.floor(rng() * emptySlots.length)] as number;
+      const tmp = cups[last] as TeaId[];
+      cups[last] = cups[slot] as TeaId[];
+      cups[slot] = tmp;
+      // Role swap: the moved-aside cup keeps its (normal) role; the sink
+      // role lands on the last slot. If the swapped-aside slot held a
+      // target role it would move — but sink+targets never coexist, so
+      // every swappable role here is plain normal.
+      const tmpC = constraints[last] as CupConstraint;
+      constraints[last] = constraints[slot] as CupConstraint;
+      constraints[slot] = tmpC;
+    }
+    constraints[last] = { mode: 'sink-only' };
+    cups[last] = [];
+    return true;
+  };
+
   if (sourceOnlyCount <= 0) {
     const base = defaultCupConstraints(cups.length);
-    if (targetTeas.length === 0) return { cups, cupConstraints: base };
+    if (targetTeas.length === 0) {
+      if (sinkOnlyCount > 0) {
+        if (!placeSinkAtLastSlot(base)) return null;
+      }
+      return { cups, cupConstraints: base };
+    }
     const withTargets = assignTargetConstraints(
       cups,
       base,
@@ -339,7 +440,12 @@ function dealCandidate(
   }
   const cupConstraints = defaultCupConstraints(cups.length);
   cupConstraints[0] = { mode: 'source-only' };
-  if (targetTeas.length === 0) return { cups, cupConstraints };
+  if (targetTeas.length === 0) {
+    if (sinkOnlyCount > 0) {
+      if (!placeSinkAtLastSlot(cupConstraints)) return null;
+    }
+    return { cups, cupConstraints };
+  }
   const withTargets = assignTargetConstraints(
     cups,
     cupConstraints,
@@ -402,7 +508,30 @@ function finalizeCandidate(
       if ((hiddenCounts[i] ?? 0) !== 0) return null; // U: never hide in target
     }
   }
-  // U: mystery cup is neither teapot nor target.
+  // V–AA: sink-only guest-cup invariant.
+  const wantSink = requestedSinkOnlyCount(req);
+  if (countSinkOnly(normalized) !== wantSink) return null; // V
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i]?.mode === 'sink-only') {
+      const cup = cups[i] as TeaId[];
+      if (!cup || cup.length !== 0) return null; // W: starts empty
+      if (normalized[i]?.targetTeaId !== undefined) return null; // X
+      if ((hiddenCounts[i] ?? 0) !== 0) return null; // Y: never Mystery
+    }
+  }
+  if (wantSink > 0) {
+    //_sink_unsupported combos are rejected at request validation; the gate
+    // re-checks defensively so no weaker path can slip through.
+    if (wantTargets.length > 0) return null;
+    // Z: canonical production parks the sink at the stable last slot.
+    if (normalized[normalized.length - 1]?.mode !== 'sink-only') return null;
+    // AA: keep at least one ordinary empty buffer beside the terminal sink.
+    const ordinaryEmpty = normalized.filter(
+      (c, i) => c.mode === 'normal' && (cups[i] as TeaId[]).length === 0,
+    ).length;
+    if (ordinaryEmpty < 1) return null;
+  }
+  // U: mystery cup is neither teapot, guest cup, nor target.
   for (let i = 0; i < hiddenCounts.length; i++) {
     if ((hiddenCounts[i] ?? 0) > 0) {
       const c = normalized[i] as CupConstraint | undefined;
@@ -620,10 +749,89 @@ function primaryTargetFallback(
   return null;
 }
 
-function constraintsForShape(totalCups: number, sourceOnlyCount: number): CupConstraint[] {
+/**
+ * Dedicated sink-only fallback shapes (Gauntlet 3), palette-parameterized.
+ * The guest cup sits EMPTY at the stable last slot with one ordinary
+ * empty spare; color counts are preserved by construction (pure
+ * permutation of the 4-units-per-color pool). Every shape passes through
+ * `finalizeCandidate`, so only genuinely in-band layouts are returned —
+ * these are candidates, not trusted layouts.
+ */
+function primarySinkFallback(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[] } | null {
+  const wantSink = requestedSinkOnlyCount(req);
+  if (wantSink !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  const wantTeapot = requestedSourceOnlyCount(req) > 0;
+  const [c0, c1, c2, c3, c4] = req.colors as (TeaId | undefined)[];
+  const plain = (): CupConstraint => ({ mode: 'normal' });
+  const sink: CupConstraint = { mode: 'sink-only' };
+
+  if (req.numColors === 4 && !wantTeapot && !req.hasMysteryLayer && req.emptyCups === 2 &&
+      c0 !== undefined && c1 !== undefined && c2 !== undefined && c3 !== undefined) {
+    // Sink challenge: asymmetric pair + single swap among normals; the
+    // solver routes one finished tea into the terminal guest cup.
+    return {
+      cups: [
+        [c1, c0, c0, c0],
+        [c0, c1, c1, c1],
+        [c2, c2, c2, c3],
+        [c3, c3, c3, c2],
+        [],
+        [],
+      ],
+      constraints: [plain(), plain(), plain(), plain(), plain(), sink],
+    };
+  }
+  if (req.numColors === 4 && wantTeapot && !req.hasMysteryLayer && req.emptyCups === 2 &&
+      c0 !== undefined && c1 !== undefined && c2 !== undefined && c3 !== undefined) {
+    // Teapot + sink: mixed teapot at 0, asymmetric normals, guest last.
+    return {
+      cups: [
+        [c1, c2, c0, c3],
+        [c0, c0, c0, c1],
+        [c1, c1, c2, c2],
+        [c3, c3, c3, c2],
+        [],
+        [],
+      ],
+      constraints: [{ mode: 'source-only' }, plain(), plain(), plain(), plain(), sink],
+    };
+  }
+  if (req.numColors === 5 && !wantTeapot && req.hasMysteryLayer && req.emptyCups === 2 &&
+      c0 !== undefined && c1 !== undefined && c2 !== undefined && c3 !== undefined && c4 !== undefined) {
+    // Sink + mystery peak: full rotation among normals, guest last.
+    // Mystery-capable at cup 0 ([c0,c1,c2,c3] bottom differs from above).
+    return {
+      cups: [
+        [c0, c1, c2, c3],
+        [c1, c2, c3, c4],
+        [c2, c3, c4, c0],
+        [c3, c4, c0, c1],
+        [c4, c0, c1, c2],
+        [],
+        [],
+      ],
+      constraints: [plain(), plain(), plain(), plain(), plain(), plain(), sink],
+    };
+  }
+  return null;
+}
+
+/** Generic sink rotation: rotation among filled + teapot, guest cup last. */
+function sinkRotationCups(req: GenerateRequest): TeaId[][] {
+  const cups = rotationCups({ ...req, sourceOnlyCount: 0 });
+  return cups;
+}
+
+function constraintsForShape(totalCups: number, sourceOnlyCount: number, sinkOnlyCount = 0): CupConstraint[] {
   const out = defaultCupConstraints(totalCups);
   for (let i = 0; i < sourceOnlyCount && i < totalCups; i++) {
     out[i] = { mode: 'source-only' };
+  }
+  if (sinkOnlyCount > 0 && totalCups > 0) {
+    out[totalCups - 1] = { mode: 'sink-only' };
   }
   return out;
 }
@@ -643,15 +851,24 @@ function constraintsForShape(totalCups: number, sourceOnlyCount: number): CupCon
  */
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
+  validateSinkRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
+  const wantSink = requestedSinkOnlyCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
-    `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}`;
+    `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
+    `${wantSink > 0 ? ':sink' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
-  if (wantSourceOnly > 0) {
+  // Dedicated sink-only shapes go first for sink requests (1 solve on hit).
+  if (wantSink > 0) {
+    const dedicatedSink = primarySinkFallback(req);
+    if (dedicatedSink) shapeEntries.push(dedicatedSink);
+    const sinkRot = sinkRotationCups(req);
+    shapeEntries.push({ cups: sinkRot, constraints: constraintsForShape(sinkRot.length, wantSourceOnly, wantSink) });
+  } else if (wantSourceOnly > 0) {
     const primary = primarySourceOnlyFallbackCups(req);
     if (primary) shapeEntries.push({ cups: primary, constraints: constraintsForShape(primary.length, 1) });
     const rot = sourceOnlyRotationCups(req);
@@ -730,6 +947,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       req.emptyCups,
       wantSourceOnly,
       wantTargets,
+      wantSink,
     );
     if (!deal) continue;
     const hiddenCounts = deal.cups.map(() => 0);
@@ -775,6 +993,85 @@ export function targetTemplateKindFor(req: GenerateRequest): TargetTemplateKind 
   }
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 1) {
     return 'teapot-target-challenge';
+  }
+  return null;
+}
+
+/**
+ * Match a request against a sink-bank kind (Gauntlet 3 fast path).
+ * Only the three canonical production sink configs qualify; any other
+ * sink-bearing request keeps the random-scan path. Sink + targets never
+ * qualifies (rejected loudly at validation).
+ */
+export function sinkTemplateKindFor(req: GenerateRequest): SinkTemplateKind | null {
+  if (requestedSinkOnlyCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  const teapot = requestedSourceOnlyCount(req);
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 0) {
+    return 'sink-challenge';
+  }
+  if (req.numColors === 5 && req.emptyCups === 2 && req.hasMysteryLayer && teapot === 0) {
+    return 'sink-mystery-peak';
+  }
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 1) {
+    return 'teapot-sink-challenge';
+  }
+  return null;
+}
+
+/**
+ * Bounded sink fast path (Gauntlet 3 §28–29): seeded template choice →
+ * palette-relative instantiation (seeded full permutation — a complete
+ * puzzle isomorphism, so the bank depth is preserved) → mystery
+ * assignment → single `finalizeCandidate` validation. At most
+ * SINK_TEMPLATE_ATTEMPTS solver validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses the fallback
+ * ladder).
+ */
+function generateFromSinkTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = sinkTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = SINK_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  for (let a = 0; a < SINK_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: full palette permutation (bijection, so
+    // depth is preserved exactly).
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateSinkTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+    constraints[inst.sinkSlot] = { mode: 'sink-only' };
+    const hiddenCounts = inst.cups.map(() => 0);
+    if (req.hasMysteryLayer) {
+      const idx = selectMysteryCup(
+        inst.cups,
+        (candidates) => {
+          const at = Math.floor(rng() * candidates.length);
+          return candidates[at] ?? null;
+        },
+        constraints,
+      );
+      if (idx === null) continue;
+      hiddenCounts[idx] = 1;
+    }
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#sink:${tpl.id}`,
+      constraints,
+      stats,
+    );
+    if (level) return level;
   }
   return null;
 }
@@ -848,12 +1145,14 @@ export function generateLevel(
   opts: GenerateOptions = {},
 ): GeneratedLevel {
   validateTargetRequest(req);
+  validateSinkRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
   const rng = createRng(seedStr);
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
+  const wantSink = requestedSinkOnlyCount(req);
 
   // Canonical target configs skip the random scan entirely: the template
   // bank serves bounded, solver-validated topologies (~1 validation per
@@ -863,6 +1162,16 @@ export function generateLevel(
   // valid level through the fast path or the fallback ladder.
   if (targetTemplateKindFor(req) !== null) {
     const fast = generateFromTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical sink configs skip the random scan entirely (Gauntlet 3
+  // §28–29): bounded SINK_TEMPLATE_ATTEMPTS validations, never a
+  // 150-deal scan. maxRetries: 0 still yields a valid level through the
+  // fast path or the validated fallback ladder.
+  if (sinkTemplateKindFor(req) !== null) {
+    const fast = generateFromSinkTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -881,12 +1190,13 @@ export function generateLevel(
       req.emptyCups,
       wantSourceOnly,
       wantTargets,
+      wantSink,
     );
     if (!deal) continue;
     if (isWonState(deal.cups, deal.cupConstraints)) continue;
 
     // Mystery placement uses the same rng stream (deterministic).
-    // Never inside the teapot or a target cup.
+    // Never inside the teapot, guest cup, or a target cup.
     const hiddenCounts = deal.cups.map(() => 0);
     if (req.hasMysteryLayer) {
       const idx = selectMysteryCup(
@@ -925,15 +1235,18 @@ export function generateLevel(
 
 /**
  * Validate a produced level's structural invariants (production gate AND
- * test helper). Covers contract items A–F + K–U:
+ * test helper). Covers contract items A–F + K–AA:
  * A. correct number of cups; B. capacity; C. 4 units per color;
  * D. not already solved; E. hiddenCounts length + exactly-one-hidden iff
  * mystery; F. mystery cup: length >= 3, cup[0] !== cup[1], hiddenCount == 1,
- * hidden cup is an untargeted NORMAL (never teapot/target); K. constraints
- * length; L. exact source-only count; M. teapot full + mixed + unhidden;
- * N. exact requested target TeaIds; O. no duplicate targets; P. targets in
- * palette; Q. target cups are normal; R. teapot carries no target;
- * S. targets start full; T. targets not pre-solved; U. mystery role check.
+ * hidden cup is an untargeted NORMAL (never teapot/guest/target);
+ * K. constraints length; L. exact source-only count; M. teapot full +
+ * mixed + unhidden; N. exact requested target TeaIds; O. no duplicate
+ * targets; P. targets in palette; Q. target cups are normal; R. teapot
+ * carries no target; S. targets start full; T. targets not pre-solved;
+ * U. mystery role check; V. exact sink-only count; W. sink starts empty;
+ * X. sink has no target; Y. sink has no Mystery; Z. sink at stable last
+ * slot; AA. at least one ordinary empty beside the sink.
  * Solver items G–J are enforced by finalizeCandidate, not here.
  */
 export function validateLevelStructure(
@@ -966,12 +1279,20 @@ export function validateLevelStructure(
   if (gotSourceOnly !== wantSourceOnly) {
     reasons.push(`expected ${wantSourceOnly} source-only vessels, got ${gotSourceOnly}`);
   }
+  const wantSinkOnly = requestedSinkOnlyCount(req);
+  const gotSinkOnly = constraints.filter((c) => c?.mode === 'sink-only').length;
+  if (gotSinkOnly !== wantSinkOnly) {
+    reasons.push(`expected ${wantSinkOnly} sink-only vessels, got ${gotSinkOnly} (V)`);
+  }
   constraints.forEach((c, i) => {
-    if (c?.mode !== 'normal' && c?.mode !== 'source-only') {
+    if (c?.mode !== 'normal' && c?.mode !== 'source-only' && c?.mode !== 'sink-only') {
       reasons.push(`cup ${i} has unknown mode`);
     }
     if (c?.mode === 'source-only' && c?.targetTeaId !== undefined) {
       reasons.push(`teapot ${i} must not carry a target (R)`);
+    }
+    if (c?.mode === 'sink-only' && c?.targetTeaId !== undefined) {
+      reasons.push(`guest cup ${i} must not carry a target (X)`);
     }
     if (c?.targetTeaId !== undefined && c?.mode !== 'normal') {
       reasons.push(`target cup ${i} must be normal (Q)`);
@@ -985,6 +1306,10 @@ export function validateLevelStructure(
         reasons.push(`teapot ${i} must contain at least 2 TeaIds`);
       }
       if ((level.hiddenCounts[i] ?? 0) !== 0) reasons.push(`teapot ${i} must not hide mystery`);
+    }
+    if (constraints[i]?.mode === 'sink-only') {
+      if (cup.length !== 0) reasons.push(`guest cup ${i} must start empty (W)`);
+      if ((level.hiddenCounts[i] ?? 0) !== 0) reasons.push(`guest cup ${i} must not hide mystery (Y)`);
     }
     const target = constraints[i]?.targetTeaId;
     if (target !== undefined) {
@@ -1034,7 +1359,10 @@ export function validateLevelStructure(
         if (cup[0] === cup[1]) reasons.push('hidden layer equals adjacent visible layer');
         if ((level.hiddenCounts[hiddenIdx] as number) !== 1) reasons.push('hiddenCount must be 1');
         if (constraints[hiddenIdx]?.mode !== 'normal') {
-          reasons.push('mystery must be on a normal cup, never the teapot');
+          reasons.push('mystery must be on a normal cup, never the teapot/guest cup');
+        }
+        if (constraints[hiddenIdx]?.mode === 'sink-only') {
+          reasons.push('mystery must not be on the guest cup (Y)');
         }
         if (constraints[hiddenIdx]?.targetTeaId !== undefined) {
           reasons.push('mystery must not be on a target cup (U)');
@@ -1042,6 +1370,21 @@ export function validateLevelStructure(
       }
     } else if (hiddenIndices.length !== 0) {
       reasons.push(`unexpected hidden layers without mystery: ${hiddenIndices.length}`);
+    }
+  }
+  // Z/AA: sink occupies the stable last slot with an ordinary empty spare.
+  if (wantSinkOnly > 0) {
+    if (constraints[constraints.length - 1]?.mode !== 'sink-only') {
+      reasons.push('guest cup must sit at the stable last slot (Z)');
+    }
+    const ordinaryEmpty = constraints.filter(
+      (c, i) => c?.mode === 'normal' && (level.cups[i] as TeaId[]).length === 0,
+    ).length;
+    if (ordinaryEmpty < 1) {
+      reasons.push('sink production must keep at least one ordinary empty (AA)');
+    }
+    if (wantTargets.length > 0) {
+      reasons.push('sink-only + targets is out of scope for Gauntlet 3');
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.

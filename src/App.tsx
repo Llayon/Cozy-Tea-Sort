@@ -129,6 +129,7 @@ export default function App() {
         emptyCups: cfg.emptyCups,
         hasMysteryLayer: cfg.hasMysteryLayer,
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
+        sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -201,6 +202,7 @@ export default function App() {
         emptyCups: cfg.emptyCups,
         hasMysteryLayer: cfg.hasMysteryLayer,
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
+        sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -493,14 +495,27 @@ export default function App() {
         )}
       </div>
 
-      {/* Teapot first-encounter onboarding (Level 6): one compact cozy hint, never blocking. */}
-      {currentConfig.hasSourceOnlyTeapot && moves === 0 && !isWon && (
+      {/* Teapot first-encounter onboarding (Level 6): one compact cozy hint, never blocking.
+          Suppressed beside the guest-cup banner (L22 teapot+sink): the teapot
+          was already taught at L6/7/14/15 — no overlapping banners on combined levels. */}
+      {currentConfig.hasSourceOnlyTeapot && !currentConfig.hasSinkGuestCup && moves === 0 && !isWon && (
         <div
           id="teapot-tutorial-hint"
           className="shrink-0 px-3 py-1.5 bg-[#2B2115]/95 border-b border-[#5A4426] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8C98A] z-10 text-center"
         >
           <Coffee className="w-3.5 h-3.5 text-[#E8B878] shrink-0" />
           <span>Новый сосуд — чайник. Из него можно только разливать чай. Налить обратно нельзя.</span>
+        </div>
+      )}
+
+      {/* Guest-cup first-encounter onboarding (Level 18): compact, never blocking. */}
+      {currentConfig.hasSinkGuestCup && moves === 0 && !isWon && (
+        <div
+          id="sink-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#241B2E]/95 border-b border-[#5A4A6B] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#D9C9F0] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#C9A8E8] shrink-0" />
+          <span>Чашка гостя: в неё можно наливать чай, но переливать обратно нельзя. Выбери, какой чай подать.</span>
         </div>
       )}
 
@@ -688,6 +703,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8B878] font-bold">🫖</span>
                 <span>Из чайника можно только разливать чай. Налить чай обратно в него нельзя.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#C9A8E8] font-bold">🍵</span>
+                <span>Чашка гостя принимает чай, но не отдаёт его обратно.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

@@ -56,6 +56,8 @@ export interface LevelConfig {
   hasMysteryLayer: boolean;
   /** True when this level includes the source-only teapot (Gauntlet 1). */
   hasSourceOnlyTeapot: boolean;
+  /** True when this level includes the sink-only guest cup (Gauntlet 3). */
+  hasSinkGuestCup: boolean;
   /**
    * Named-serving destinations for this level (Gauntlet 2). Empty = none.
    * Deterministic per level: reshuffling keeps the same serving goals.

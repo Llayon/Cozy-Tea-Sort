@@ -15,7 +15,7 @@
 import { Application, Container, Graphics, Rectangle } from 'pixi.js';
 import { CupConstraint, CupSkinId, TEA_TYPES, TeaId, cloneCupConstraint } from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
-import { targetCupState } from '../logic/rules';
+import { canActAsSource, isCompleteCup, targetCupState } from '../logic/rules';
 import { audioSynth } from '../audio/audioSynth';
 import { telegram } from '../telegram/telegramHaptics';
 import { POUR_ANIMATION, POUR_DURATION_SEC } from './animation';
@@ -109,6 +109,11 @@ export class CupView {
   /** Source-only teapot: wider body + spout + handle, same skin language. */
   get isTeapot(): boolean {
     return this.constraint.mode === 'source-only';
+  }
+
+  /** Sink-only guest cup («Чашка гостя»): receives but never pours out. */
+  get isSinkOnly(): boolean {
+    return this.constraint.mode === 'sink-only';
   }
 
   /** Named-serving destination, if this cup is a target cup. */
@@ -210,6 +215,14 @@ export class CupView {
     // reuse the same liquid renderer so readability is unchanged.
     if (this.isTeapot) {
       this.drawTeapotFrame(w, h, r);
+      return;
+    }
+
+    // Sink-only guest cup: low ceremonial tea cup with a small handle and
+    // a saucer beneath, restrained gold rim/detail in the active skin
+    // language. Same liquid box so layers stay readable; no text, no icons.
+    if (this.isSinkOnly) {
+      this.drawGuestCupFrame(w, h, r);
       return;
     }
 
@@ -415,6 +428,86 @@ export class CupView {
   }
 
   /**
+   * Sink-only guest cup («Чашка гостя»): a low ceremonial tea cup — same
+   * liquid box as ordinary vessels (readability first), but with a small
+   * visible handle, a saucer beneath, and a restrained gold rim/detail in
+   * the active skin language. No baked-in text, no padlock icon: the
+   * silhouette itself reads as a serving destination, never as a teapot.
+   * Saucer/handle overflow slightly into the inter-cup gap padding, so
+   * rows stay clean and the hit area (widened at setup) covers them.
+   */
+  private drawGuestCupFrame(w: number, h: number, r: number) {
+    const g = this.glassOverlay;
+    let bodyFill = 0xffffff;
+    let bodyFillAlpha = 0.12;
+    let edgeColor = 0xffffff;
+    let edgeAlpha = 0.82;
+    let saucerColor = 0xffffff;
+    let saucerAlpha = 0.2;
+    let goldColor = 0xd4af37;
+    if (this.skinId === 'ceramic') {
+      bodyFill = 0x5a3d2b;
+      bodyFillAlpha = 0.28;
+      edgeColor = 0xc49a75;
+      edgeAlpha = 0.95;
+      saucerColor = 0x5a3d2b;
+      saucerAlpha = 0.55;
+      goldColor = 0xe8c878;
+    } else if (this.skinId === 'porcelain') {
+      bodyFill = 0xfffaea;
+      bodyFillAlpha = 0.26;
+      edgeColor = 0xffffff;
+      edgeAlpha = 0.92;
+      saucerColor = 0xfffaea;
+      saucerAlpha = 0.42;
+      goldColor = 0xd4af37;
+    }
+
+    // Saucer beneath the cup.
+    g.ellipse(w / 2, h + 9, w / 2 + 11, 8).fill({ color: saucerColor, alpha: saucerAlpha });
+    g.ellipse(w / 2, h + 9, w / 2 + 11, 8).stroke({ width: 1.6, color: goldColor, alpha: 0.75 });
+    g.ellipse(w / 2, h + 8, w / 2 + 4, 4.5).fill({ color: 0x000000, alpha: 0.18 });
+    g.ellipse(w / 2, h + 8, w / 2 + 4, 4.5).stroke({ width: 1, color: goldColor, alpha: 0.5 });
+
+    // Small handle (right): tighter ceremonial C-curve.
+    g.beginPath();
+    g.moveTo(w - 1, 44);
+    g.bezierCurveTo(w + 15, 49, w + 15, 92, w - 1, 98);
+    g.stroke({ width: 4.5, color: edgeColor, alpha: edgeAlpha });
+    g.beginPath();
+    g.moveTo(w - 1, 49);
+    g.bezierCurveTo(w + 8, 53, w + 8, 87, w - 1, 93);
+    g.stroke({ width: 1.6, color: goldColor, alpha: 0.7 });
+
+    // Cup body.
+    g.beginPath();
+    g.moveTo(0, 4);
+    g.lineTo(w, 4);
+    g.lineTo(w, h - r);
+    g.quadraticCurveTo(w, h, w - r, h);
+    g.lineTo(r, h);
+    g.quadraticCurveTo(0, h, 0, h - r);
+    g.closePath();
+    g.fill({ color: bodyFill, alpha: bodyFillAlpha });
+    g.beginPath();
+    g.moveTo(0, 4);
+    g.lineTo(0, h - r);
+    g.quadraticCurveTo(0, h, r, h);
+    g.lineTo(w - r, h);
+    g.quadraticCurveTo(w, h, w, h - r);
+    g.lineTo(w, 4);
+    g.stroke({ width: 2.6, color: edgeColor, alpha: edgeAlpha });
+
+    // Restrained gold rim + base accent.
+    g.roundRect(-2, 1, w + 4, 6, 3).fill({ color: goldColor, alpha: 0.9 });
+    g.ellipse(w / 2, 4, w / 2, 2.8).stroke({ width: 1.4, color: 0xfff3c4, alpha: 0.9 });
+    g.roundRect(5, h - 5, w - 10, 3, 1.5).fill({ color: goldColor, alpha: 0.85 });
+
+    // Soft highlight (keeps tea layers readable).
+    g.roundRect(5, 12, 4, h - 34, 2).fill({ color: 0xffffff, alpha: 0.3 });
+  }
+
+  /**
    * Named-serving destination motif (Gauntlet 2): a small restrained gold
    * porcelain-style medallion near the cup base with an accent dot in the
    * target tea's color. Rendered from the authoritative CupConstraint
@@ -450,9 +543,32 @@ export class CupView {
     g.circle(cx - 1.2, cy - 1.2, 1.4).fill({ color: 0xffffff, alpha: 0.55 });
   }
 
+  /**
+   * Sink-only per-vessel completion treatment (Gauntlet 3 §44): a soft
+   * gold glow behind a FULL homogeneous guest cup — the same restrained
+   * per-vessel language the target 'correct' motif already uses, so no
+   * global "wrong state" is implied (any tea may serve the guest).
+   */
+  private refreshSinkGlow(cup: Cup | null) {
+    if (!this.isSinkOnly || !cup || !isCompleteCup(cup.layers) || !cup.isHomogeneous) return;
+    this.glowGraphics
+      .roundRect(-7, -3, this.width + 14, this.height + 10, this.cornerRadius + 5)
+      .fill({ color: 0xffe9a8, alpha: 0.22 });
+    this.glowGraphics
+      .roundRect(-4, 0, this.width + 8, this.height + 4, this.cornerRadius + 3)
+      .stroke({ width: 2, color: 0xd4af37, alpha: 0.6 });
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
     this.renderTargetMotif(cup);
+    // Sink glow lives in glowGraphics (behind the liquid, like the
+    // selection ring); re-apply it on every liquid redraw unless a
+    // selection ring is active (setSelection owns the layer then).
+    if (this.isSinkOnly && !this.isLifted) {
+      this.glowGraphics.clear();
+      this.refreshSinkGlow(cup);
+    }
     const g = this.liquidGraphics;
     g.clear();
 
@@ -562,6 +678,8 @@ export class CupView {
     this.targetLift = selected ? -24 : 0;
 
     this.glowGraphics.clear();
+    // A selected guest cup keeps its completion glow underneath the ring.
+    if (this.isSinkOnly && this.lastCup) this.refreshSinkGlow(this.lastCup);
     if (selected) {
       this.glowGraphics
         .roundRect(-6, -2, this.width + 12, this.height + 8, this.cornerRadius + 4)
@@ -790,10 +908,12 @@ export class TeaSortView {
 
       view.container.eventMode = 'static';
       view.container.cursor = 'pointer';
-      // Teapot spout/handle overflow slightly: keep the touch target at
-      // least as usable as a normal vessel with a wider padded hit area.
-      const padX = view.isTeapot ? 22 : 16;
-      view.container.hitArea = new Rectangle(-padX, -16, view.width + padX * 2, view.height + 32);
+      // Teapot spout/handle and guest-cup saucer/handle overflow slightly:
+      // keep the touch target at least as usable as a normal vessel with
+      // a wider padded hit area (saucer extends below the body too).
+      const padX = view.isTeapot ? 22 : view.isSinkOnly ? 20 : 16;
+      const padBottom = view.isSinkOnly ? 40 : 32;
+      view.container.hitArea = new Rectangle(-padX, -16, view.width + padX * 2, view.height + padBottom);
 
       view.container.on('pointerdown', (e) => {
         e.stopPropagation();
@@ -942,9 +1062,10 @@ export class TeaSortView {
         const view = this.cupViews[i] as CupView;
         const x = view.container.x;
         const y = view.container.y;
-        // Teapot spout/handle extend beyond the body: widen the touch
-        // padding so the special vessel stays at least as tappable.
-        const touchPadding = view.isTeapot ? 26 : 20;
+        // Teapot spout/handle and guest-cup saucer/handle extend beyond
+        // the body: widen the touch padding so special vessels stay at
+        // least as tappable.
+        const touchPadding = view.isTeapot ? 26 : view.isSinkOnly ? 24 : 20;
 
         if (
           clickPos.x >= x - touchPadding &&
@@ -978,6 +1099,18 @@ export class TeaSortView {
         audioSynth.playInvalid();
         telegram.hapticError();
         clickedView.triggerShake();
+        return;
+      }
+
+      // Guest cup as SOURCE (Gauntlet 3 §40): never leave it selected as
+      // if a legal source existed — subtle invalid feedback + hint, no
+      // state mutation. Legality itself stays in rules.ts (`canActAsSource`
+      // reads the authoritative constraint; the view duplicates nothing).
+      if (!canActAsSource(clickedCup.constraint)) {
+        audioSynth.playInvalid();
+        telegram.hapticError();
+        clickedView.triggerShake();
+        this.callbacks.onInvalidMove?.('Из чашки гостя нельзя переливать — можно отменить ход.');
         return;
       }
 
@@ -1039,6 +1172,11 @@ export class TeaSortView {
   }
 
   private getInvalidPourReason(sourceCup: Cup, targetCup: Cup): string {
+    // Guest cup can never pour out (defensive: selection UX already
+    // refuses to select it as a source) — Undo is the way back.
+    if (sourceCup.isSinkOnly) {
+      return 'Из чашки гостя нельзя переливать — можно отменить ход.';
+    }
     // Source-only teapot can never receive — no state mutation, no
     // move-count increment; the caller already plays invalid haptics/audio.
     if (targetCup.isSourceOnly) {
