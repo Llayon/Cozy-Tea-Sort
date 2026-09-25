@@ -41,8 +41,14 @@ import {
   defaultCupConstraints,
 } from '../types';
 import { isHomogeneous, isInFinalState, isWonState } from './rules';
-import { createRng, SeedInput, shuffleInPlace } from './rng';
+import { createRng, Rng, SeedInput, shuffleInPlace } from './rng';
 import { solvePuzzle } from './solver';
+import {
+  TARGET_TEMPLATE_ATTEMPTS,
+  TARGET_TEMPLATE_BANK,
+  TargetTemplateKind,
+  instantiateTargetTemplate,
+} from './targetTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -86,6 +92,34 @@ export interface GeneratedLevel {
 
 export interface GenerateOptions {
   maxRetries?: number;
+  /**
+   * Optional diagnostics collector (dev/test only — React never depends
+   * on it). When provided, generation fills in structural counters:
+   * how many random candidates were tried, how many production solver
+   * calls ran, how many template instantiations were attempted, and
+   * whether the result came from the fallback ladder.
+   */
+  stats?: GenerateStats;
+}
+
+/**
+ * Structural generation diagnostics (no wall-clock data — CI hardware
+ * varies, so performance gates assert THESE counters, never milliseconds).
+ */
+export interface GenerateStats {
+  /** Random deals pulled from the rng (0 on a pure template path). */
+  candidatesTried: number;
+  /** Production solvePuzzle invocations across all paths. */
+  solverCalls: number;
+  /** Target-template instantiations attempted (0 for non-target). */
+  templateAttempts: number;
+  /** True when the returned level came from the fallback ladder. */
+  usedFallback: boolean;
+}
+
+/** Fresh zeroed stats (also useful for callers that only read results). */
+export function createGenerateStats(): GenerateStats {
+  return { candidatesTried: 0, solverCalls: 0, templateAttempts: 0, usedFallback: false };
 }
 
 export const GENERATOR_MAX_RETRIES = 150;
@@ -328,6 +362,7 @@ function finalizeCandidate(
   hiddenCounts: number[],
   seed: string,
   cupConstraints: readonly CupConstraint[],
+  stats?: GenerateStats,
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -375,6 +410,7 @@ function finalizeCandidate(
     }
   }
   if (isWonState(cups, normalized)) return null; // D
+  if (stats) stats.solverCalls++;
   const solved = solvePuzzle(cups, {
     maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
     cupConstraints: normalized,
@@ -605,8 +641,9 @@ function constraintsForShape(totalCups: number, sourceOnlyCount: number): CupCon
  * Throws loudly if nothing validates: that is a programming error, and
  * lying about difficulty is worse than failing fast in dev/tests.
  */
-export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
+export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
+  const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
   const tag =
@@ -675,13 +712,17 @@ export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
       if (idx === null) continue;
       hiddenCounts[idx] = 1;
     }
-    const level = finalizeCandidate(req, cups, hiddenCounts, `${tag}#${s}`, constraints);
-    if (level) return level;
+    const level = finalizeCandidate(req, cups, hiddenCounts, `${tag}#${s}`, constraints, stats);
+    if (level) {
+      if (stats) stats.usedFallback = true;
+      return level;
+    }
   }
 
   // Safety net for exotic configs: bounded, seeded, still fully gated.
   const rng = createRng(tag);
   for (let i = 0; i < FALLBACK_SCAN_ATTEMPTS; i++) {
+    if (stats) stats.candidatesTried++;
     const deal = dealCandidate(
       rng,
       req.numColors,
@@ -704,8 +745,11 @@ export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
       if (idx === null) continue;
       hiddenCounts[idx] = 1;
     }
-    const level = finalizeCandidate(req, deal.cups, hiddenCounts, `${tag}#scan${i}`, deal.cupConstraints);
-    if (level) return level;
+    const level = finalizeCandidate(req, deal.cups, hiddenCounts, `${tag}#scan${i}`, deal.cupConstraints, stats);
+    if (level) {
+      if (stats) stats.usedFallback = true;
+      return level;
+    }
   }
 
   throw new Error(
@@ -715,6 +759,89 @@ export function fallbackLevel(req: GenerateRequest): GeneratedLevel {
   );
 }
 
+/**
+ * Match a request against a template-bank kind (Gauntlet 2.1 fast path).
+ * Only the three canonical production target configs qualify; any other
+ * target-bearing request keeps the existing random-scan path.
+ */
+export function targetTemplateKindFor(req: GenerateRequest): TargetTemplateKind | null {
+  if (requestedTargetTeas(req).length !== 2) return null;
+  const teapot = requestedSourceOnlyCount(req);
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 0) {
+    return 'target-challenge';
+  }
+  if (req.numColors === 5 && req.emptyCups === 2 && req.hasMysteryLayer && teapot === 0) {
+    return 'target-mystery-peak';
+  }
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 1) {
+    return 'teapot-target-challenge';
+  }
+  return null;
+}
+
+/**
+ * Bounded target fast path (Gauntlet 2.1 §9): seeded template choice →
+ * palette-relative instantiation (seeded t-swap + o-permutation, both
+ * full isomorphisms so the bank depth is preserved) → mystery assignment
+ * → single `finalizeCandidate` validation. At most
+ * TARGET_TEMPLATE_ATTEMPTS solver validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses the fallback
+ * ladder); null is a near-impossible programming-error signal, since
+ * every bank template is validated by tests.
+ */
+function generateFromTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = targetTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = TARGET_TEMPLATE_BANK[kind];
+  const wantTargets = requestedTargetTeas(req);
+  const tTeas = [wantTargets[0] as TeaId, wantTargets[1] as TeaId] as [TeaId, TeaId];
+  const others = req.colors.slice(0, req.numColors).filter((c) => c !== tTeas[0] && c !== tTeas[1]);
+  for (let a = 0; a < TARGET_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: shuffle target order (t-swap) and other
+    // order (o-permutation). Both are bijections, so depth is preserved.
+    const tOrder = [...tTeas] as [TeaId, TeaId];
+    shuffleInPlace(rng, tOrder);
+    const oOrder = [...others];
+    shuffleInPlace(rng, oOrder);
+    const inst = instantiateTargetTemplate(tpl, tTeas, others, tOrder, oOrder);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+    for (const [idx, tea] of inst.targetTeaBySlot) {
+      constraints[idx] = { mode: 'normal', targetTeaId: tea };
+    }
+    const hiddenCounts = inst.cups.map(() => 0);
+    if (req.hasMysteryLayer) {
+      const idx = selectMysteryCup(
+        inst.cups,
+        (candidates) => {
+          const at = Math.floor(rng() * candidates.length);
+          return candidates[at] ?? null;
+        },
+        constraints,
+      );
+      if (idx === null) continue;
+      hiddenCounts[idx] = 1;
+    }
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#tpl:${tpl.id}`,
+      constraints,
+      stats,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 export function generateLevel(
   req: GenerateRequest,
   seed: SeedInput,
@@ -722,10 +849,23 @@ export function generateLevel(
 ): GeneratedLevel {
   validateTargetRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
+  const stats = opts.stats;
   const seedStr = String(seed);
   const rng = createRng(seedStr);
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
+
+  // Canonical target configs skip the random scan entirely: the template
+  // bank serves bounded, solver-validated topologies (~1 validation per
+  // level). Non-canonical requests keep the existing scan below.
+  // maxRetries does not apply here — template attempts are structurally
+  // bounded by TARGET_TEMPLATE_ATTEMPTS, so maxRetries: 0 still yields a
+  // valid level through the fast path or the fallback ladder.
+  if (targetTemplateKindFor(req) !== null) {
+    const fast = generateFromTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
 
   // Closest-to-TARGET among ACCEPTED candidates only. Out-of-band deals
   // are rejected outright and never remembered.
@@ -733,6 +873,7 @@ export function generateLevel(
   let bestAcceptedDistance = Number.POSITIVE_INFINITY;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (stats) stats.candidatesTried++;
     const deal = dealCandidate(
       rng,
       req.numColors,
@@ -766,6 +907,7 @@ export function generateLevel(
       hiddenCounts,
       `${seedStr}#${attempt}`,
       deal.cupConstraints,
+      stats,
     );
     if (!level) continue;
 
@@ -778,7 +920,7 @@ export function generateLevel(
   }
 
   if (bestAccepted) return bestAccepted;
-  return fallbackLevel(req);
+  return fallbackLevel(req, { stats });
 }
 
 /**
