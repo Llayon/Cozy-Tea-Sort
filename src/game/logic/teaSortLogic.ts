@@ -14,15 +14,16 @@
 
 import {
   CupConstraint,
-  MAX_CUP_CAPACITY,
   TeaId,
   cloneCupConstraint,
+  cupCapacity,
+  isTastingCupConstraint,
   normalizeCupConstraints,
 } from '../types';
 import {
   applyPour,
   canPourBetween,
-  isCompleteCup,
+  cupEndStateSatisfied,
   isDeadlockedState,
   isHomogeneous,
   isWonState,
@@ -95,8 +96,14 @@ export class Cup {
     return this.layers.length;
   }
 
+  /** Effective vessel capacity (tasting bowl: 2, else standard). */
+  get capacity(): number {
+    return cupCapacity(this.constraint);
+  }
+
+  /** Full means full FOR THIS VESSEL (a 2/2 tasting bowl is full). */
   get isFull(): boolean {
-    return this.layers.length >= MAX_CUP_CAPACITY;
+    return this.layers.length >= this.capacity;
   }
 
   get isEmpty(): boolean {
@@ -104,7 +111,7 @@ export class Cup {
   }
 
   get remainingCapacity(): number {
-    return MAX_CUP_CAPACITY - this.layers.length;
+    return this.capacity - this.layers.length;
   }
 
   get topLayer(): TeaId | null {
@@ -115,8 +122,18 @@ export class Cup {
     return topCountOf(this.layers);
   }
 
+  /**
+   * Constraint-aware completion: a non-empty vessel already satisfying
+   * its own end-state rule. A full tasting bowl is NOT complete (it must
+   * be emptied); a wrongly-filled target is NOT complete either.
+   */
   get isComplete(): boolean {
-    return isCompleteCup(this.layers);
+    return this.layers.length > 0 && cupEndStateSatisfied(this.layers, this.constraint);
+  }
+
+  /** Production tasting-bowl identification (delegates to the domain helper). */
+  get isTastingBowl(): boolean {
+    return isTastingCupConstraint(this.constraint);
   }
 
   get isHomogeneous(): boolean {

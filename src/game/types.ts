@@ -111,7 +111,28 @@ export const ALL_TEA_IDS: readonly TeaId[] = [
   'buckwheat',
 ];
 
-export const MAX_CUP_CAPACITY = 4;
+/**
+ * STANDARD TEA QUANTITY PER COLOR (Gauntlet 4 decoupling).
+ *
+ * Every active TeaId always contributes exactly this many units to a
+ * puzzle — regardless of vessel capacities. A capacity-2 tasting bowl
+ * never changes the tea pool: it is a temporary workspace, not a
+ * destination.
+ */
+export const TEA_UNITS_PER_COLOR = 4;
+
+/** Standard vessel capacity (ordinary cups, teapot, guest cup, targets). */
+export const STANDARD_CUP_CAPACITY = 4;
+
+/**
+ * Legacy alias (Gauntlets 0–3). New code must use `TEA_UNITS_PER_COLOR`
+ * for tea-quantity questions and `cupCapacity(constraint)` for
+ * vessel-capacity questions. Retained so the migration stays safe.
+ */
+export const MAX_CUP_CAPACITY = STANDARD_CUP_CAPACITY;
+
+/** Tasting-bowl (дегустационная пиала) physical capacity. */
+export const TASTING_BOWL_CAPACITY = 2;
 
 /**
  * Per-vessel constraint (puzzle/domain data, never UI data).
@@ -129,10 +150,21 @@ export const MAX_CUP_CAPACITY = 4;
  *     source-only or sink-only vessel MUST NOT carry a target (rejected in
  *     production generation — flow restriction and destination identity
  *     stay separate).
+ * - `capacity` controls PHYSICAL SPACE (Gauntlet 4):
+ *   - absent        : standard capacity (`STANDARD_CUP_CAPACITY`).
+ *   - present       : this vessel holds at most that many layers. The
+ *     production tasting bowl uses `TASTING_BOWL_CAPACITY` (2).
+ * - `mustEndEmpty` controls COMPLETION REQUIREMENT (Gauntlet 4):
+ *   - absent/false  : normal end-state semantics for the mode.
+ *   - true          : this vessel MUST be empty in the solved state
+ *     (tasting bowl — even a full homogeneous bowl is NOT complete).
  *
  * Target is NOT a pouring mode: during play a target cup pours exactly
  * like a normal cup (any legal tea in or out, mistakes allowed). The
  * constraint binds ONLY the final solved state.
+ *
+ * A tasting bowl is NOT a flow mode: it pours exactly like a normal cup
+ * in both directions. Only its capacity and end-state rule differ.
  *
  * No Pixi/React types may ever appear in this module.
  */
@@ -141,6 +173,18 @@ export type CupMode = 'normal' | 'source-only' | 'sink-only';
 export interface CupConstraint {
   mode: CupMode;
   targetTeaId?: TeaId;
+  /**
+   * Vessel capacity. Undefined = standard capacity
+   * (`STANDARD_CUP_CAPACITY`). Explicit `4` is semantically identical to
+   * omitted (canonicalization treats them the same).
+   */
+  capacity?: number;
+  /**
+   * This vessel must be empty in the solved state. Undefined = false
+   * (normal end-state semantics). Explicit `false` is semantically
+   * identical to omitted.
+   */
+  mustEndEmpty?: boolean;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -157,6 +201,45 @@ export const SOURCE_ONLY_CUP_CONSTRAINT: CupConstraint = Object.freeze({
 export const SINK_ONLY_CUP_CONSTRAINT: CupConstraint = Object.freeze({
   mode: 'sink-only',
 }) as CupConstraint;
+
+/** Canonical tasting-bowl (дегустационная пиала) constraint (frozen). */
+export const TASTING_BOWL_CONSTRAINT: CupConstraint = Object.freeze({
+  mode: 'normal',
+  capacity: TASTING_BOWL_CAPACITY,
+  mustEndEmpty: true,
+}) as CupConstraint;
+
+/**
+ * Effective vessel capacity: explicit `capacity`, else standard.
+ * Non-positive / non-finite values fall back to standard (production
+ * validation rejects them loudly; this keeps pure helpers total).
+ */
+export function cupCapacity(c: CupConstraint | undefined): number {
+  const v = c?.capacity;
+  if (v === undefined) return STANDARD_CUP_CAPACITY;
+  if (!Number.isFinite(v) || (v as number) <= 0) return STANDARD_CUP_CAPACITY;
+  return Math.floor(v as number);
+}
+
+/** Effective must-end-empty flag (explicit `true`, else false). */
+export function mustEndEmpty(c: CupConstraint | undefined): boolean {
+  return c?.mustEndEmpty === true;
+}
+
+/**
+ * Production tasting-bowl identification (pure domain helper): normal
+ * flow, capacity 2, must end empty, no named target. The View uses this
+ * for the visual form — no parallel `isTastingCup` booleans anywhere.
+ */
+export function isTastingCupConstraint(c: CupConstraint | undefined): boolean {
+  if (!c) return false;
+  return (
+    c.mode === 'normal' &&
+    cupCapacity(c) === TASTING_BOWL_CAPACITY &&
+    mustEndEmpty(c) &&
+    c.targetTeaId === undefined
+  );
+}
 
 /** Build `count` default (normal) constraints. */
 export function defaultCupConstraints(count: number): CupConstraint[] {
@@ -175,9 +258,7 @@ export function normalizeCupConstraints(
   if (!constraints) return defaultCupConstraints(count);
   const clone = (c: CupConstraint | undefined): CupConstraint => {
     if (!c) return { mode: 'normal' };
-    return c.targetTeaId !== undefined
-      ? { mode: c.mode, targetTeaId: c.targetTeaId }
-      : { mode: c.mode };
+    return cloneCupConstraint(c);
   };
   if (constraints.length === count) return constraints.map(clone);
   // Length mismatch: pad/truncate defensively with normal (validators reject).
@@ -188,23 +269,31 @@ export function normalizeCupConstraints(
   return out;
 }
 
-/** Defensive copy of one constraint (keeps mode + target identity together). */
+/** Defensive copy of one constraint (all four semantic fields). */
 export function cloneCupConstraint(c: CupConstraint): CupConstraint {
-  return c.targetTeaId !== undefined
-    ? { mode: c.mode, targetTeaId: c.targetTeaId }
-    : { mode: c.mode };
+  const out: CupConstraint = { mode: c.mode };
+  if (c.targetTeaId !== undefined) out.targetTeaId = c.targetTeaId;
+  if (c.capacity !== undefined) out.capacity = c.capacity;
+  if (c.mustEndEmpty !== undefined) out.mustEndEmpty = c.mustEndEmpty;
+  return out;
 }
 
 /**
  * Stable signature for canonicalization grouping. Cups collapse ONLY
  * when their complete behavioral + end-state signature is identical:
- * `N:_` (ordinary), `N:<tea>` (named target), `SRC:_` (teapot),
- * `SNK:_` (guest cup). Source-only and sink-only never share a group.
- * A special vessel with a target would be `SRC:<tea>` / `SNK:<tea>` —
- * rejected by production validation, but kept distinct here by
- * construction.
+ * mode, target, effective capacity and must-end-empty flag.
+ *
+ * Standard vessels keep their legacy signatures (`N:_`, `N:<tea>`,
+ * `SRC:_`, `SNK:_`); any capacity/end-state deviation appends an
+ * explicit suffix (`N:_:C2:E` for the tasting bowl). Explicit defaults
+ * (`capacity: 4`, `mustEndEmpty: false`) canonicalize identically to
+ * omitted fields — no state-key fragmentation.
  */
 export function cupConstraintSignature(c: CupConstraint): string {
   const modeSig = c.mode === 'source-only' ? 'SRC' : c.mode === 'sink-only' ? 'SNK' : 'N';
-  return `${modeSig}:${c.targetTeaId ?? '_'}`;
+  const base = `${modeSig}:${c.targetTeaId ?? '_'}`;
+  const cap = cupCapacity(c);
+  const endEmpty = mustEndEmpty(c);
+  if (cap === STANDARD_CUP_CAPACITY && !endEmpty) return base;
+  return `${base}:C${cap}:${endEmpty ? 'E' : 'D'}`;
 }
