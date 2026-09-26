@@ -67,8 +67,8 @@ describe('rollout 17–24 (Gauntlet 3 guest-cup introduction)', () => {
         expect(cfg.targetTeaIds).toEqual([]);
       }
     }
-    expect(mechanicPlanForLevel(18)).toEqual({ teapot: false, targets: false, sink: true });
-    expect(mechanicPlanForLevel(22)).toEqual({ teapot: true, targets: false, sink: true });
+    expect(mechanicPlanForLevel(18)).toEqual({ teapot: false, targets: false, sink: true, tasting: false });
+    expect(mechanicPlanForLevel(22)).toEqual({ teapot: true, targets: false, sink: true, tasting: false });
   });
 
   it('level 18/19/22 subtitles match the specified product copy', () => {

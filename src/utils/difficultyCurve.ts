@@ -9,7 +9,7 @@ import { LevelConfig, LevelRhythmPhase, TeaId } from '../types/tea';
  * 4. Релакс-награда (Спад сложности: 3 цвета, 5 чашек, новый эстетичный цвет чая)
  *
  * Special-mechanic rollout (max 7 vessels, NEVER three specials at once —
- * specials are: teapot, mystery, target serving, sink guest cup):
+ * specials are: teapot, mystery, target serving, sink guest cup, tasting bowl):
  * 1 warmup clean · 2 challenge clean · 3 peak mystery · 4 relax clean ·
  * 5 warmup clean · 6 challenge TEAPOT · 7 peak TEAPOT+mystery · 8 relax clean ·
  * 9 warmup clean · 10 challenge 2 TARGETS · 11 peak 2 TARGETS+mystery ·
@@ -44,7 +44,10 @@ interface MechanicPlan {
   teapot: boolean;
   targets: boolean;
   sink: boolean;
+  tasting: boolean;
 }
+
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -55,22 +58,22 @@ interface MechanicPlan {
  * 15 peak TEAPOT+mystery · 16 relax clean.
  */
 const PINNED_ROLLOUT_1_16: Record<number, MechanicPlan> = {
-  1: { teapot: false, targets: false, sink: false },
-  2: { teapot: false, targets: false, sink: false },
-  3: { teapot: false, targets: false, sink: false },
-  4: { teapot: false, targets: false, sink: false },
-  5: { teapot: false, targets: false, sink: false },
-  6: { teapot: true, targets: false, sink: false },
-  7: { teapot: true, targets: false, sink: false },
-  8: { teapot: false, targets: false, sink: false },
-  9: { teapot: false, targets: false, sink: false },
-  10: { teapot: false, targets: true, sink: false },
-  11: { teapot: false, targets: true, sink: false },
-  12: { teapot: false, targets: false, sink: false },
-  13: { teapot: false, targets: false, sink: false },
-  14: { teapot: true, targets: true, sink: false },
-  15: { teapot: true, targets: false, sink: false },
-  16: { teapot: false, targets: false, sink: false },
+  1: { ...CLEAN },
+  2: { ...CLEAN },
+  3: { ...CLEAN },
+  4: { ...CLEAN },
+  5: { ...CLEAN },
+  6: { ...CLEAN, teapot: true },
+  7: { ...CLEAN, teapot: true },
+  8: { ...CLEAN },
+  9: { ...CLEAN },
+  10: { ...CLEAN, targets: true },
+  11: { ...CLEAN, targets: true },
+  12: { ...CLEAN },
+  13: { ...CLEAN },
+  14: { ...CLEAN, teapot: true, targets: true },
+  15: { ...CLEAN, teapot: true },
+  16: { ...CLEAN },
 };
 
 /**
@@ -80,41 +83,68 @@ const PINNED_ROLLOUT_1_16: Record<number, MechanicPlan> = {
  * 23 peak TARGETS+mystery (familiar combo, no sink) · 24 relax clean.
  */
 const PINNED_ROLLOUT_17_24: Record<number, MechanicPlan> = {
-  17: { teapot: false, targets: false, sink: false },
-  18: { teapot: false, targets: false, sink: true },
-  19: { teapot: false, targets: false, sink: true },
-  20: { teapot: false, targets: false, sink: false },
-  21: { teapot: false, targets: false, sink: false },
-  22: { teapot: true, targets: false, sink: true },
-  23: { teapot: false, targets: true, sink: false },
-  24: { teapot: false, targets: false, sink: false },
+  17: { ...CLEAN },
+  18: { ...CLEAN, sink: true },
+  19: { ...CLEAN, sink: true },
+  20: { ...CLEAN },
+  21: { ...CLEAN },
+  22: { ...CLEAN, teapot: true, sink: true },
+  23: { ...CLEAN, targets: true },
+  24: { ...CLEAN },
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–24, then a deterministic
+ * Pinned rollout 25–32 (Gauntlet 4 — first tasting bowl):
+ * 25 warmup clean · 26 challenge TASTING · 27 peak TASTING+mystery ·
+ * 28 relax clean · 29 warmup clean · 30 challenge TEAPOT+TASTING ·
+ * 31 peak TARGETS+mystery (familiar combo, no tasting) · 32 relax clean.
+ */
+const PINNED_ROLLOUT_25_32: Record<number, MechanicPlan> = {
+  25: { ...CLEAN },
+  26: { ...CLEAN, tasting: true },
+  27: { ...CLEAN, tasting: true },
+  28: { ...CLEAN },
+  29: { ...CLEAN },
+  30: { ...CLEAN, teapot: true, tasting: true },
+  31: { ...CLEAN, targets: true },
+  32: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–32, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
- * combos, never sink + targets, never three specials together).
+ * combos, never sink + targets / tasting + sink / tasting + targets,
+ * never three specials together).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
-  const pinned = PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum];
+  const pinned =
+    PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ?? PINNED_ROLLOUT_25_32[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
-  if (cycleIndex === 0 || cycleIndex === 3) return { teapot: false, targets: false, sink: false };
-  const step = cycleNumber % 4;
+  if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // challenge (no mystery): sink → teapot+sink → targets → teapot+targets.
-    if (step === 0) return { teapot: false, targets: false, sink: true };
-    if (step === 1) return { teapot: true, targets: false, sink: true };
-    if (step === 2) return { teapot: false, targets: true, sink: false };
-    return { teapot: true, targets: true, sink: false };
+    // challenge (no mystery): tasting → teapot+tasting → sink →
+    // teapot+sink → targets → teapot+targets.
+    switch (cycleNumber % 6) {
+      case 0: return { ...CLEAN, tasting: true };
+      case 1: return { ...CLEAN, teapot: true, tasting: true };
+      case 2: return { ...CLEAN, sink: true };
+      case 3: return { ...CLEAN, teapot: true, sink: true };
+      case 4: return { ...CLEAN, targets: true };
+      default: return { ...CLEAN, teapot: true, targets: true };
+    }
   }
-  // peak (mystery always on): sink+mystery → targets+mystery →
-  // teapot+mystery → mystery-only.
-  if (step === 0) return { teapot: false, targets: false, sink: true };
-  if (step === 1) return { teapot: false, targets: true, sink: false };
-  if (step === 2) return { teapot: true, targets: false, sink: false };
-  return { teapot: false, targets: false, sink: false };
+  // peak (mystery always on, plus AT MOST ONE more mechanic):
+  // tasting+mystery → sink+mystery → targets+mystery → teapot+mystery →
+  // mystery-only.
+  switch (cycleNumber % 5) {
+    case 0: return { ...CLEAN, tasting: true };
+    case 1: return { ...CLEAN, sink: true };
+    case 2: return { ...CLEAN, targets: true };
+    case 3: return { ...CLEAN, teapot: true };
+    default: return { ...CLEAN };
+  }
 }
 export function getLevelConfig(levelNum: number): LevelConfig {
   const cycleIndex = (levelNum - 1) % 4; // 0, 1, 2, 3
@@ -205,12 +235,19 @@ export function getLevelConfig(levelNum: number): LevelConfig {
 
 
 
-  // Special-mechanic overlay: single source of truth for teapot/targets/sink.
+  // Special-mechanic overlay: single source of truth for
+  // teapot/targets/sink/tasting.
   const plan = mechanicPlanForLevel(levelNum);
   hasSourceOnlyTeapot = plan.teapot;
   const targetTeaIds: TeaId[] = plan.targets ? pickTargetPair(colors) : [];
   const hasSinkGuestCup = plan.sink;
-  if (plan.sink && plan.teapot) {
+  const hasTastingBowl = plan.tasting;
+  if (plan.tasting && plan.teapot) {
+    phaseSubtitle = 'Чайник и дегустационная пиала • 6 сосудов';
+  } else if (plan.tasting) {
+    phaseSubtitle =
+      phase === 'challenge' ? 'Дегустационная пиала • 6 сосудов' : 'Пиала и таинственный настой • 7 сосудов';
+  } else if (plan.sink && plan.teapot) {
     phaseSubtitle = 'Чайник и чашка гостя • 6 сосудов';
   } else if (plan.sink) {
     phaseSubtitle =
@@ -255,6 +292,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasMysteryLayer,
     hasSourceOnlyTeapot,
     hasSinkGuestCup,
+    hasTastingBowl,
     targetTeaIds,
     rewardRecipeId,
     rewardSkinId,

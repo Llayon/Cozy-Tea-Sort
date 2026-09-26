@@ -523,7 +523,7 @@ describe('P. level rollout 1–16', () => {
       expect(cfg.totalCups).toBeLessThanOrEqual(7);
     }
     expect(getLevelConfig(10).phaseSubtitle).toContain('сервировка');
-    expect(mechanicPlanForLevel(10)).toEqual({ teapot: false, targets: true, sink: false });
+    expect(mechanicPlanForLevel(10)).toEqual({ teapot: false, targets: true, sink: false, tasting: false });
     expect(pickTargetPair(['saffron', 'lavender', 'karkade', 'milk_oolong'])).toEqual([
       'lavender',
       'karkade',

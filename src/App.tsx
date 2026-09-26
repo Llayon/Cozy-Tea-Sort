@@ -130,6 +130,7 @@ export default function App() {
         hasMysteryLayer: cfg.hasMysteryLayer,
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
         sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
+        tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -203,6 +204,7 @@ export default function App() {
         hasMysteryLayer: cfg.hasMysteryLayer,
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
         sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
+        tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -496,9 +498,10 @@ export default function App() {
       </div>
 
       {/* Teapot first-encounter onboarding (Level 6): one compact cozy hint, never blocking.
-          Suppressed beside the guest-cup banner (L22 teapot+sink): the teapot
-          was already taught at L6/7/14/15 — no overlapping banners on combined levels. */}
-      {currentConfig.hasSourceOnlyTeapot && !currentConfig.hasSinkGuestCup && moves === 0 && !isWon && (
+          Suppressed beside the guest-cup / tasting banners (L22, L30): the
+          teapot was already taught at L6/7/14/15 — no overlapping banners
+          on combined levels. */}
+      {currentConfig.hasSourceOnlyTeapot && !currentConfig.hasSinkGuestCup && !currentConfig.hasTastingBowl && moves === 0 && !isWon && (
         <div
           id="teapot-tutorial-hint"
           className="shrink-0 px-3 py-1.5 bg-[#2B2115]/95 border-b border-[#5A4426] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8C98A] z-10 text-center"
@@ -516,6 +519,17 @@ export default function App() {
         >
           <Coffee className="w-3.5 h-3.5 text-[#C9A8E8] shrink-0" />
           <span>Чашка гостя: в неё можно наливать чай, но переливать обратно нельзя. Выбери, какой чай подать.</span>
+        </div>
+      )}
+
+      {/* Tasting-bowl first-encounter onboarding (Level 26): compact, never blocking. */}
+      {currentConfig.hasTastingBowl && moves === 0 && !isWon && (
+        <div
+          id="tasting-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#1B2A24]/95 border-b border-[#3E5A4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#C9E8D4] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#8AC9A8] shrink-0" />
+          <span>Дегустационная пиала: в неё помещается только 2 слоя. Используй её как временное место — к концу она должна быть пустой.</span>
         </div>
       )}
 
@@ -707,6 +721,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#C9A8E8] font-bold">🍵</span>
                 <span>Чашка гостя принимает чай, но не отдаёт его обратно.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#8AC9A8] font-bold">🍶</span>
+                <span>Дегустационная пиала вмещает только 2 слоя и к концу должна быть пустой.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

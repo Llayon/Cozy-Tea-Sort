@@ -13,9 +13,40 @@
  */
 
 import { Application, Container, Graphics, Rectangle } from 'pixi.js';
-import { CupConstraint, CupSkinId, TEA_TYPES, TeaId, cloneCupConstraint } from '../types';
+import {
+  CupConstraint,
+  CupSkinId,
+  TEA_TYPES,
+  TeaId,
+  cloneCupConstraint,
+  cupCapacity,
+  isTastingCupConstraint,
+} from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
 import { canActAsSource, isCompleteCup, targetCupState } from '../logic/rules';
+
+/**
+ * Tasting-bowl body height (Gauntlet 4): the shallow bowl is bottom-aligned
+ * inside the standard 142-tall layout cell, so rows never jump and pour
+ * animation layout never churns. Rim top = height - body height.
+ */
+export const TASTING_BOWL_BODY_H = 66;
+
+/** Standard liquid slot height for tall vessels (4 slots fill the body). */
+const STANDARD_SLOT_H = 29;
+
+/**
+ * Full-vessel UX copy (Gauntlet 4 §35): capacity-aware, vessel-friendly.
+ * Standard cups keep the exact legacy `4/4` wording; the tasting bowl
+ * reports `2/2`. Pure helper — unit-tested, no Pixi.
+ */
+export function fullVesselHint(constraint: CupConstraint): string {
+  if (isTastingCupConstraint(constraint)) {
+    return 'Пиала заполнена (2/2)! Выберите другой сосуд или пустой стакан.';
+  }
+  const cap = cupCapacity(constraint);
+  return `Стакан полон (${cap}/${cap})! Выберите другой сосуд или пустой стакан.`;
+}
 import { audioSynth } from '../audio/audioSynth';
 import { telegram } from '../telegram/telegramHaptics';
 import { POUR_ANIMATION, POUR_DURATION_SEC } from './animation';
@@ -140,6 +171,31 @@ export class CupView {
     return this.constraint.mode === 'sink-only';
   }
 
+  /** Tasting bowl (дегустационная пиала): normal flow, capacity 2, ends empty. */
+  get isTastingBowl(): boolean {
+    return isTastingCupConstraint(this.constraint);
+  }
+
+  /**
+   * Rim Y in container-local coords — the stream origin/destination anchor.
+   * Tall vessels pour from y=4; the bottom-aligned bowl pours from its own
+   * rim, never from empty air where a tall rim would have been.
+   */
+  get rimLocalY(): number {
+    return this.isTastingBowl ? this.height - TASTING_BOWL_BODY_H : 4;
+  }
+
+  /**
+   * Logical liquid slot height: tall vessels use the fixed 4-slot rhythm;
+   * the bowl divides its own interior (rim inset → base) by its effective
+   * capacity — exactly 2 readable slots, never 4 compressed slots.
+   */
+  slotHeightFor(c: CupConstraint): number {
+    if (!isTastingCupConstraint(c)) return STANDARD_SLOT_H;
+    const bottomY = this.height - 6;
+    return (bottomY - (this.rimLocalY + 4)) / cupCapacity(c);
+  }
+
   /** Named-serving destination, if this cup is a target cup. */
   get targetTeaId(): TeaId | undefined {
     return this.constraint.mode === 'normal' ? this.constraint.targetTeaId : undefined;
@@ -247,6 +303,18 @@ export class CupView {
     // language. Same liquid box so layers stay readable; no text, no icons.
     if (this.isSinkOnly) {
       this.drawGuestCupFrame(w, h, r);
+      return;
+    }
+
+    // Tasting bowl (Gauntlet 4): shallow ceremonial пиала, bottom-aligned
+    // in the standard cell — smaller, shallower, gold-rimmed, with a foot
+    // saucer. The liquid mask covers only the bowl interior (see below).
+    if (this.isTastingBowl) {
+      this.liquidMask.clear();
+      this.liquidMask
+        .roundRect(3, this.rimLocalY + 4, w - 6, h - 6 - (this.rimLocalY + 4), 10)
+        .fill({ color: 0xffffff });
+      this.drawTastingBowlFrame(w, h);
       return;
     }
 
@@ -532,6 +600,76 @@ export class CupView {
   }
 
   /**
+   * Tasting bowl (Gauntlet 4): a shallow ceremonial пиала — wider rim
+   * relative to height, foot saucer, restrained gold rim/detail in the
+   * active skin language. Bottom-aligned in the standard cell; clearly
+   * distinct from the tall cup, the teapot and the guest cup. No text,
+   * no icons. Liquid (2 slots) is drawn by the shared renderer through
+   * the bowl-interior mask set in drawCupFrame.
+   */
+  private drawTastingBowlFrame(w: number, h: number) {
+    const g = this.glassOverlay;
+    const rimY = this.rimLocalY;
+    let bodyFill = 0xffffff;
+    let bodyFillAlpha = 0.12;
+    let edgeColor = 0xffffff;
+    let edgeAlpha = 0.82;
+    let saucerColor = 0xffffff;
+    let saucerAlpha = 0.2;
+    let goldColor = 0xd4af37;
+    if (this.skinId === 'ceramic') {
+      bodyFill = 0x5a3d2b;
+      bodyFillAlpha = 0.3;
+      edgeColor = 0xc49a75;
+      edgeAlpha = 0.95;
+      saucerColor = 0x5a3d2b;
+      saucerAlpha = 0.55;
+      goldColor = 0xe8c878;
+    } else if (this.skinId === 'porcelain') {
+      bodyFill = 0xfffaea;
+      bodyFillAlpha = 0.28;
+      edgeColor = 0xffffff;
+      edgeAlpha = 0.92;
+      saucerColor = 0xfffaea;
+      saucerAlpha = 0.42;
+      goldColor = 0xd4af37;
+    }
+
+    // Foot saucer beneath the bowl.
+    g.ellipse(w / 2, h + 4, w / 2 + 6, 6).fill({ color: saucerColor, alpha: saucerAlpha });
+    g.ellipse(w / 2, h + 4, w / 2 + 6, 6).stroke({ width: 1.6, color: goldColor, alpha: 0.75 });
+    // Foot stem.
+    g.roundRect(w / 2 - 9, h - 10, 18, 10, 3).fill({ color: edgeColor, alpha: 0.5 });
+
+    // Bowl body: wide rim tapering to a rounded base.
+    const rimOver = 4;
+    const baseHalf = w / 2 - 13;
+    g.beginPath();
+    g.moveTo(-rimOver, rimY);
+    g.quadraticCurveTo(-rimOver + 2, h - 14, w / 2 - baseHalf, h - 4);
+    g.quadraticCurveTo(w / 2, h, w / 2 + baseHalf, h - 4);
+    g.quadraticCurveTo(w + rimOver - 2, h - 14, w + rimOver, rimY);
+    g.closePath();
+    g.fill({ color: bodyFill, alpha: bodyFillAlpha });
+    g.beginPath();
+    g.moveTo(-rimOver, rimY);
+    g.quadraticCurveTo(-rimOver + 2, h - 14, w / 2 - baseHalf, h - 4);
+    g.quadraticCurveTo(w / 2, h, w / 2 + baseHalf, h - 4);
+    g.quadraticCurveTo(w + rimOver - 2, h - 14, w + rimOver, rimY);
+    g.stroke({ width: 2.6, color: edgeColor, alpha: edgeAlpha });
+
+    // Restrained gold rim band + opening highlight.
+    g.roundRect(-rimOver - 1, rimY - 3, w + (rimOver + 1) * 2, 6, 3).fill({
+      color: goldColor,
+      alpha: 0.9,
+    });
+    g.ellipse(w / 2, rimY, w / 2 - 2, 2.8).stroke({ width: 1.4, color: 0xfff3c4, alpha: 0.9 });
+
+    // Soft highlight on the left wall (keeps tea layers readable).
+    g.roundRect(7, rimY + 10, 3.5, h - rimY - 26, 2).fill({ color: 0xffffff, alpha: 0.28 });
+  }
+
+  /**
    * Named-serving destination motif (Gauntlet 2): a small restrained gold
    * porcelain-style medallion near the cup base with an accent dot in the
    * target tea's color. Rendered from the authoritative CupConstraint
@@ -599,7 +737,9 @@ export class CupView {
     const w = this.width;
     const h = this.height;
     const bottomY = h - 6;
-    const layerH = 29;
+    // Dynamic slot height: tall vessels keep the 4-slot rhythm; the bowl
+    // renders exactly its own capacity (2 readable slots, bottom → top).
+    const layerH = this.slotHeightFor(cup.constraint);
 
     const layers = [...cup.layers];
 
@@ -697,6 +837,19 @@ export class CupView {
     }
   }
 
+  /**
+   * Selection/glow bounds: tall vessels use the full cell; the tasting
+   * bowl hugs its own shallow body (rim → foot) so the ring reads on the
+   * real silhouette, not empty cell space.
+   */
+  private selectionBounds(): { x: number; y: number; w: number; h: number } {
+    if (this.isTastingBowl) {
+      const y = this.rimLocalY - 8;
+      return { x: -7, y, w: this.width + 14, h: this.height + 10 - y };
+    }
+    return { x: -6, y: -2, w: this.width + 12, h: this.height + 8 };
+  }
+
   setSelection(selected: boolean) {
     this.isLifted = selected;
     this.targetLift = selected ? -24 : 0;
@@ -705,11 +858,12 @@ export class CupView {
     // A selected guest cup keeps its completion glow underneath the ring.
     if (this.isSinkOnly && this.lastCup) this.refreshSinkGlow(this.lastCup);
     if (selected) {
+      const b = this.selectionBounds();
       this.glowGraphics
-        .roundRect(-6, -2, this.width + 12, this.height + 8, this.cornerRadius + 4)
+        .roundRect(b.x, b.y, b.w, b.h, this.cornerRadius + 4)
         .fill({ color: 0xf5deb3, alpha: 0.18 });
       this.glowGraphics
-        .roundRect(-3, 1, this.width + 6, this.height + 2, this.cornerRadius + 2)
+        .roundRect(b.x + 3, b.y + 3, b.w - 6, b.h - 6, this.cornerRadius + 2)
         .stroke({ width: 2, color: 0xffe4b5, alpha: 0.65 });
     }
   }
@@ -934,8 +1088,10 @@ export class TeaSortView {
       view.container.cursor = 'pointer';
       // Teapot spout/handle and guest-cup saucer/handle overflow slightly:
       // keep the touch target at least as usable as a normal vessel with
-      // a wider padded hit area (saucer extends below the body too).
-      const padX = view.isTeapot ? 22 : view.isSinkOnly ? 20 : 16;
+      // a wider padded hit area (saucer extends below the body too). The
+      // tasting bowl keeps the full-cell interaction target even though
+      // its visible ceramic is smaller — never shrink to the saucer.
+      const padX = view.isTeapot ? 22 : view.isSinkOnly || view.isTastingBowl ? 20 : 16;
       const padBottom = view.isSinkOnly ? 40 : 32;
       view.container.hitArea = new Rectangle(-padX, -16, view.width + padX * 2, view.height + padBottom);
 
@@ -1086,10 +1242,10 @@ export class TeaSortView {
         const view = this.cupViews[i] as CupView;
         const x = view.container.x;
         const y = view.container.y;
-        // Teapot spout/handle and guest-cup saucer/handle extend beyond
-        // the body: widen the touch padding so special vessels stay at
-        // least as tappable.
-        const touchPadding = view.isTeapot ? 26 : view.isSinkOnly ? 24 : 20;
+        // Teapot spout/handle, guest-cup saucer/handle and the tasting
+        // bowl extend beyond (or sit small inside) the body: widen the
+        // touch padding so special vessels stay at least as tappable.
+        const touchPadding = view.isTeapot ? 26 : view.isSinkOnly || view.isTastingBowl ? 24 : 20;
 
         if (
           clickPos.x >= x - touchPadding &&
@@ -1222,7 +1378,7 @@ export class TeaSortView {
       return 'В чайник нельзя наливать — он только раздаёт настой';
     }
     if (targetCup.isFull) {
-      return 'Стакан полон (4/4)! Выберите другой сосуд или пустой стакан.';
+      return fullVesselHint(targetCup.constraint);
     }
     if (sourceCup.isComplete && targetCup.isEmpty) {
       return 'Этот купаж уже полностью собран!';
@@ -1315,8 +1471,11 @@ export class TeaSortView {
       if (fromCup) sourceView.renderLiquid(fromCup);
       if (toCup) targetView.renderLiquid(toCup);
 
+      // Stream anchors use each vessel's ACTUAL rim: a tasting bowl
+      // pours from (and receives at) its own shallow rim, never from
+      // empty air where a tall cup rim would have been.
       const spoutLocalX = isLeft ? sourceView.width - 2 : 2;
-      const spoutLocalY = 4;
+      const spoutLocalY = sourceView.rimLocalY;
       const rotatedSpout = this.rotatePoint(
         spoutLocalX - sourceView.width / 2,
         spoutLocalY - 10,
@@ -1327,7 +1486,7 @@ export class TeaSortView {
       const spoutY = sourceView.container.y + (10 + rotatedSpout.y) * sourceView.scale;
 
       const destX = targetView.container.x + (targetView.width / 2) * targetView.scale;
-      const destY = targetView.container.y + 12 * targetView.scale;
+      const destY = targetView.container.y + (targetView.rimLocalY + 8) * targetView.scale;
 
       this.drawLiquidStream(spoutX, spoutY, destX, destY, tea.colorNum);
 
@@ -1460,7 +1619,8 @@ export class TeaSortView {
     const teaColor = Number.isNaN(parsed) ? 0xffffff : parsed;
     this.particles.push({
       x: cupView.container.x + cupView.visualWidth / 2 + (Math.random() * 20 - 10) * cupView.scale,
-      y: cupView.container.y + 10 * cupView.scale,
+      // Steam rises from the actual rim (bowl rim for tasting vessels).
+      y: cupView.container.y + (cupView.isTastingBowl ? cupView.rimLocalY : 10) * cupView.scale,
       vx: Math.random() * 0.8 - 0.4,
       vy: -(Math.random() * 1.2 + 0.8),
       alpha: 0.35,
