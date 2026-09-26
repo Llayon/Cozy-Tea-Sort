@@ -31,6 +31,9 @@ src/game/logic/teaSortLogic.ts    Cup + TeaSortLogic = puzzle truth (undo, myste
 src/game/logic/rng.ts             seeded RNG (mulberry32, no external dep)
 src/game/logic/solver.ts          pure BFS solver, Pixi/React-free
 src/game/logic/generator.ts       solver-validated generation, bounded retries + fallback
+src/game/logic/targetTemplates.ts  offline-curated named-serving topologies (fast path)
+src/game/logic/sinkTemplates.ts    offline-curated guest-cup topologies (fast path)
+src/game/logic/tastingTemplates.ts offline-curated tasting-bowl topologies (fast path)
 src/game/logic/difficulty.ts      solver-depth targets + acceptance bands per rhythm phase
 src/game/logic/progression.ts     pure win application (current vs highest, reward-once)
 src/game/storage.ts               safe localStorage load/save with validation
@@ -55,13 +58,13 @@ The old "100% solvable via reverse shuffle" claim was false: arbitrary single-la
 
 Any level is reproducible from its seed (`seed` is stored on the generated level for bug reports).
 
-Canonical target and sink production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts` — topologies discovered offline with the production solver, palette-relative) serve each level with ~1 solver validation (`TARGET_TEMPLATE_ATTEMPTS` / `SINK_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it.
+Canonical target, sink and tasting production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts`, `tastingTemplates.ts` — topologies discovered offline with the production solver, palette-relative) serve each level with ~1 solver validation (`*_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it.
 
 ## Solver
 
 BFS over the exact shared rule table. State key is canonical (cups are unlabeled, so cup encodings are sorted — collapses empty/identical-cup permutations). Constructive moves only (homogeneous-stack → empty relocations are pruned, which also keeps deadlock detection consistent by construction). Supports the maximum puzzle (5 colors, 7 cups, capacity 4). Used at generation time and in tests, not per-frame.
 
-Asymmetric vessels: `CupConstraint` (`normal` | `source-only` | `sink-only`, plus optional `targetTeaId`) travels with every puzzle. Canonicalization groups cups by identical full signature (`N:_`, `N:<tea>`, `SRC:_`, `SNK:_`) and sorts contents only *within* each group — normal, teapot, guest, lavender-target and karkade-target cups never collapse into each other. The homogeneous→empty prune likewise applies only within identical-signature groups AND only when a full stack is already in its final state (emptying a wrongly-filled target or a teapot is real progress, never pruned; moving a finished tea into an empty guest cup changes role groups, so it stays legal and constructive). Win requires source-only vessels to be EMPTY (a full uniform teapot is not a win), sink-only vessels to be FULL + HOMOGENEOUS (any tea; empty/partial/mixed guests are not wins), and target cups to hold exactly full homogeneous `targetTeaId` (empty/wrong/partial targets are not wins).
+Asymmetric vessels: `CupConstraint` (`normal` | `source-only` | `sink-only`, plus optional `targetTeaId`, `capacity`, `mustEndEmpty`) travels with every puzzle. Two decoupled concepts: `TEA_UNITS_PER_COLOR` (4 tea units per color, always) vs vessel capacity (`cupCapacity`: standard 4, tasting bowl 2). Canonicalization groups cups by identical full signature (`N:_`, `N:<tea>`, `SRC:_`, `SNK:_`, `N:_:C2:E` for the tasting bowl — explicit defaults canonicalize identically to omitted fields) and sorts contents only *within* each group. The homogeneous→empty prune likewise applies only within identical-signature groups AND only when a full-for-its-own-capacity stack is already in its final state (emptying a wrongly-filled target, a teapot, or a tasting bowl that must end empty is real progress, never pruned). One shared `cupEndStateSatisfied` helper defines victory per vessel: source-only empty, sink-only full-to-capacity homogeneous, targets full-to-capacity of exactly their tea, tasting bowls empty (even a full homogeneous bowl is not complete), plain normals empty or full-to-capacity homogeneous.
 
 ## Source-only teapot
 
@@ -78,6 +81,10 @@ Flow table (`mode` = pour behavior, `targetTeaId` = final destination — orthog
 | sink-only   | no              | yes (ordinary Water Sort target rules) |
 
 One empty vessel may be a guest cup: it RECEIVES tea but tea can NEVER be poured back out (`source-sink-only` rejection, UI shows «Из чашки гостя нельзя переливать — можно отменить ход.»). Total vessels unchanged (replaces one empty cup, max 7), starts empty at the stable last slot with at least one ordinary empty buffer beside it, must finish full + homogeneous (any tea — no named target, no Mystery inside). Undo is unlimited timeline reversal and restores exact previous layers, so every commitment is recoverable. The first pour into the empty guest effectively chooses which tea is served. Rollout: L18 challenge sink, L19 peak sink + mystery (normal cup), L22 challenge teapot + sink (teapot may pour directly into the guest); later challenge/peak cycles rotate sink / teapot+sink / targets / teapot+targets and sink+mystery / targets+mystery / teapot+mystery / mystery-only; NEVER sink + targets, NEVER three specials (max 2 per level); warmup/relax always clean.
+
+## Tasting bowl (дегустационная пиала)
+
+A small working vessel with capacity 2 and normal flow in both directions — it changes space management, not flow direction. `AAAA` into an empty bowl moves exactly 2 layers; a `2/2` bowl is full (`Пиала заполнена (2/2)!`); its contents pour back out under ordinary color rules. It starts empty at the stable last slot (replacing one empty vessel, max 7 total, one ordinary standard empty buffer always remains) and MUST finish empty — even a full homogeneous bowl is not complete. The optimal solution of every committed template demonstrably routes tea through the bowl (in and back out). Mystery never lives inside it; tasting + sink and tasting + targets are rejected loudly. Rollout: L26 challenge tasting, L27 peak tasting + mystery (standard cup), L30 challenge teapot + tasting; later cycles rotate tasting / teapot+tasting / sink / teapot+sink / targets / teapot+targets (challenge) and tasting/sink/targets/teapot + mystery or mystery-only (peak); NEVER tasting + sink, NEVER tasting + targets, NEVER three specials (max 2 per level); warmup/relax always clean. Visually a shallow gold-rimmed bowl with foot saucer, bottom-aligned in the standard cell (2 readable liquid slots, pour stream anchored to the real rim, full-cell hit area).
 
 ## Named serving (target cups)
 
