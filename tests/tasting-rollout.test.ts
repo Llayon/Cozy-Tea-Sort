@@ -42,7 +42,7 @@ describe('rollout 1–24 unchanged (Gauntlets 0–3)', () => {
 
 describe('rollout 25–32 (Gauntlet 4 tasting-bowl introduction)', () => {
   it('pins the exact specified mechanic mix + subtitles', () => {
-    const expectations: Array<[number, boolean, boolean, string, number, string]> = [
+    const expectations: Array<[number, boolean, boolean, boolean, string, number, string]> = [
       // lvl, teapot, tasting, mystery, phase, totalCups, subtitle fragment
       [25, false, false, false, 'warmup', 5, 'медитативный'],
       [26, false, true, false, 'challenge', 6, 'Дегустационная пиала'],
