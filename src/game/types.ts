@@ -112,6 +112,106 @@ export const ALL_TEA_IDS: readonly TeaId[] = [
 ];
 
 /**
+ * Floating ingredients (Gauntlet 5+): dynamic puzzle objects that ride on
+ * the liquid surface. They are NOT tea — they never participate in
+ * topCountOf, tea quantities, color matching, cup capacity or the TeaId
+ * pool. Future-proof enum: Gauntlet 5 ships exactly one (`lemon`).
+ *
+ * No Pixi/React types may ever appear in this module.
+ */
+export type FloatingIngredientId = 'lemon';
+
+export interface FloatingIngredientType {
+  id: FloatingIngredientId;
+  nameRu: string;
+  /** Tea the ingredient must finish on (full homogeneous standard cup). */
+  targetTeaId: TeaId;
+}
+
+export const FLOATING_INGREDIENT_TYPES = {
+  lemon: {
+    id: 'lemon',
+    nameRu: 'Лимон',
+    targetTeaId: 'sea_buckthorn',
+  },
+} satisfies Record<FloatingIngredientId, FloatingIngredientType>;
+
+/**
+ * Per-vessel floating-ingredient slot: the ingredient id floating on that
+ * vessel's surface, or null. This aligned array is the ONE authoritative
+ * lemon-location representation — never a second mutable cupIndex stored
+ * on an ingredient object somewhere else.
+ */
+export type FloatingIngredientSlot = FloatingIngredientId | null;
+
+/**
+ * Full dynamic puzzle state: tea layers plus independent floating-object
+ * positions. Immutable level data (CupConstraint[], ingredient TYPE
+ * metadata, Mystery definition, difficulty) lives elsewhere; hiddenCounts
+ * stay presentation-only.
+ */
+export interface PuzzleState {
+  cups: TeaId[][];
+  floatingIngredients: FloatingIngredientSlot[];
+}
+
+/**
+ * Read-only view of puzzle state accepted by every state-aware rule,
+ * solver and generator helper (callers may hold mutable or readonly
+ * arrays; legacy tea-only arrays are never accepted here — normalize
+ * first).
+ */
+export interface ReadonlyPuzzleState {
+  cups: readonly TeaId[][];
+  floatingIngredients: readonly FloatingIngredientSlot[] | undefined;
+}
+
+/** All-null slots for a vessel count (ordinary old levels). */
+export function emptyFloatingIngredients(count: number): FloatingIngredientSlot[] {
+  return Array.from({ length: count }, () => null);
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers that only pass
+ * `TeaId[][]` synthesize all-null slots. Wrong-length arrays are
+ * padded/truncated defensively (production validation rejects them).
+ */
+export function normalizeFloatingIngredients(
+  slots: readonly FloatingIngredientSlot[] | undefined,
+  count: number,
+): FloatingIngredientSlot[] {
+  if (!slots) return emptyFloatingIngredients(count);
+  const out: FloatingIngredientSlot[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(slots[i] ?? null);
+  }
+  return out;
+}
+
+/** Defensive deep copy of a puzzle state (no shared arrays). */
+export function clonePuzzleState(state: PuzzleState): PuzzleState {
+  return {
+    cups: state.cups.map((c) => [...c]),
+    floatingIngredients: [...state.floatingIngredients],
+  };
+}
+
+/** Vessel index hosting an ingredient id, or -1 when absent. */
+export function floatingIngredientIndex(
+  state: { floatingIngredients: readonly FloatingIngredientSlot[] | undefined },
+  id: FloatingIngredientId,
+): number {
+  return (state.floatingIngredients ?? []).findIndex((s) => s === id);
+}
+
+/** Total floating ingredients present in a state. */
+export function countFloatingIngredients(state: {
+  floatingIngredients: readonly FloatingIngredientSlot[] | undefined;
+}): number {
+  return (state.floatingIngredients ?? []).filter((s) => s !== null).length;
+}
+
+/**
  * STANDARD TEA QUANTITY PER COLOR (Gauntlet 4 decoupling).
  *
  * Every active TeaId always contributes exactly this many units to a

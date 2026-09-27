@@ -1,7 +1,7 @@
 /**
  * Deterministic BFS solver for the actual game rules.
  *
- * Pure: operates on `TeaId[][]`, never touches Pixi/React.
+ * Pure: operates on puzzle state, never touches Pixi/React.
  * Uses the shared `rules.ts` move table so solver, UI, generator
  * and deadlock detection can never diverge.
  *
@@ -10,16 +10,31 @@
  * groups cups by identical constraint signature — normal and
  * source-only vessels are never interchangeable. The constructive-move
  * pruning (`homogeneous -> empty`) is likewise applied only within
- * identical-constraint groups (see `rules.isConstructiveMove`).
+ * identical-constraint groups (see `rules.isConstructiveMoveState`).
+ *
+ * Floating ingredients (Gauntlet 5): the BFS queue carries full
+ * `PuzzleState` (tea + ingredient slots) and keys on
+ * `canonicalPuzzleKey`. Callers without ingredients get byte-identical
+ * legacy behavior (same keys, same verdicts). Ingredient movement is
+ * deterministic from state + move, so `SolverMove` is unchanged.
  */
 
-import { CupConstraint, TeaId, normalizeCupConstraints } from '../types';
+import {
+  CupConstraint,
+  FloatingIngredientSlot,
+  PuzzleState,
+  ReadonlyPuzzleState,
+  TeaId,
+  normalizeCupConstraints,
+  normalizeFloatingIngredients,
+} from '../types';
 import {
   applyPour,
-  canonicalKey,
+  applyPourState,
+  canonicalPuzzleKey,
   isHomogeneous,
-  isWonState,
-  listLegalMoves,
+  isPuzzleWonState,
+  listLegalMovesState,
 } from './rules';
 
 export interface SolverMove {
@@ -49,6 +64,11 @@ export interface SolverOptions {
   returnSolution?: boolean;
   /** Per-vessel behavioral constraints, aligned with cup indices. */
   cupConstraints?: readonly CupConstraint[];
+  /**
+   * Floating-ingredient slots, aligned with cup indices (Gauntlet 5).
+   * Omitted (or all null) = legacy tea-only behavior, unchanged.
+   */
+  floatingIngredients?: readonly FloatingIngredientSlot[];
 }
 
 const DEFAULT_MAX_VISITED = 200_000;
@@ -63,18 +83,21 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     : undefined;
 
   // Never mutate caller input.
-  const start: TeaId[][] = cups.map((c) => [...c]);
+  const start: PuzzleState = {
+    cups: cups.map((c) => [...c]),
+    floatingIngredients: normalizeFloatingIngredients(opts.floatingIngredients, cups.length),
+  };
 
-  if (isWonState(start, constraints)) {
+  if (isPuzzleWonState(start, constraints)) {
     return { solvable: true, minMoves: 0, visitedStates: 1, solution: [] };
   }
 
   const visited = new Set<string>();
-  visited.add(canonicalKey(start, constraints));
+  visited.add(canonicalPuzzleKey(start, constraints));
 
   // BFS queue with head pointer (no shift()).
-  const queue: Array<{ cups: TeaId[][]; depth: number; path: SolverMove[] }> = [
-    { cups: start, depth: 0, path: [] },
+  const queue: Array<{ state: PuzzleState; depth: number; path: SolverMove[] }> = [
+    { state: start, depth: 0, path: [] },
   ];
   let head = 0;
 
@@ -82,25 +105,27 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     if (visited.size >= maxVisited) {
       return { solvable: false, visitedStates: visited.size, truncated: true };
     }
-    const node = queue[head++] as { cups: TeaId[][]; depth: number; path: SolverMove[] };
+    const node = queue[head++] as { state: PuzzleState; depth: number; path: SolverMove[] };
     if (node.depth >= maxDepth) continue;
 
     // Constructive moves only — same set deadlock detection uses.
     // (Homogeneous stack -> empty only permutes identical cups WITHIN the
-    // same constraint group; cross-group moves stay constructive.)
-    const moves = listLegalMoves(node.cups, true, constraints);
+    // same constraint group; cross-group moves stay constructive. The
+    // ingredient marker travels with its contents, so the same argument
+    // covers ingredient-carrying relocations.)
+    const moves = listLegalMovesState(node.state, true, constraints);
 
     for (const m of moves) {
-      const res = applyPour(node.cups, m.from, m.to, constraints);
+      const res = applyPourState(node.state, m.from, m.to, constraints);
       if (!res) continue;
-      const key = canonicalKey(res.cups, constraints);
+      const key = canonicalPuzzleKey(res.state, constraints);
       if (visited.has(key)) continue;
       visited.add(key);
 
       const step: SolverMove = { from: m.from, to: m.to, layer: res.layer, count: res.transferred };
       const nextDepth = node.depth + 1;
 
-      if (isWonState(res.cups, constraints)) {
+      if (isPuzzleWonState(res.state, constraints)) {
         const solution = returnSolution ? [...node.path, step] : undefined;
         return {
           solvable: true,
@@ -111,7 +136,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
       }
 
       queue.push({
-        cups: res.cups,
+        state: res.state,
         depth: nextDepth,
         path: returnSolution ? [...node.path, step] : [],
       });
@@ -125,6 +150,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
  * Replay a solver path against a board (test/debug helper).
  * Returns the final board, or null if any step is illegal.
  * Constraint-aware: pass the same `cupConstraints` the solver used.
+ * Tea-only: on ingredient levels use `applySolutionState` instead.
  */
 export function applySolution(
   cups: TeaId[][],
@@ -143,6 +169,29 @@ export function applySolution(
     if (!res) return null;
     void isHomogeneous;
     board = res.cups;
+  }
+  return board;
+}
+
+/**
+ * State-aware replay (Gauntlet 5): replays a solver path against a full
+ * puzzle state, tracking ingredient rides. Returns the final state, or
+ * null if any step is illegal. Lemon tests MUST use this.
+ */
+export function applySolutionState(
+  state: ReadonlyPuzzleState,
+  solution: SolverMove[],
+  cupConstraints?: readonly CupConstraint[],
+): PuzzleState | null {
+  let board: PuzzleState = {
+    cups: state.cups.map((c) => [...c]),
+    floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+  };
+  for (const step of solution) {
+    const res = applyPourState(board, step.from, step.to, cupConstraints);
+    if (!res) return null;
+    void isHomogeneous;
+    board = res.state;
   }
   return board;
 }

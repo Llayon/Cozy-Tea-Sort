@@ -10,26 +10,42 @@
  * move legality delegates to the shared `rules.ts` table. Undo is
  * timeline reversal and restores exact previous layers even when forward
  * rules forbid pouring out of a sink-only guest cup.
+ *
+ * Floating ingredients (Gauntlet 5): each cup carries its own mutable
+ * surface slot (`floatingIngredient`, default null) — the cups array is
+ * the single source, and `toState()` reconstructs the aligned
+ * `floatingIngredients` array from it. Snapshots capture exact slots, so
+ * Undo restores lemon position with zero guessing.
  */
 
 import {
   CupConstraint,
+  FloatingIngredientSlot,
   TeaId,
   cloneCupConstraint,
   cupCapacity,
   isTastingCupConstraint,
   normalizeCupConstraints,
+  normalizeFloatingIngredients,
 } from '../types';
 import {
-  applyPour,
-  canPourBetween,
+  applyPourState,
+  canPourState,
   cupEndStateSatisfied,
-  isDeadlockedState,
   isHomogeneous,
-  isWonState,
+  isPuzzleDeadlockedState,
+  isPuzzleWonState,
   topCountOf,
   topLayerOf,
 } from './rules';
+
+/** Named initial state for a level (preferred over long positional lists). */
+export interface LevelInitialState {
+  cups: TeaId[][];
+  hiddenCounts?: number[];
+  cupConstraints?: readonly CupConstraint[];
+  floatingIngredients?: readonly FloatingIngredientSlot[];
+}
 
 export class Cup {
   id: number;
@@ -42,16 +58,36 @@ export class Cup {
    * (backwards compatible). Never mutated by moves/undo/restart.
    */
   constraint: CupConstraint = { mode: 'normal' };
+  /**
+   * Floating ingredient riding this vessel's surface (Gauntlet 5),
+   * or null. Mutable dynamic state — moves/undo/restart update it
+   * exactly; the cups array owns it (no second mutable truth).
+   */
+  floatingIngredient: FloatingIngredientSlot = null;
 
-  constructor(id: number, initialLayers: TeaId[] = [], hiddenCount = 0, constraint?: CupConstraint) {
+  constructor(
+    id: number,
+    initialLayers: TeaId[] = [],
+    hiddenCount = 0,
+    constraint?: CupConstraint,
+    floatingIngredient: FloatingIngredientSlot = null,
+  ) {
     this.id = id;
     this.layers = [...initialLayers];
     this.hiddenCount = Math.min(hiddenCount, Math.max(0, this.layers.length - 1));
     if (constraint) this.constraint = cloneCupConstraint(constraint);
+    this.floatingIngredient = floatingIngredient ?? null;
   }
 
   clone(): Cup {
-    return new Cup(this.id, [...this.layers], this.hiddenCount, cloneCupConstraint(this.constraint));
+    const c = new Cup(
+      this.id,
+      [...this.layers],
+      this.hiddenCount,
+      cloneCupConstraint(this.constraint),
+      this.floatingIngredient,
+    );
+    return c;
   }
 
   get mode(): 'normal' | 'source-only' | 'sink-only' {
@@ -141,27 +177,34 @@ export class Cup {
   }
 
   canPourInto(target: Cup): boolean {
-    // Delegate to the shared rule table via lightweight board view.
-    // Constraints travel alongside so teapot-as-destination is rejected here.
-    return canPourBetween(
-      [this.layers, target.layers],
+    // Delegate to the shared state-aware rule table via a lightweight
+    // board view. Slots travel alongside so ingredient collision is
+    // honored here too.
+    return canPourState(
+      { cups: [this.layers, target.layers], floatingIngredients: [this.floatingIngredient, target.floatingIngredient] },
       0,
       1,
       [this.constraint, target.constraint],
     );
   }
 
-  pourInto(target: Cup): { transferred: number; layer: TeaId } | null {
-    const res = applyPour(
-      [this.layers, target.layers],
+  pourInto(target: Cup): { transferred: number; layer: TeaId; floatingIngredientMoved?: FloatingIngredientSlot } | null {
+    const res = applyPourState(
+      { cups: [this.layers, target.layers], floatingIngredients: [this.floatingIngredient, target.floatingIngredient] },
       0,
       1,
       [this.constraint, target.constraint],
     );
     if (!res) return null;
-    this.layers = [...(res.cups[0] as TeaId[])];
-    target.layers = [...(res.cups[1] as TeaId[])];
-    return { transferred: res.transferred, layer: res.layer };
+    this.layers = [...(res.state.cups[0] as TeaId[])];
+    target.layers = [...(res.state.cups[1] as TeaId[])];
+    this.floatingIngredient = res.state.floatingIngredients[0] ?? null;
+    target.floatingIngredient = res.state.floatingIngredients[1] ?? null;
+    return {
+      transferred: res.transferred,
+      layer: res.layer,
+      floatingIngredientMoved: res.floatingIngredientMoved ?? null,
+    };
   }
 }
 
@@ -175,6 +218,7 @@ export interface MoveStep {
 export interface GameStateSnapshot {
   cups: TeaId[][];
   hiddenCounts: number[];
+  floatingIngredients: FloatingIngredientSlot[];
   move: MoveStep;
 }
 
@@ -187,9 +231,10 @@ export class TeaSortLogic {
     initialCups: TeaId[][] = [],
     hiddenCounts: number[] = [],
     cupConstraints?: readonly CupConstraint[],
+    floatingIngredients?: readonly FloatingIngredientSlot[],
   ) {
     if (initialCups.length > 0) {
-      this.initFromState(initialCups, hiddenCounts, cupConstraints);
+      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients);
     }
   }
 
@@ -197,14 +242,21 @@ export class TeaSortLogic {
     state: TeaId[][],
     hiddenCounts: number[] = [],
     cupConstraints?: readonly CupConstraint[],
+    floatingIngredients?: readonly FloatingIngredientSlot[],
   ) {
     const normalized = normalizeCupConstraints(cupConstraints, state.length);
+    const slots = normalizeFloatingIngredients(floatingIngredients, state.length);
     this.cups = state.map(
       (layers, idx) =>
-        new Cup(idx, layers, hiddenCounts[idx] ?? 0, normalized[idx] as CupConstraint),
+        new Cup(idx, layers, hiddenCounts[idx] ?? 0, normalized[idx] as CupConstraint, slots[idx] ?? null),
     );
     this.history = [];
     this.movesCount = 0;
+  }
+
+  /** Initialize from a named state object (preferred for lemon levels). */
+  initFromPuzzleState(init: LevelInitialState): void {
+    this.initFromState(init.cups, init.hiddenCounts, init.cupConstraints, init.floatingIngredients);
   }
 
   /** Immutable per-vessel constraints for the current puzzle (defensive copies). */
@@ -212,12 +264,23 @@ export class TeaSortLogic {
     return this.cups.map((c) => cloneCupConstraint(c.constraint));
   }
 
+  /** Aligned floating-ingredient slots, reconstructed from the cups. */
+  get floatingIngredients(): FloatingIngredientSlot[] {
+    return this.cups.map((c) => c.floatingIngredient ?? null);
+  }
+
   /** Current board as plain arrays (defensive copies). */
-  toState(): { cups: TeaId[][]; hiddenCounts: number[]; cupConstraints: CupConstraint[] } {
+  toState(): {
+    cups: TeaId[][];
+    hiddenCounts: number[];
+    cupConstraints: CupConstraint[];
+    floatingIngredients: FloatingIngredientSlot[];
+  } {
     return {
       cups: this.cups.map((c) => [...c.layers]),
       hiddenCounts: this.cups.map((c) => c.hiddenCount),
       cupConstraints: this.cupConstraints,
+      floatingIngredients: this.floatingIngredients,
     };
   }
 
@@ -225,19 +288,29 @@ export class TeaSortLogic {
     return this.cups.map((c) => c.constraint);
   }
 
+  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[] } {
+    return {
+      cups: this.cups.map((c) => c.layers),
+      floatingIngredients: this.floatingIngredients,
+    };
+  }
+
   canMakeMove(fromIdx: number, toIdx: number): boolean {
     if (fromIdx < 0 || fromIdx >= this.cups.length) return false;
     if (toIdx < 0 || toIdx >= this.cups.length) return false;
-    const board = this.cups.map((c) => c.layers);
-    return canPourBetween(board, fromIdx, toIdx, this.boardConstraints());
+    return canPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints());
   }
 
-  makeMove(fromIdx: number, toIdx: number): { move: MoveStep; sourceUncovered: boolean } | null {
+  makeMove(
+    fromIdx: number,
+    toIdx: number,
+  ): { move: MoveStep; sourceUncovered: boolean; floatingIngredientMoved?: FloatingIngredientSlot } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
       cups: this.cups.map((c) => [...c.layers]),
       hiddenCounts: this.cups.map((c) => c.hiddenCount),
+      floatingIngredients: this.floatingIngredients,
       move: {
         fromCupIndex: fromIdx,
         toCupIndex: toIdx,
@@ -253,15 +326,21 @@ export class TeaSortLogic {
     snapshot.move.count = res.transferred;
     this.history.push(snapshot);
     this.movesCount++;
-    return { move: snapshot.move, sourceUncovered };
+    return {
+      move: snapshot.move,
+      sourceUncovered,
+      floatingIngredientMoved: res.floatingIngredientMoved ?? null,
+    };
   }
 
   undo(): MoveStep | null {
     if (this.history.length === 0) return null;
     const last = this.history.pop() as GameStateSnapshot;
+    const slots = normalizeFloatingIngredients(last.floatingIngredients, this.cups.length);
     this.cups.forEach((cup, idx) => {
       cup.layers = [...(last.cups[idx] ?? [])];
       cup.hiddenCount = last.hiddenCounts[idx] ?? 0;
+      cup.floatingIngredient = slots[idx] ?? null;
       // Constraints are immutable level-definition data: never restored
       // from snapshots, the teapot role stays fixed for the whole level.
     });
@@ -274,16 +353,10 @@ export class TeaSortLogic {
   }
 
   isWon(): boolean {
-    return isWonState(
-      this.cups.map((c) => c.layers),
-      this.boardConstraints(),
-    );
+    return isPuzzleWonState(this.puzzleState(), this.boardConstraints());
   }
 
   isDeadlocked(): boolean {
-    return isDeadlockedState(
-      this.cups.map((c) => c.layers),
-      this.boardConstraints(),
-    );
+    return isPuzzleDeadlockedState(this.puzzleState(), this.boardConstraints());
   }
 }

@@ -37,6 +37,19 @@
  * - Tea quantity per color (`TEA_UNITS_PER_COLOR`) is a separate concept
  *   and never shrinks because a small vessel exists.
  *
+ * Floating ingredients (Gauntlet 5 — lemon slice):
+ * - the lemon is dynamic CONTENT state (`PuzzleState.floatingIngredients`,
+ *   an aligned array — the one authoritative location), never a TeaId,
+ *   never capacity, never a constraint.
+ * - it rides the surface: any legal outflow from its host carries it to
+ *   the destination; inflow never pushes it away; illegal pours leave it
+ *   untouched (atomic transition).
+ * - it must finish on a full homogeneous standard sea_buckthorn cup.
+ * - the `*State` functions below are the single transition truth; the
+ *   legacy tea-only APIs delegate with all-null slots and behave exactly
+ *   as before (including identical canonical strings for lemon-free
+ *   boards).
+ *
  * `Cup.canPourInto`, the solver, the generator and deadlock detection
  * must ALL delegate to this module so the rules cannot diverge.
  *
@@ -45,12 +58,18 @@
 
 import {
   CupConstraint,
+  FLOATING_INGREDIENT_TYPES,
+  FloatingIngredientId,
+  PuzzleState,
+  ReadonlyPuzzleState,
   STANDARD_CUP_CAPACITY,
   TeaId,
   cupCapacity,
   cupConstraintSignature,
+  emptyFloatingIngredients,
   mustEndEmpty,
   normalizeCupConstraints,
+  normalizeFloatingIngredients,
 } from '../types';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
@@ -64,6 +83,7 @@ export type PourRejectCode =
   | 'source-sink-only'
   | 'target-full'
   | 'target-source-only'
+  | 'target-floating-occupied'
   | 'complete-to-empty'
   | 'color-mismatch';
 
@@ -193,10 +213,12 @@ function isPrunableHomogeneousToEmpty(
 }
 
 /**
- * Full legality reason shared by UI, solver and generator.
- * Returns 'ok' when the pour is legal.
+ * Tea-only legality core (private): color/capacity/role rules WITHOUT
+ * floating-ingredient interaction. The state-aware
+ * `pourRejectCodeState` below is the single truth; legacy callers reach
+ * this core through it with all-null slots.
  */
-export function pourRejectCodeBetween(
+function teaRejectCodeBetween(
   cups: readonly TeaId[][],
   fromIdx: number,
   toIdx: number,
@@ -239,6 +261,60 @@ export function pourRejectCodeBetween(
 }
 
 /**
+ * State-aware legality (single truth): tea rules first, then
+ * floating-ingredient collision. The lemon never alters color/capacity
+ * legality — but a source ingredient meeting an already-occupied target
+ * slot is rejected fail-closed (`target-floating-occupied`) rather than
+ * overwriting. Illegal tea pours leave ingredient state untouched.
+ */
+export function pourRejectCodeState(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): PourRejectCode {
+  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints);
+  if (tea !== 'ok') return tea;
+  const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  const srcIng = slots[fromIdx];
+  const dstIng = slots[toIdx];
+  if (srcIng != null && dstIng != null) return 'target-floating-occupied';
+  return 'ok';
+}
+
+/**
+ * Full legality reason shared by UI, solver and generator.
+ * Returns 'ok' when the pour is legal. Legacy wrapper: delegates to the
+ * state-aware truth with all-null slots (identical behavior).
+ */
+export function pourRejectCodeBetween(
+  cups: readonly TeaId[][],
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): PourRejectCode {
+  return pourRejectCodeState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+    fromIdx,
+    toIdx,
+    constraints,
+  );
+}
+
+/**
+ * State-aware legality check. Legacy wrapper below delegates with
+ * all-null slots.
+ */
+export function canPourState(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  return pourRejectCodeState(state, fromIdx, toIdx, constraints) === 'ok';
+}
+
+/**
  * Full legality check shared by UI, solver and generator.
  * Returns false for out-of-range indices as well.
  * When `constraints` is omitted, all vessels are treated as normal
@@ -253,6 +329,21 @@ export function canPourBetween(
   return pourRejectCodeBetween(cups, fromIdx, toIdx, constraints) === 'ok';
 }
 
+/** State-aware transfer count (0 when illegal). Ingredient is weightless. */
+export function pourCountState(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): number {
+  if (!canPourState(state, fromIdx, toIdx, constraints)) return 0;
+  const source = state.cups[fromIdx] as TeaId[];
+  const target = state.cups[toIdx] as TeaId[];
+  // Transfer is bounded by the DESTINATION's free space: AAAA into an
+  // empty tasting bowl moves exactly 2 layers, never 4.
+  return Math.min(topCountOf(source), cupCapacity(constraints?.[toIdx]) - target.length);
+}
+
 /** Number of layers that would transfer (0 when illegal). */
 export function pourCountBetween(
   cups: readonly TeaId[][],
@@ -260,12 +351,12 @@ export function pourCountBetween(
   toIdx: number,
   constraints?: readonly CupConstraint[],
 ): number {
-  if (!canPourBetween(cups, fromIdx, toIdx, constraints)) return 0;
-  const source = cups[fromIdx] as TeaId[];
-  const target = cups[toIdx] as TeaId[];
-  // Transfer is bounded by the DESTINATION's free space: AAAA into an
-  // empty tasting bowl moves exactly 2 layers, never 4.
-  return Math.min(topCountOf(source), cupCapacity(constraints?.[toIdx]) - target.length);
+  return pourCountState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+    fromIdx,
+    toIdx,
+    constraints,
+  );
 }
 
 /**
@@ -281,15 +372,24 @@ export function pourCountBetween(
  * behavioral/end-state group holds the tea, so it IS constructive.
  * Uses the same predicate as legality so the two can never diverge.
  */
-export function isConstructiveMove(
-  cups: readonly TeaId[][],
+/**
+ * State-aware constructive-move classification (single truth). The lemon
+ * does NOT automatically make a move constructive: a homogeneous stack
+ * (with its riding ingredient, if any) relocated into an empty cup of the
+ * SAME signature group merely permutes interchangeable vessels — the
+ * canonical state key is invariant, so the prune stays sound. Any move
+ * that changes the ingredient relative to different tea contents or a
+ * different vessel group stays constructive.
+ */
+export function isConstructiveMoveState(
+  state: ReadonlyPuzzleState,
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
 ): boolean {
-  if (!canPourBetween(cups, fromIdx, toIdx, constraints)) return false;
-  const source = cups[fromIdx] as TeaId[];
-  const target = cups[toIdx] as TeaId[];
+  if (!canPourState(state, fromIdx, toIdx, constraints)) return false;
+  const source = state.cups[fromIdx] as TeaId[];
+  const target = state.cups[toIdx] as TeaId[];
   if (
     target.length === 0 &&
     isPrunableHomogeneousToEmpty(source, constraints?.[fromIdx], constraints?.[toIdx])
@@ -299,23 +399,96 @@ export function isConstructiveMove(
   return true;
 }
 
+export function isConstructiveMove(
+  cups: readonly TeaId[][],
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  return isConstructiveMoveState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+    fromIdx,
+    toIdx,
+    constraints,
+  );
+}
+
+export function listLegalMovesState(
+  state: ReadonlyPuzzleState,
+  constructiveOnly = false,
+  constraints?: readonly CupConstraint[],
+): Array<{ from: number; to: number; count: number }> {
+  const out: Array<{ from: number; to: number; count: number }> = [];
+  for (let from = 0; from < state.cups.length; from++) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (from === to) continue;
+      const ok = constructiveOnly
+        ? isConstructiveMoveState(state, from, to, constraints)
+        : canPourState(state, from, to, constraints);
+      if (!ok) continue;
+      out.push({ from, to, count: pourCountState(state, from, to, constraints) });
+    }
+  }
+  return out;
+}
+
 export function listLegalMoves(
   cups: readonly TeaId[][],
   constructiveOnly = false,
   constraints?: readonly CupConstraint[],
 ): Array<{ from: number; to: number; count: number }> {
-  const out: Array<{ from: number; to: number; count: number }> = [];
-  for (let from = 0; from < cups.length; from++) {
-    for (let to = 0; to < cups.length; to++) {
-      if (from === to) continue;
-      const ok = constructiveOnly
-        ? isConstructiveMove(cups, from, to, constraints)
-        : canPourBetween(cups, from, to, constraints);
-      if (!ok) continue;
-      out.push({ from, to, count: pourCountBetween(cups, from, to, constraints) });
-    }
+  return listLegalMovesState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+    constructiveOnly,
+    constraints,
+  );
+}
+
+export interface PourStateResult {
+  state: PuzzleState;
+  transferred: number;
+  layer: TeaId;
+  /** Ingredient that rode this pour, if any (for animation metadata). */
+  floatingIngredientMoved?: FloatingIngredientId;
+}
+
+/**
+ * Atomic pure state transition (single truth): tea movement plus the
+ * ingredient ride in ONE operation. The source's ingredient (if any)
+ * moves to the destination; an ingredient-free source leaves slots
+ * unchanged; inflow never displaces a destination ingredient (collision
+ * is rejected in legality, never overwritten here).
+ */
+export function applyPourState(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): PourStateResult | null {
+  const count = pourCountState(state, fromIdx, toIdx, constraints);
+  if (count <= 0) return null;
+  const nextCups: TeaId[][] = state.cups.map((c) => [...c]);
+  const nextSlots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  const source = nextCups[fromIdx] as TeaId[];
+  const target = nextCups[toIdx] as TeaId[];
+  const layer = topLayerOf(source) as TeaId;
+  for (let i = 0; i < count; i++) {
+    source.pop();
+    target.push(layer);
   }
-  return out;
+  const moved = nextSlots[fromIdx] ?? null;
+  let floatingIngredientMoved: FloatingIngredientId | undefined;
+  if (moved != null) {
+    nextSlots[toIdx] = moved;
+    nextSlots[fromIdx] = null;
+    floatingIngredientMoved = moved;
+  }
+  return {
+    state: { cups: nextCups, floatingIngredients: nextSlots },
+    transferred: count,
+    layer,
+    floatingIngredientMoved,
+  };
 }
 
 /** Pure pour: returns a fresh board or null when illegal. */
@@ -325,17 +498,14 @@ export function applyPour(
   toIdx: number,
   constraints?: readonly CupConstraint[],
 ): { cups: TeaId[][]; transferred: number; layer: TeaId } | null {
-  const count = pourCountBetween(cups, fromIdx, toIdx, constraints);
-  if (count <= 0) return null;
-  const next: TeaId[][] = cups.map((c) => [...c]);
-  const source = next[fromIdx] as TeaId[];
-  const target = next[toIdx] as TeaId[];
-  const layer = topLayerOf(source) as TeaId;
-  for (let i = 0; i < count; i++) {
-    source.pop();
-    target.push(layer);
-  }
-  return { cups: next, transferred: count, layer };
+  const res = applyPourState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+    fromIdx,
+    toIdx,
+    constraints,
+  );
+  if (!res) return null;
+  return { cups: res.state.cups, transferred: res.transferred, layer: res.layer };
 }
 
 /**
@@ -361,19 +531,10 @@ export function targetCupState(
 }
 
 /**
- * Win semantics with asymmetric vessels, named serving and tasting bowls.
- * Every vessel must satisfy the single shared `cupEndStateSatisfied`
- * helper (no duplicated completion logic): source-only vessels empty,
- * sink-only full-to-capacity homogeneous, targets full-to-capacity of
- * exactly their tea, tasting bowls (must-end-empty) empty, plain normals
- * empty or full-to-capacity homogeneous. At least one non-empty vessel
- * must be completed (an all-empty board is not a win).
- * When `constraints` is omitted, all vessels are normal (legacy).
+ * Tea-only win core (private): every vessel satisfies
+ * `cupEndStateSatisfied`, plus at least one non-empty completed vessel.
  */
-export function isWonState(
-  cups: readonly TeaId[][],
-  constraints?: readonly CupConstraint[],
-): boolean {
+function teaWonState(cups: readonly TeaId[][], constraints?: readonly CupConstraint[]): boolean {
   let completed = 0;
   for (let i = 0; i < cups.length; i++) {
     const cup = cups[i] as TeaId[];
@@ -383,6 +544,76 @@ export function isWonState(
     completed++;
   }
   return completed > 0;
+}
+
+/**
+ * Win semantics with asymmetric vessels, named serving and tasting bowls.
+ * (Tea-only legacy: ingredient-free boards behave exactly as before.)
+ * When `constraints` is omitted, all vessels are normal (legacy).
+ */
+export function isWonState(
+  cups: readonly TeaId[][],
+  constraints?: readonly CupConstraint[],
+): boolean {
+  return teaWonState(cups, constraints);
+}
+
+/**
+ * Lemon final-host rule, fail-closed (Gauntlet 5 §20): the host must be a
+ * plain standard normal vessel (no target, standard capacity, no
+ * must-end-empty) holding exactly full homogeneous target tea. Teapots,
+ * sinks, tasting bowls, named targets, partial/mixed/empty cups and wrong
+ * teas all fail — as do unknown future ingredient ids.
+ */
+export function floatingIngredientHostSatisfied(
+  id: FloatingIngredientId,
+  layers: TeaId[],
+  c: CupConstraint | undefined,
+): boolean {
+  const known = (FLOATING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[id];
+  if (!known) return false;
+  if (!c || c.mode !== 'normal') return false;
+  if (c.targetTeaId !== undefined) return false;
+  if (cupCapacity(c) !== STANDARD_CUP_CAPACITY) return false;
+  if (mustEndEmpty(c)) return false;
+  if (layers.length !== STANDARD_CUP_CAPACITY) return false;
+  if (!isHomogeneous(layers)) return false;
+  return layers[0] === known.targetTeaId;
+}
+
+/**
+ * Floating-ingredient victory goals: no-ingredient boards pass; otherwise
+ * every present ingredient must sit on a satisfying host, with no
+ * duplicates and no unknown ids. Malformed states fail closed.
+ */
+export function floatingIngredientGoalsSatisfied(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  const present = slots.filter((s): s is FloatingIngredientId => s != null);
+  if (new Set(present).size !== present.length) return false;
+  for (let i = 0; i < slots.length; i++) {
+    const id = slots[i];
+    if (id == null) continue;
+    if (!floatingIngredientHostSatisfied(id, state.cups[i] as TeaId[], constraints?.[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Canonical puzzle win: tea sorted AND every floating ingredient on its
+ * correct completed tea. A tea-sorted board with the lemon on matcha is
+ * NOT won.
+ */
+export function isPuzzleWonState(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  if (!teaWonState(state.cups, constraints)) return false;
+  return floatingIngredientGoalsSatisfied(state, constraints);
 }
 
 /**
@@ -396,8 +627,22 @@ export function isDeadlockedState(
   cups: readonly TeaId[][],
   constraints?: readonly CupConstraint[],
 ): boolean {
-  if (isWonState(cups, constraints)) return false;
+  if (teaWonState(cups, constraints)) return false;
   return listLegalMoves(cups, true, constraints).length === 0;
+}
+
+/**
+ * Puzzle deadlock (single truth for runtime): a tea-sorted board with the
+ * lemon on the wrong tea is NOT won — and with no constructive puzzle
+ * move left, it IS deadlocked. TeaSortLogic must use this, never the
+ * tea-only helper, on ingredient levels.
+ */
+export function isPuzzleDeadlockedState(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  if (isPuzzleWonState(state, constraints)) return false;
+  return listLegalMovesState(state, true, constraints).length === 0;
 }
 
 /**
@@ -417,13 +662,17 @@ export function isDeadlockedState(
  * Tea OUT OF a full tasting bowl into an empty normal is real progress
  * (the bowl must end empty), never a symmetric relocation.
  *
+ * Floating ingredients (Gauntlet 5) join the encoding as content
+ * markers (`A,A,B,B#_` vs `A,A,B,B#lemon`): the marker travels WITH the
+ * tea as one unit and sorts inside the same vessel-signature group, so
+ * permuting interchangeable vessels (contents + marker together) stays
+ * canonical, while genuinely different ingredient placements key
+ * differently. Lemon-free boards produce byte-identical legacy keys.
+ *
  * When `constraints` is omitted (or all normal), this is exactly the
  * legacy key (all encodings sorted together).
  */
-export function canonicalKey(
-  cups: readonly TeaId[][],
-  constraints?: readonly CupConstraint[],
-): string {
+function teaCanonicalKey(cups: readonly TeaId[][], constraints?: readonly CupConstraint[]): string {
   if (!constraints) {
     const parts = cups.map((c) => c.join(','));
     parts.sort();
@@ -434,6 +683,46 @@ export function canonicalKey(
   cups.forEach((cup, idx) => {
     const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
     const enc = cup.join(',');
+    const arr = groups.get(sig);
+    if (arr) arr.push(enc);
+    else groups.set(sig, [enc]);
+  });
+  const orderedSigs = [...groups.keys()].sort();
+  const sections = orderedSigs.map((sig) => {
+    const arr = groups.get(sig) as string[];
+    arr.sort();
+    return `${sig}:${arr.join('|')}`;
+  });
+  return sections.join('||');
+}
+
+export function canonicalKey(
+  cups: readonly TeaId[][],
+  constraints?: readonly CupConstraint[],
+): string {
+  return teaCanonicalKey(cups, constraints);
+}
+
+/**
+ * Canonical puzzle key (single truth for the solver): tea contents +
+ * vessel signatures + floating-ingredient markers. With no ingredients
+ * present this returns EXACTLY the legacy key (same strings, same BFS
+ * state counts — no representation-driven explosion for old levels).
+ */
+export function canonicalPuzzleKey(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): string {
+  const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  if (!slots.some((s) => s != null)) {
+    return teaCanonicalKey(state.cups, constraints);
+  }
+  const normalized = normalizeCupConstraints(constraints, state.cups.length);
+  const groups = new Map<string, string[]>();
+  state.cups.forEach((cup, idx) => {
+    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const marker = slots[idx] ?? '_';
+    const enc = `${cup.join(',')}#${marker}`;
     const arr = groups.get(sig);
     if (arr) arr.push(enc);
     else groups.set(sig, [enc]);
