@@ -150,6 +150,36 @@ describe('F–G. win + completion semantics', () => {
     expect(isWonState([[], [A, A, A, A], [B, B, B, B]], [T, N, N])).toBe(true);
   });
 
+  it('G2. malformed contradictory constraints never satisfy (fail-closed)', () => {
+    // Source-only carrying a target: never satisfied, even empty.
+    expect(cupEndStateSatisfied([], { mode: 'source-only', targetTeaId: A })).toBe(false);
+    expect(cupEndStateSatisfied([A, B], { mode: 'source-only', targetTeaId: A })).toBe(false);
+    // Sink with a target, or sink simultaneously required to end empty.
+    expect(cupEndStateSatisfied([A, A, A, A], { mode: 'sink-only', targetTeaId: A })).toBe(false);
+    expect(
+      cupEndStateSatisfied([A, A, A, A], { mode: 'sink-only', mustEndEmpty: true }),
+    ).toBe(false);
+    expect(cupEndStateSatisfied([], { mode: 'sink-only', mustEndEmpty: true })).toBe(false);
+    // Target with deviating capacity or simultaneous must-end-empty.
+    expect(
+      cupEndStateSatisfied([A, A], { mode: 'normal', targetTeaId: A, capacity: 2 }),
+    ).toBe(false);
+    expect(
+      cupEndStateSatisfied([A, A, A, A], { mode: 'normal', targetTeaId: A, mustEndEmpty: true }),
+    ).toBe(false);
+    expect(cupEndStateSatisfied([], { mode: 'normal', targetTeaId: A, mustEndEmpty: true })).toBe(false);
+    // Malformed boards never win.
+    expect(
+      isWonState([[], [B, B, B, B]], [{ mode: 'source-only', targetTeaId: A }, N]),
+    ).toBe(false);
+    expect(
+      isWonState(
+        [[A, A, A, A]],
+        [{ mode: 'normal', targetTeaId: A, capacity: 2, mustEndEmpty: true }],
+      ),
+    ).toBe(false);
+  });
+
   it('G. completion across all roles', () => {
     expect(cupEndStateSatisfied([A, A, A, A], N)).toBe(true);
     expect(cupEndStateSatisfied([A, A, A, A], SNK)).toBe(true);

@@ -124,16 +124,29 @@ export function isCompleteCup(layers: TeaId[]): boolean {
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
   const mode = c?.mode ?? 'normal';
   const cap = cupCapacity(c);
-  if (mode === 'source-only') return layers.length === 0;
+  const target = c?.targetTeaId;
+  const endEmpty = mustEndEmpty(c);
+  if (mode === 'source-only') {
+    // Fail-closed (Gauntlet 4.1): a teapot carrying a named target is a
+    // contradictory constraint — never satisfied, even when empty.
+    // Production validation rejects the combo outright.
+    if (target !== undefined) return false;
+    return layers.length === 0;
+  }
   if (mode === 'sink-only') {
-    if (c?.targetTeaId !== undefined) return false;
+    // Fail-closed: a guest cup with a named target, or one simultaneously
+    // required to end empty, is contradictory — never satisfied.
+    if (target !== undefined || endEmpty) return false;
     return layers.length === cap && isHomogeneous(layers);
   }
-  const target = c?.targetTeaId;
   if (target !== undefined) {
+    // Fail-closed: named-serving destinations are standard vessels. A
+    // capacity deviation or a simultaneous must-end-empty flag contradicts
+    // the full-homogeneous-target rule — never satisfied.
+    if (cap !== STANDARD_CUP_CAPACITY || endEmpty) return false;
     return layers.length === cap && layers.every((l) => l === target);
   }
-  if (mustEndEmpty(c)) return layers.length === 0;
+  if (endEmpty) return layers.length === 0;
   if (layers.length === 0) return true;
   return layers.length === cap && isHomogeneous(layers);
 }

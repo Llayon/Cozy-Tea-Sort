@@ -1002,79 +1002,48 @@ function sinkRotationCups(req: GenerateRequest): TeaId[][] {
 }
 
 /**
- * Dedicated tasting-bowl fallback shapes (Gauntlet 4), palette-parameterized.
- * The bowl sits EMPTY (capacity 2, must-end-empty) at the stable last slot
- * with one ordinary standard empty spare; color counts are preserved by
- * construction (pure permutation of the TEA_UNITS_PER_COLOR pool). Every
- * shape passes through `finalizeCandidate`, so only genuinely in-band
- * layouts are returned — these are candidates, not trusted layouts.
+ * Pinned tasting-bowl fallback topology per canonical kind (Gauntlet 4.1).
+ * Each pin is a committed bank template whose optimal production solution
+ * demonstrably ENTERS the tasting bowl and later EXITS it (verified
+ * offline; asserted by the direct fallback tests) — the fallback ladder
+ * honors the same participation contract as the template bank.
+ */
+const TASTING_FALLBACK_TEMPLATE_ID: Record<TastingTemplateKind, string> = {
+  'tasting-challenge': 'tasting-challenge-9-10002',
+  'tasting-mystery-peak': 'tasting-mystery-peak-12-2',
+  'teapot-tasting-challenge': 'teapot-tasting-challenge-9-31',
+};
+
+/**
+ * Dedicated tasting-bowl fallback (Gauntlet 4.1): instantiate the pinned
+ * bank topology with the identity role mapping (c_i → palette[i], a
+ * bijection), so the recorded depth holds EXACTLY for any production
+ * palette. The bowl sits EMPTY (capacity 2, must-end-empty) at the stable
+ * last slot with one ordinary standard empty spare; color counts are
+ * preserved by construction. Passes through `finalizeCandidate` like any
+ * other candidate — never trusted blindly.
  */
 function primaryTastingFallback(
   req: GenerateRequest,
 ): { cups: TeaId[][]; constraints: CupConstraint[] } | null {
-  const wantTasting = requestedTastingCupCount(req);
-  if (wantTasting !== 1) return null;
+  if (requestedTastingCupCount(req) !== 1) return null;
   if (requestedTargetTeas(req).length > 0) return null;
   if (requestedSinkOnlyCount(req) > 0) return null;
-  const wantTeapot = requestedSourceOnlyCount(req) > 0;
-  const [c0, c1, c2, c3, c4] = req.colors as (TeaId | undefined)[];
-  const plain = (): CupConstraint => ({ mode: 'normal' });
-  const tasting: CupConstraint = {
+  const kind = tastingTemplateKindFor(req);
+  if (!kind) return null;
+  const tpl = TASTING_TEMPLATE_BANK[kind].find((t) => t.id === TASTING_FALLBACK_TEMPLATE_ID[kind]);
+  if (!tpl) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return null;
+  const inst = instantiateTastingTemplate(tpl, palette, [...palette]);
+  const constraints = defaultCupConstraints(inst.cups.length);
+  if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+  constraints[inst.tastingSlot] = {
     mode: 'normal',
     capacity: TASTING_BOWL_CAPACITY,
     mustEndEmpty: true,
   };
-
-  if (req.numColors === 4 && !wantTeapot && !req.hasMysteryLayer && req.emptyCups === 2 &&
-      c0 !== undefined && c1 !== undefined && c2 !== undefined && c3 !== undefined) {
-    // Tasting challenge: asymmetric pair + single swap among normals; the
-    // extra 2-slot buffer only ever helps solvability, and the bowl must
-    // end empty (unused is fine — the gate still requires a valid solve).
-    return {
-      cups: [
-        [c1, c0, c0, c0],
-        [c0, c1, c1, c1],
-        [c2, c2, c2, c3],
-        [c3, c3, c3, c2],
-        [],
-        [],
-      ],
-      constraints: [plain(), plain(), plain(), plain(), plain(), tasting],
-    };
-  }
-  if (req.numColors === 4 && wantTeapot && !req.hasMysteryLayer && req.emptyCups === 2 &&
-      c0 !== undefined && c1 !== undefined && c2 !== undefined && c3 !== undefined) {
-    // Teapot + tasting: mixed teapot at 0, asymmetric normals, bowl last.
-    return {
-      cups: [
-        [c1, c2, c0, c3],
-        [c0, c0, c0, c1],
-        [c1, c1, c2, c2],
-        [c3, c3, c3, c2],
-        [],
-        [],
-      ],
-      constraints: [{ mode: 'source-only' }, plain(), plain(), plain(), plain(), tasting],
-    };
-  }
-  if (req.numColors === 5 && !wantTeapot && req.hasMysteryLayer && req.emptyCups === 2 &&
-      c0 !== undefined && c1 !== undefined && c2 !== undefined && c3 !== undefined && c4 !== undefined) {
-    // Tasting + mystery peak: full rotation among normals, bowl last.
-    // Mystery-capable at cup 0 ([c0,c1,c2,c3] bottom differs from above).
-    return {
-      cups: [
-        [c0, c1, c2, c3],
-        [c1, c2, c3, c4],
-        [c2, c3, c4, c0],
-        [c3, c4, c0, c1],
-        [c4, c0, c1, c2],
-        [],
-        [],
-      ],
-      constraints: [plain(), plain(), plain(), plain(), plain(), plain(), tasting],
-    };
-  }
-  return null;
+  return { cups: inst.cups, constraints };
 }
 
 /** Generic tasting rotation: rotation among filled + teapot, bowl last. */

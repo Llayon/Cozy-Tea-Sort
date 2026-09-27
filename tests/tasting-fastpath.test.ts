@@ -163,10 +163,14 @@ describe('tasting fast-path structural contract (no 150-scan)', () => {
 });
 
 describe('tasting fallback branch (direct fallbackLevel)', () => {
+  // Gauntlet 4.1: the fallback ladder honors the same participation
+  // contract as the template bank — the pinned topology's optimal
+  // solution must ENTER the bowl and later EXIT it (an unused bowl is a
+  // rejected fallback shape, not a quiet pass).
   it.each([
-    ['tasting-challenge', TASTING_CHALLENGE, 6, { mystery: false, teapot: false }],
-    ['tasting-mystery-peak', TASTING_MYSTERY_PEAK, 16, { mystery: true, teapot: false }],
-    ['teapot-tasting-challenge', TEAPOT_TASTING_CHALLENGE, 7, { mystery: false, teapot: true }],
+    ['tasting-challenge', TASTING_CHALLENGE, 9, { mystery: false, teapot: false }],
+    ['tasting-mystery-peak', TASTING_MYSTERY_PEAK, 12, { mystery: true, teapot: false }],
+    ['teapot-tasting-challenge', TEAPOT_TASTING_CHALLENGE, 9, { mystery: false, teapot: true }],
   ])('%s fallback is solver-validated with REAL depth %i', (name, req, depth, flags) => {
     const stats = createGenerateStats();
     const lvl = fallbackLevel(req, { stats });
@@ -180,8 +184,12 @@ describe('tasting fallback branch (direct fallbackLevel)', () => {
     expect(solved.minMoves).toBe(lvl.minMoves);
     const tastingIdx = tastingIndexOf(lvl);
     expect(tastingIdx).toBe(lvl.cups.length - 1);
+    const solution = solved.solution ?? [];
+    expect(solution.some((m) => m.to === tastingIdx)).toBe(true);
+    const firstIn = solution.findIndex((m) => m.to === tastingIdx);
+    expect(solution.slice(firstIn + 1).some((m) => m.from === tastingIdx)).toBe(true);
     let board = lvl.cups.map((c) => [...c]);
-    for (const step of solved.solution ?? []) {
+    for (const step of solution) {
       const res = applyPour(board, step.from, step.to, lvl.cupConstraints);
       expect(res).not.toBeNull();
       board = res?.cups ?? board;
