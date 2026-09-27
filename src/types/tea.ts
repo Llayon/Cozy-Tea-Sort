@@ -5,7 +5,7 @@
  */
 
 export type { TeaId, CupSkinId, TeaType } from '../game/types';
-import type { CupSkinId, TeaId } from '../game/types';
+import type { CupSkinId, FloatingIngredientId, TeaId } from '../game/types';
 
 export interface CupSkin {
   id: CupSkinId;
@@ -60,6 +60,12 @@ export interface LevelConfig {
   hasSinkGuestCup: boolean;
   /** True when this level includes the tasting bowl (Gauntlet 4). */
   hasTastingBowl: boolean;
+  /**
+   * Floating ingredient active on this level (Gauntlet 5). `undefined` =
+   * classic level. Deterministic per level: reshuffling keeps the lemon
+   * (new topology, new host) but never advances progression.
+   */
+  floatingIngredient?: FloatingIngredientId;
   /**
    * Named-serving destinations for this level (Gauntlet 2). Empty = none.
    * Deterministic per level: reshuffling keeps the same serving goals.

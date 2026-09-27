@@ -9,12 +9,23 @@ import { LevelConfig, LevelRhythmPhase, TeaId } from '../types/tea';
  * 4. Релакс-награда (Спад сложности: 3 цвета, 5 чашек, новый эстетичный цвет чая)
  *
  * Special-mechanic rollout (max 7 vessels, NEVER three specials at once —
- * specials are: teapot, mystery, target serving, sink guest cup, tasting bowl):
+ * specials are: teapot, mystery, target serving, sink guest cup, tasting
+ * bowl, lemon):
  * 1 warmup clean · 2 challenge clean · 3 peak mystery · 4 relax clean ·
  * 5 warmup clean · 6 challenge TEAPOT · 7 peak TEAPOT+mystery · 8 relax clean ·
  * 9 warmup clean · 10 challenge 2 TARGETS · 11 peak 2 TARGETS+mystery ·
  * 12 relax clean · 13 warmup clean · 14 challenge TEAPOT+2 TARGETS ·
- * 15 peak TEAPOT+mystery · 16 relax clean.
+ * 15 peak TEAPOT+mystery · 16 relax clean ·
+ * 17 warmup clean · 18 challenge SINK · 19 peak SINK+mystery ·
+ * 20 relax clean · 21 warmup clean · 22 challenge TEAPOT+SINK ·
+ * 23 peak TARGETS+mystery · 24 relax clean ·
+ * 25 warmup clean · 26 challenge TASTING · 27 peak TASTING+mystery ·
+ * 28 relax clean · 29 warmup clean · 30 challenge TEAPOT+TASTING ·
+ * 31 peak TARGETS+mystery · 32 relax clean ·
+ * 33 warmup clean · 34 challenge LEMON · 35 peak LEMON+mystery ·
+ * 36 relax clean · 37 warmup clean · 38 challenge TEAPOT+LEMON ·
+ * 39 peak SINK+mystery · 40 relax clean.
+ * Lemon levels always carry sea_buckthorn in the active palette.
  * Later cycles rotate challenge/peak through ≤2-special combos;
  * warmup/relax stay clean decompression levels.
  */
@@ -45,9 +56,10 @@ interface MechanicPlan {
   targets: boolean;
   sink: boolean;
   tasting: boolean;
+  lemon: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -111,38 +123,60 @@ const PINNED_ROLLOUT_25_32: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–32, then a deterministic
+ * Pinned rollout 33–40 (Gauntlet 5 — first floating lemon):
+ * 33 warmup clean · 34 challenge LEMON · 35 peak LEMON+mystery ·
+ * 36 relax clean · 37 warmup clean · 38 challenge TEAPOT+LEMON ·
+ * 39 peak SINK+mystery (familiar combo, no lemon) · 40 relax clean.
+ */
+const PINNED_ROLLOUT_33_40: Record<number, MechanicPlan> = {
+  33: { ...CLEAN },
+  34: { ...CLEAN, lemon: true },
+  35: { ...CLEAN, lemon: true },
+  36: { ...CLEAN },
+  37: { ...CLEAN },
+  38: { ...CLEAN, teapot: true, lemon: true },
+  39: { ...CLEAN, sink: true },
+  40: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–40, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
- * combos, never sink + targets / tasting + sink / tasting + targets,
- * never three specials together).
+ * combos, never lemon + sink / lemon + tasting / lemon + targets /
+ * sink + targets / tasting + sink / tasting + targets, never three
+ * specials together).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
-    PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ?? PINNED_ROLLOUT_25_32[levelNum];
+    PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ??
+    PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // challenge (no mystery): tasting → teapot+tasting → sink →
-    // teapot+sink → targets → teapot+targets.
-    switch (cycleNumber % 6) {
-      case 0: return { ...CLEAN, tasting: true };
-      case 1: return { ...CLEAN, teapot: true, tasting: true };
-      case 2: return { ...CLEAN, sink: true };
-      case 3: return { ...CLEAN, teapot: true, sink: true };
-      case 4: return { ...CLEAN, targets: true };
+    // challenge (no mystery): lemon → teapot+lemon → tasting →
+    // teapot+tasting → sink → teapot+sink → targets → teapot+targets.
+    switch (cycleNumber % 8) {
+      case 0: return { ...CLEAN, lemon: true };
+      case 1: return { ...CLEAN, teapot: true, lemon: true };
+      case 2: return { ...CLEAN, tasting: true };
+      case 3: return { ...CLEAN, teapot: true, tasting: true };
+      case 4: return { ...CLEAN, sink: true };
+      case 5: return { ...CLEAN, teapot: true, sink: true };
+      case 6: return { ...CLEAN, targets: true };
       default: return { ...CLEAN, teapot: true, targets: true };
     }
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
-  // tasting+mystery → sink+mystery → targets+mystery → teapot+mystery →
-  // mystery-only.
-  switch (cycleNumber % 5) {
-    case 0: return { ...CLEAN, tasting: true };
-    case 1: return { ...CLEAN, sink: true };
-    case 2: return { ...CLEAN, targets: true };
-    case 3: return { ...CLEAN, teapot: true };
+  // lemon+mystery → tasting+mystery → sink+mystery → targets+mystery →
+  // teapot+mystery → mystery-only.
+  switch (cycleNumber % 6) {
+    case 0: return { ...CLEAN, lemon: true };
+    case 1: return { ...CLEAN, tasting: true };
+    case 2: return { ...CLEAN, sink: true };
+    case 3: return { ...CLEAN, targets: true };
+    case 4: return { ...CLEAN, teapot: true };
     default: return { ...CLEAN };
   }
 }
@@ -236,13 +270,25 @@ export function getLevelConfig(levelNum: number): LevelConfig {
 
 
   // Special-mechanic overlay: single source of truth for
-  // teapot/targets/sink/tasting.
+  // teapot/targets/sink/tasting/lemon.
   const plan = mechanicPlanForLevel(levelNum);
   hasSourceOnlyTeapot = plan.teapot;
   const targetTeaIds: TeaId[] = plan.targets ? pickTargetPair(colors) : [];
   const hasSinkGuestCup = plan.sink;
   const hasTastingBowl = plan.tasting;
-  if (plan.tasting && plan.teapot) {
+  // Lemon levels require sea_buckthorn in the active palette (validated
+  // loudly at generation). Later-cycle palettes may lack it, so swap it
+  // into slot 0 deterministically — reshuffles keep the same palette.
+  const floatingIngredient = plan.lemon ? ('lemon' as const) : undefined;
+  if (floatingIngredient !== undefined && !colors.includes('sea_buckthorn')) {
+    colors = ['sea_buckthorn', ...colors.slice(1)];
+  }
+  if (plan.lemon && plan.teapot) {
+    phaseSubtitle = 'Чайник и лимон • 6 сосудов';
+  } else if (plan.lemon) {
+    phaseSubtitle =
+      phase === 'challenge' ? 'Долька лимона • 6 сосудов' : 'Лимон и таинственный настой • 7 сосудов';
+  } else if (plan.tasting && plan.teapot) {
     phaseSubtitle = 'Чайник и дегустационная пиала • 6 сосудов';
   } else if (plan.tasting) {
     phaseSubtitle =
@@ -293,6 +339,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasSourceOnlyTeapot,
     hasSinkGuestCup,
     hasTastingBowl,
+    floatingIngredient,
     targetTeaIds,
     rewardRecipeId,
     rewardSkinId,

@@ -44,6 +44,23 @@
  *   AL. no sink + tasting
  *   AM. no target + tasting
  *   AN. every vessel holds at most ITS OWN capacity
+ *   AO. floatingIngredients length == cups length
+ *   AP. exact requested floating ingredient count
+ *   AQ. only supported ingredient ids
+ *   AR. lemon target tea exists in active palette
+ *   AS. exactly one lemon when requested
+ *   AT. lemon initial host non-empty
+ *   AU. lemon initial host full standard capacity
+ *   AV. lemon initial host mixed
+ *   AW. host constraint plain standard normal
+ *   AX. host carries no target
+ *   AY. host is not teapot/sink/tasting
+ *   AZ. initial lemon host != Mystery host
+ *   BA. lemon initial state is not already satisfied
+ *   BB. unsupported lemon combinations absent
+ *   BC. solver validates INCLUDING lemon goal
+ *   BD. solver not truncated
+ *   BE. real minMoves in hard band
  *
  * TARGET (desired sweet spot) and ACCEPTANCE (hard safety band) are kept
  * explicit: generation prefers candidates closest to target, but ONLY among
@@ -55,17 +72,30 @@
 
 import {
   CupConstraint,
+  FLOATING_INGREDIENT_TYPES,
+  FloatingIngredientSlot,
   STANDARD_CUP_CAPACITY,
   TASTING_BOWL_CAPACITY,
   TEA_UNITS_PER_COLOR,
   TeaId,
   cloneCupConstraint,
+  countFloatingIngredients,
   cupCapacity,
   defaultCupConstraints,
+  emptyFloatingIngredients,
+  floatingIngredientIndex,
   isTastingCupConstraint,
   mustEndEmpty,
+  normalizeFloatingIngredients,
+  type FloatingIngredientId,
 } from '../types';
-import { isHomogeneous, isInFinalState, isWonState } from './rules';
+import {
+  floatingIngredientHostSatisfied,
+  isHomogeneous,
+  isInFinalState,
+  isPuzzleWonState,
+  isWonState,
+} from './rules';
 import { createRng, Rng, SeedInput, shuffleInPlace } from './rng';
 import { solvePuzzle } from './solver';
 import {
@@ -86,6 +116,13 @@ import {
   TastingTemplateKind,
   instantiateTastingTemplate,
 } from './tastingTemplates';
+import {
+  LEMON_TEMPLATE_ATTEMPTS,
+  LEMON_TEMPLATE_BANK,
+  LEMON_TARGET_TEA,
+  LemonTemplateKind,
+  instantiateLemonTemplate,
+} from './lemonTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -131,6 +168,13 @@ export interface GenerateRequest {
    * sink and tasting + targets are rejected loudly.
    */
   tastingCupCount?: number;
+  /**
+   * Floating ingredient requested (Gauntlet 5). `undefined` = classic
+   * level without floating objects; `'lemon'` = exactly ONE lemon slice
+   * riding a liquid surface, destined for full homogeneous sea_buckthorn.
+   * Count >1 is out of scope (no count field exists yet on purpose).
+   */
+  floatingIngredient?: FloatingIngredientId;
 }
 
 export interface GeneratedLevel {
@@ -138,6 +182,12 @@ export interface GeneratedLevel {
   hiddenCounts: number[];
   /** Immutable per-vessel roles, aligned with `cups` indices. */
   cupConstraints: CupConstraint[];
+  /**
+   * Dynamic floating-ingredient slots, aligned with `cups` indices.
+   * ALWAYS returned (all-null for pre-lemon levels) so runtime never
+   * guesses whether the field exists.
+   */
+  floatingIngredients: FloatingIngredientSlot[];
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -206,6 +256,42 @@ export function requestedTastingCupCount(req: GenerateRequest): number {
 /** Requested named-serving destinations, in stable slot order (default []). */
 export function requestedTargetTeas(req: GenerateRequest): TeaId[] {
   return [...(req.targetTeaIds ?? [])];
+}
+
+/** Requested floating ingredient (`undefined` = classic level). */
+export function requestedFloatingIngredient(req: GenerateRequest): FloatingIngredientId | undefined {
+  return req.floatingIngredient ?? undefined;
+}
+
+/**
+ * Fail-fast request validation for floating ingredients (programming
+ * errors, not generation luck). For lemon Gauntlet 5 requires:
+ * sea_buckthorn in the active palette; no sink-only, no target cups, no
+ * tasting bowl (all rejected loudly, never silently dropped). A
+ * source-only teapot and Mystery MAY coexist. Only one ingredient exists.
+ */
+export function validateFloatingIngredientRequest(req: GenerateRequest): void {
+  const ing = requestedFloatingIngredient(req);
+  if (ing === undefined) return;
+  const known = (FLOATING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[ing];
+  if (!known) {
+    throw new Error(`validateFloatingIngredientRequest: unsupported ingredient ${ing}`);
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (!palette.includes(known.targetTeaId)) {
+    throw new Error(
+      `validateFloatingIngredientRequest: ${ing} target tea ${known.targetTeaId} not in active palette`,
+    );
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error(`validateFloatingIngredientRequest: ${ing} + sink-only is out of scope for Gauntlet 5`);
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error(`validateFloatingIngredientRequest: ${ing} + targets is out of scope for Gauntlet 5`);
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error(`validateFloatingIngredientRequest: ${ing} + tasting bowl is out of scope for Gauntlet 5`);
+  }
 }
 
 /**
@@ -356,6 +442,36 @@ export function selectMysteryCup(
 interface DealResult {
   cups: TeaId[][];
   cupConstraints: CupConstraint[];
+  /** Initial lemon host chosen by the deal, or null when not requested. */
+  lemonHost: number | null;
+}
+
+/**
+ * Lemon host selection (Gauntlet 5 §33): a FULL MIXED plain-standard
+ * normal vessel — full standard capacity, mixed (never pre-solved, never
+ * already satisfying the lemon goal), no target, never teapot/sink/
+ * tasting. Mystery exclusion happens at the caller (host must differ
+ * from the Mystery cup). Returns null when this deal cannot host.
+ */
+export function selectLemonHost(
+  cups: TeaId[][],
+  cupConstraints: readonly CupConstraint[],
+  pick: (candidates: number[]) => number | null,
+  excludeIndices: readonly number[] = [],
+): number | null {
+  const excluded = new Set(excludeIndices);
+  const candidates: number[] = [];
+  cups.forEach((cup, idx) => {
+    if (excluded.has(idx)) return;
+    const c = cupConstraints[idx];
+    if (!c || c.mode !== 'normal' || c.targetTeaId !== undefined) return;
+    if (cupCapacity(c) !== STANDARD_CUP_CAPACITY || mustEndEmpty(c)) return;
+    if (isTastingCupConstraint(c)) return;
+    if (!isMixedFullCup(cup)) return;
+    candidates.push(idx);
+  });
+  if (candidates.length === 0) return null;
+  return pick(candidates);
 }
 
 /**
@@ -433,6 +549,7 @@ function dealCandidate(
   targetTeas: TeaId[] = [],
   sinkOnlyCount = 0,
   tastingCupCount = 0,
+  floatingIngredient?: FloatingIngredientId,
 ): DealResult | null {
   // Gauntlet 3 product constraint: sink + targets never coexist.
   if (sinkOnlyCount > 0 && targetTeas.length > 0) return null;
@@ -445,6 +562,12 @@ function dealCandidate(
   if (tastingCupCount > 0 && sinkOnlyCount > 0) return null;
   if (tastingCupCount > emptyCups) return null;
   if (tastingCupCount > 0 && emptyCups < 2) return null;
+  // Gauntlet 5 product constraints: lemon is exclusive of sink, targets
+  // and tasting (request validation throws loudly first; the deal stays
+  // total by returning null for bad combos).
+  if (floatingIngredient !== undefined) {
+    if (sinkOnlyCount > 0 || targetTeas.length > 0 || tastingCupCount > 0) return null;
+  }
   const pool: TeaId[] = [];
   for (let c = 0; c < numColors; c++) {
     const color = colors[c] as TeaId;
@@ -527,6 +650,19 @@ function dealCandidate(
     return true;
   };
 
+  // Gauntlet 5: lemon host on a full mixed plain-standard vessel.
+  // Mystery exclusion happens at the caller (host must differ from the
+  // Mystery cup), so this picks among all eligible hosts for now.
+  const chooseDealLemonHost = (constraints: CupConstraint[]): number | null => {
+    if (floatingIngredient === undefined) return null;
+    const host = selectLemonHost(
+      cups,
+      constraints,
+      (candidates) => candidates[Math.floor(rng() * candidates.length)] ?? null,
+    );
+    return host;
+  };
+
   if (sourceOnlyCount <= 0) {
     const base = defaultCupConstraints(cups.length);
     if (targetTeas.length === 0) {
@@ -536,7 +672,9 @@ function dealCandidate(
       if (tastingCupCount > 0) {
         if (!placeTastingAtLastSlot(base)) return null;
       }
-      return { cups, cupConstraints: base };
+      const lemonHost = chooseDealLemonHost(base);
+      if (floatingIngredient !== undefined && lemonHost === null) return null;
+      return { cups, cupConstraints: base, lemonHost };
     }
     const withTargets = assignTargetConstraints(
       cups,
@@ -546,7 +684,7 @@ function dealCandidate(
       (candidates) => candidates[Math.floor(rng() * candidates.length)] as number,
     );
     if (!withTargets) return null;
-    return { cups, cupConstraints: withTargets };
+    return { cups, cupConstraints: withTargets, lemonHost: null };
   }
 
   // Gauntlet 1: exactly one teapot. It replaces one ordinary filled vessel
@@ -579,7 +717,9 @@ function dealCandidate(
     if (tastingCupCount > 0) {
       if (!placeTastingAtLastSlot(cupConstraints)) return null;
     }
-    return { cups, cupConstraints };
+    const lemonHost = chooseDealLemonHost(cupConstraints);
+    if (floatingIngredient !== undefined && lemonHost === null) return null;
+    return { cups, cupConstraints, lemonHost };
   }
   const withTargets = assignTargetConstraints(
     cups,
@@ -589,13 +729,14 @@ function dealCandidate(
     (candidates) => candidates[Math.floor(rng() * candidates.length)] as number,
   );
   if (!withTargets) return null;
-  return { cups, cupConstraints: withTargets };
+  return { cups, cupConstraints: withTargets, lemonHost: null };
 }
 
 /**
  * Single production gate shared by EVERY return path (normal candidates,
  * retry fallback, safety-net scan). Returns the level only when the full
- * contract A–U holds, otherwise null (caller rejects / moves on).
+ * contract A–BE holds, otherwise null (caller rejects / moves on).
+ * `floatingIngredients` defaults to all-null (lemon-free levels).
  */
 function finalizeCandidate(
   req: GenerateRequest,
@@ -604,6 +745,7 @@ function finalizeCandidate(
   seed: string,
   cupConstraints: readonly CupConstraint[],
   stats?: GenerateStats,
+  floatingIngredients?: readonly FloatingIngredientSlot[],
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -714,24 +856,62 @@ function finalizeCandidate(
       if (isTastingCupConstraint(c)) return null;
     }
   }
+  // AO–BB: floating-ingredient initial-state invariant.
+  const wantIngredient = requestedFloatingIngredient(req);
+  const slots: FloatingIngredientSlot[] = normalizeFloatingIngredients(
+    floatingIngredients,
+    cups.length,
+  );
+  if (slots.length !== cups.length) return null; // AO
+  const presentIds = slots.filter((s): s is FloatingIngredientId => s != null);
+  if (wantIngredient === undefined) {
+    if (presentIds.length !== 0) return null; // AP
+  } else {
+    const known = (FLOATING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[
+      wantIngredient
+    ];
+    if (!known) return null; // AQ
+    const palette = req.colors.slice(0, req.numColors);
+    if (!palette.includes(known.targetTeaId)) return null; // AR
+    if (presentIds.length !== 1 || presentIds[0] !== wantIngredient) return null; // AS
+    const host = slots.findIndex((s) => s === wantIngredient);
+    const hostCup = cups[host] as TeaId[];
+    const hostC = normalized[host] as CupConstraint;
+    if (!hostCup || hostCup.length === 0) return null; // AT
+    if (hostCup.length !== STANDARD_CUP_CAPACITY) return null; // AU
+    if (!isMixedFullCup(hostCup)) return null; // AV (mixed ⇒ not pre-solved)
+    if (hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) return null; // AW, AX
+    if (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(hostC)) return null; // AW
+    if (isTastingCupConstraint(hostC)) return null; // AY
+    if ((hiddenCounts[host] ?? 0) !== 0) return null; // AZ
+    if (floatingIngredientHostSatisfied(wantIngredient, hostCup, hostC)) return null; // BA
+    // BB: unsupported lemon combinations absent (also enforced loudly at
+    // request validation; re-checked here so no path slips through).
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
+  if (isPuzzleWonState({ cups, floatingIngredients: slots }, normalized)) return null; // D (lemon-aware)
   if (stats) stats.solverCalls++;
   const solved = solvePuzzle(cups, {
     maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
     cupConstraints: normalized,
+    floatingIngredients: slots,
   });
-  if (!solved.solvable || solved.truncated) return null; // G, H
+  if (!solved.solvable || solved.truncated) return null; // BC, BD
   if (solved.minMoves === undefined) return null; // I
-  if (!depthAccepted(solved.minMoves, req.phase)) return null; // J
+  if (!depthAccepted(solved.minMoves, req.phase)) return null; // BE
   const level: GeneratedLevel = {
     cups,
     hiddenCounts,
     cupConstraints: normalized,
+    floatingIngredients: slots,
     seed,
     minMoves: solved.minMoves,
     visitedStates: solved.visitedStates,
   };
-  if (!validateLevelStructure(level, req).ok) return null; // A–F, K–U
+  if (!validateLevelStructure(level, req).ok) return null; // A–F, K–BE
   return level;
 }
 
@@ -1052,6 +1232,56 @@ function tastingRotationCups(req: GenerateRequest): TeaId[][] {
   return cups;
 }
 
+/**
+ * Dedicated lemon fallback (Gauntlet 5 §49): pinned participating bank
+ * topology per kind (established Gauntlet 4.1 pattern). Instantiated with
+ * a fixed role mapping (c0 → sea_buckthorn, others in palette order), so
+ * the recorded depth holds for any production palette. Passes through
+ * `finalizeCandidate` — never trusted blindly. Until the bank lands this
+ * returns null and the rotation/scan shapes below cover.
+ */
+const LEMON_FALLBACK_TEMPLATE_ID: Record<LemonTemplateKind, string> = {
+  'lemon-challenge': 'lemon-challenge-9-1023',
+  'lemon-mystery-peak': 'lemon-mystery-peak-13-3',
+  'teapot-lemon-challenge': 'teapot-lemon-challenge-10-22',
+};
+
+function primaryLemonFallback(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[]; lemonHost: number } | null {
+  if (requestedFloatingIngredient(req) === undefined) return null;
+  const kind = lemonTemplateKindFor(req);
+  if (!kind) return null;
+  const wanted = LEMON_FALLBACK_TEMPLATE_ID[kind];
+  if (!wanted) return null;
+  const tpl = LEMON_TEMPLATE_BANK[kind].find((t) => t.id === wanted);
+  if (!tpl) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return null;
+  if (!palette.includes(LEMON_TARGET_TEA)) return null;
+  const others = palette.filter((t) => t !== LEMON_TARGET_TEA);
+  const inst = instantiateLemonTemplate(tpl, palette, [...others]);
+  const constraints = defaultCupConstraints(inst.cups.length);
+  if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+  return { cups: inst.cups, constraints, lemonHost: inst.lemonHost };
+}
+
+/**
+ * Generic lemon rotation shape: rotation cups among filled vessels with
+ * the lemon on the first eligible (full mixed plain-standard) host.
+ * Deterministic backup behind the pinned topology.
+ */
+function lemonRotationEntry(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[]; lemonHost: number } | null {
+  const wantSourceOnly = requestedSourceOnlyCount(req);
+  const cups = rotationCups({ ...req, sourceOnlyCount: 0 });
+  const constraints = constraintsForShape(cups.length, wantSourceOnly);
+  const host = selectLemonHost(cups, constraints, (candidates) => candidates[0] ?? null);
+  if (host === null) return null;
+  return { cups, constraints, lemonHost: host };
+}
+
 function constraintsForShape(
   totalCups: number,
   sourceOnlyCount: number,
@@ -1092,19 +1322,27 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateTargetRequest(req);
   validateSinkRequest(req);
   validateTastingRequest(req);
+  validateFloatingIngredientRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
   const wantSink = requestedSinkOnlyCount(req);
   const wantTasting = requestedTastingCupCount(req);
+  const wantIngredient = requestedFloatingIngredient(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
-    `${wantSink > 0 ? ':sink' : ''}${wantTasting > 0 ? ':tasting' : ''}`;
+    `${wantSink > 0 ? ':sink' : ''}${wantTasting > 0 ? ':tasting' : ''}` +
+    `${wantIngredient !== undefined ? `:${wantIngredient}` : ''}`;
 
-  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
-  // Dedicated tasting-bowl shapes go first for tasting requests (1 solve on hit).
-  if (wantTasting > 0) {
+  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null }> = [];
+  // Dedicated lemon shapes go first for lemon requests (1 solve on hit).
+  if (wantIngredient !== undefined) {
+    const dedicatedLemon = primaryLemonFallback(req);
+    if (dedicatedLemon) shapeEntries.push(dedicatedLemon);
+    const lemonRot = lemonRotationEntry(req);
+    if (lemonRot) shapeEntries.push(lemonRot);
+  } else if (wantTasting > 0) {
     const dedicatedTasting = primaryTastingFallback(req);
     if (dedicatedTasting) shapeEntries.push(dedicatedTasting);
     const tastingRot = tastingRotationCups(req);
@@ -1140,9 +1378,18 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   }
 
   for (let s = 0; s < shapeEntries.length; s++) {
-    const entry = shapeEntries[s] as { cups: TeaId[][]; constraints: CupConstraint[] };
+    const entry = shapeEntries[s] as {
+      cups: TeaId[][];
+      constraints: CupConstraint[];
+      lemonHost?: number | null;
+    };
     const cups = entry.cups;
     let constraints = entry.constraints;
+    // Lemon slots for this shape (all-null when no lemon requested).
+    const shapeSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(cups.length);
+    if (wantIngredient !== undefined && entry.lemonHost !== undefined && entry.lemonHost !== null) {
+      shapeSlots[entry.lemonHost] = wantIngredient;
+    }
     // Named serving roles are assigned deterministically (first eligible
     // cup per tea); failure rejects this shape, never forces a bad role.
     // Shapes that already carry exactly the requested targets skip this.
@@ -1169,16 +1416,20 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     const hiddenCounts = cups.map(() => 0);
     if (req.hasMysteryLayer) {
       // Deterministic first-candidate pick; null => layout rejected, never forced.
-      // Never inside the teapot or a target cup (constraints-aware selection).
+      // Never inside the teapot, a target cup — or on the lemon host.
+      const lemonIdx = wantIngredient !== undefined ? shapeSlots.findIndex((sl) => sl !== null) : -1;
       const idx = selectMysteryCup(
         cups,
-        (candidates) => candidates[0] ?? null,
+        (candidates) => {
+          const eligible = lemonIdx >= 0 ? candidates.filter((c) => c !== lemonIdx) : candidates;
+          return eligible[0] ?? null;
+        },
         constraints,
       );
       if (idx === null) continue;
       hiddenCounts[idx] = 1;
     }
-    const level = finalizeCandidate(req, cups, hiddenCounts, `${tag}#${s}`, constraints, stats);
+    const level = finalizeCandidate(req, cups, hiddenCounts, `${tag}#${s}`, constraints, stats, shapeSlots);
     if (level) {
       if (stats) stats.usedFallback = true;
       return level;
@@ -1198,22 +1449,36 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       wantTargets,
       wantSink,
       wantTasting,
+      wantIngredient,
     );
     if (!deal) continue;
     const hiddenCounts = deal.cups.map(() => 0);
+    const scanSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(deal.cups.length);
+    if (deal.lemonHost !== null) scanSlots[deal.lemonHost] = wantIngredient ?? null;
     if (req.hasMysteryLayer) {
+      const lemonIdx = scanSlots.findIndex((sl) => sl !== null);
       const idx = selectMysteryCup(
         deal.cups,
         (candidates) => {
-          const at = Math.floor(rng() * candidates.length);
-          return candidates[at] ?? null;
+          const eligible = lemonIdx >= 0 ? candidates.filter((c) => c !== lemonIdx) : candidates;
+          // Seeded pick among the lemon-safe candidates.
+          const at = Math.floor(rng() * eligible.length);
+          return eligible[at] ?? null;
         },
         deal.cupConstraints,
       );
       if (idx === null) continue;
       hiddenCounts[idx] = 1;
     }
-    const level = finalizeCandidate(req, deal.cups, hiddenCounts, `${tag}#scan${i}`, deal.cupConstraints, stats);
+    const level = finalizeCandidate(
+      req,
+      deal.cups,
+      hiddenCounts,
+      `${tag}#scan${i}`,
+      deal.cupConstraints,
+      stats,
+      scanSlots,
+    );
     if (level) {
       if (stats) stats.usedFallback = true;
       return level;
@@ -1223,7 +1488,8 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   throw new Error(
     `fallbackLevel: no validated layout for phase=${req.phase} ` +
       `numColors=${req.numColors} emptyCups=${req.emptyCups} mystery=${req.hasMysteryLayer} ` +
-      `sourceOnly=${wantSourceOnly} targets=[${wantTargets.join(',')}]`,
+      `sourceOnly=${wantSourceOnly} targets=[${wantTargets.join(',')}]` +
+      `${wantIngredient !== undefined ? ` ingredient=${wantIngredient}` : ''}`,
   );
 }
 
@@ -1411,6 +1677,93 @@ function generateFromTastingTemplateBank(
 }
 
 /**
+ * Match a request against a lemon-bank kind (Gauntlet 5 fast path).
+ * Only the three canonical production lemon configs qualify; any other
+ * lemon-bearing request keeps the random-scan path. Lemon + sink /
+ * targets / tasting never qualifies (rejected loudly at validation).
+ */
+export function lemonTemplateKindFor(req: GenerateRequest): LemonTemplateKind | null {
+  if (requestedFloatingIngredient(req) === undefined) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  const teapot = requestedSourceOnlyCount(req);
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 0) {
+    return 'lemon-challenge';
+  }
+  if (req.numColors === 5 && req.emptyCups === 2 && req.hasMysteryLayer && teapot === 0) {
+    return 'lemon-mystery-peak';
+  }
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 1) {
+    return 'teapot-lemon-challenge';
+  }
+  return null;
+}
+
+/**
+ * Bounded lemon fast path (Gauntlet 5 §48): seeded template choice →
+ * palette-relative instantiation (c0 fixed to sea_buckthorn, other roles
+ * seeded-permuted — a full isomorphism, so the bank depth is preserved)
+ * → lemon placement at the template host → Mystery assignment excluding
+ * the lemon host → single `finalizeCandidate` validation. At most
+ * LEMON_TEMPLATE_ATTEMPTS solver validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses the fallback
+ * ladder).
+ */
+function generateFromLemonTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = lemonTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = LEMON_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const ingredient = requestedFloatingIngredient(req) as FloatingIngredientId;
+  const palette = req.colors.slice(0, req.numColors);
+  const others = palette.filter((t) => t !== LEMON_TARGET_TEA);
+  for (let a = 0; a < LEMON_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: permute non-target roles only. c0 stays
+    // bound to sea_buckthorn — permuting it away would break the goal.
+    const otherOrder = [...others];
+    shuffleInPlace(rng, otherOrder);
+    const inst = instantiateLemonTemplate(tpl, palette, otherOrder);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+    const slots: FloatingIngredientSlot[] = emptyFloatingIngredients(inst.cups.length);
+    slots[inst.lemonHost] = ingredient;
+    const hiddenCounts = inst.cups.map(() => 0);
+    if (req.hasMysteryLayer) {
+      const idx = selectMysteryCup(
+        inst.cups,
+        (candidates) => {
+          const eligible = candidates.filter((c) => c !== inst.lemonHost);
+          const at = Math.floor(rng() * eligible.length);
+          return eligible[at] ?? null;
+        },
+        constraints,
+      );
+      if (idx === null) continue;
+      hiddenCounts[idx] = 1;
+    }
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#lemon:${tpl.id}`,
+      constraints,
+      stats,
+      slots,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Bounded target fast path (Gauntlet 2.1 §9): seeded template choice →
  * palette-relative instantiation (seeded t-swap + o-permutation, both
  * full isomorphisms so the bank depth is preserved) → mystery assignment
@@ -1481,6 +1834,7 @@ export function generateLevel(
   validateTargetRequest(req);
   validateSinkRequest(req);
   validateTastingRequest(req);
+  validateFloatingIngredientRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -1489,6 +1843,7 @@ export function generateLevel(
   const wantTargets = requestedTargetTeas(req);
   const wantSink = requestedSinkOnlyCount(req);
   const wantTasting = requestedTastingCupCount(req);
+  const wantIngredient = requestedFloatingIngredient(req);
 
   // Canonical target configs skip the random scan entirely: the template
   // bank serves bounded, solver-validated topologies (~1 validation per
@@ -1522,6 +1877,16 @@ export function generateLevel(
     return fallbackLevel(req, { stats });
   }
 
+  // Canonical lemon configs skip the random scan entirely (Gauntlet 5
+  // §48): bounded LEMON_TEMPLATE_ATTEMPTS validations, never a 150-deal
+  // scan. maxRetries: 0 still yields a valid level through the fast path
+  // or the validated fallback ladder.
+  if (lemonTemplateKindFor(req) !== null) {
+    const fast = generateFromLemonTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
   // Closest-to-TARGET among ACCEPTED candidates only. Out-of-band deals
   // are rejected outright and never remembered.
   let bestAccepted: GeneratedLevel | null = null;
@@ -1538,19 +1903,28 @@ export function generateLevel(
       wantTargets,
       wantSink,
       wantTasting,
+      wantIngredient,
     );
     if (!deal) continue;
     if (isWonState(deal.cups, deal.cupConstraints)) continue;
 
+    // Lemon slots for this deal (all-null when no lemon requested; the
+    // gate re-validates host placement loudly).
+    const dealSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(deal.cups.length);
+    if (deal.lemonHost !== null) dealSlots[deal.lemonHost] = wantIngredient ?? null;
+
     // Mystery placement uses the same rng stream (deterministic).
-    // Never inside the teapot, guest cup, tasting bowl, or a target cup.
+    // Never inside the teapot, guest cup, tasting bowl, a target cup —
+    // or on the lemon host.
     const hiddenCounts = deal.cups.map(() => 0);
     if (req.hasMysteryLayer) {
+      const lemonIdx = dealSlots.findIndex((sl) => sl !== null);
       const idx = selectMysteryCup(
         deal.cups,
         (candidates) => {
-          const at = Math.floor(rng() * candidates.length);
-          return candidates[at] ?? null;
+          const eligible = lemonIdx >= 0 ? candidates.filter((c) => c !== lemonIdx) : candidates;
+          const at = Math.floor(rng() * eligible.length);
+          return eligible[at] ?? null;
         },
         deal.cupConstraints,
       );
@@ -1565,6 +1939,7 @@ export function generateLevel(
       `${seedStr}#${attempt}`,
       deal.cupConstraints,
       stats,
+      dealSlots,
     );
     if (!level) continue;
 
@@ -1599,8 +1974,14 @@ export function generateLevel(
  * mode normal; AE. tasting capacity 2; AF. tasting must-end-empty; AG. no
  * tasting target; AH. tasting starts empty; AI. no tasting Mystery; AJ.
  * tasting at stable last slot; AK. ordinary standard empty remains; AL. no
- * sink+tasting; AM. no target+tasting; AN. per-vessel capacity respected.
- * Solver items G–J are enforced by finalizeCandidate, not here.
+ * sink+tasting; AM. no target+tasting; AN. per-vessel capacity respected;
+ * AO. floatingIngredients length == cups length; AP. exact requested
+ * floating count; AQ. only supported ids; AR. lemon target tea in palette;
+ * AS. exactly one lemon when requested; AT. host non-empty; AU. host full
+ * standard; AV. host mixed; AW. host plain standard normal; AX. host
+ * untargeted; AY. host not teapot/sink/tasting; AZ. host != Mystery host;
+ * BA. initial lemon not already satisfied; BB. no unsupported lemon combos.
+ * Solver items G–J and BC–BE are enforced by finalizeCandidate, not here.
  */
 export function validateLevelStructure(
   level: GeneratedLevel,
@@ -1612,6 +1993,13 @@ export function validateLevelStructure(
     reasons.push(`expected ${totalCups} cups, got ${level.cups.length}`);
   }
   const constraints = level.cupConstraints ?? [];
+  // Normalized once for every check below (AO–BE, D): legacy levels carry
+  // all-null slots, so tea-only behavior is unchanged.
+  const slots: FloatingIngredientSlot[] = normalizeFloatingIngredients(
+    level.floatingIngredients,
+    level.cups.length,
+  );
+  const presentIds = slots.filter((s): s is FloatingIngredientId => s != null);
   const counts = new Map<string, number>();
   level.cups.forEach((cup, i) => {
     // AN: dynamic per-vessel capacity (a 2/2 tasting bowl is full, a 3/2
@@ -1743,7 +2131,16 @@ export function validateLevelStructure(
   for (const t of actualTargets) {
     if (!palette.includes(t)) reasons.push(`targetTeaId ${t} not in palette (P)`);
   }
-  if (isWonState(level.cups, constraints.length > 0 ? constraints : undefined)) {
+  // D: not already solved (lemon-aware: tea-sorted with the lemon on the
+  // wrong tea is NOT a solved start).
+  const startWon =
+    presentIds.length > 0
+      ? isPuzzleWonState(
+          { cups: level.cups, floatingIngredients: slots },
+          constraints.length > 0 ? constraints : undefined,
+        )
+      : isWonState(level.cups, constraints.length > 0 ? constraints : undefined);
+  if (startWon) {
     reasons.push('level is already solved');
   }
   if (level.hiddenCounts.length !== level.cups.length) {
@@ -1791,6 +2188,69 @@ export function validateLevelStructure(
     }
     if (wantTargets.length > 0) {
       reasons.push('sink-only + targets is out of scope for Gauntlet 3');
+    }
+  }
+  // AO–BB: floating-ingredient structural invariant.
+  const wantIngredient = requestedFloatingIngredient(req);
+  if ((level.floatingIngredients ?? []).length !== level.cups.length) {
+    reasons.push(`floatingIngredients length mismatch (AO): got ${(level.floatingIngredients ?? []).length}`);
+  }
+  if (wantIngredient === undefined) {
+    if (presentIds.length !== 0) {
+      reasons.push(`unexpected floating ingredients without request (AP): ${presentIds.join(',')}`);
+    }
+  } else {
+    const known = (FLOATING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[
+      wantIngredient
+    ];
+    if (!known) {
+      reasons.push(`unsupported floating ingredient ${wantIngredient} (AQ)`);
+    } else {
+      const palette = req.colors.slice(0, req.numColors);
+      if (!palette.includes(known.targetTeaId)) {
+        reasons.push(`lemon target tea ${known.targetTeaId} not in palette (AR)`);
+      }
+      if (presentIds.length !== 1 || presentIds[0] !== wantIngredient) {
+        reasons.push(`expected exactly one ${wantIngredient} (AS), got [${presentIds.join(',')}]`);
+      } else {
+        const host = slots.findIndex((s) => s === wantIngredient);
+        const hostCup = level.cups[host] as TeaId[];
+        const hostC = constraints[host] as CupConstraint | undefined;
+        if (!hostCup || hostCup.length === 0) reasons.push(`lemon host ${host} starts empty (AT)`);
+        if (hostCup && hostCup.length !== STANDARD_CUP_CAPACITY) {
+          reasons.push(`lemon host ${host} must start full standard (AU)`);
+        }
+        if (hostCup && hostCup.length > 0 && !isMixedFullCup(hostCup) && hostCup.length === STANDARD_CUP_CAPACITY) {
+          reasons.push(`lemon host ${host} must start mixed (AV)`);
+        }
+        if (!hostC || hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) {
+          reasons.push(`lemon host ${host} must be untargeted plain normal (AW/AX)`);
+        }
+        if (hostC && (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(hostC))) {
+          reasons.push(`lemon host ${host} must be a standard vessel (AW)`);
+        }
+        if (hostC && (hostC.mode !== 'normal' || isTastingCupConstraint(hostC))) {
+          reasons.push(`lemon host ${host} must not be teapot/sink/tasting (AY)`);
+        }
+        if ((level.hiddenCounts[host] ?? 0) !== 0) {
+          reasons.push(`lemon host ${host} must not be the Mystery cup (AZ)`);
+        }
+        if (
+          hostC &&
+          floatingIngredientHostSatisfied(wantIngredient, hostCup ?? [], hostC)
+        ) {
+          reasons.push(`lemon must not start already satisfied (BA)`);
+        }
+      }
+      if (constraints.some((c) => c?.mode === 'sink-only')) {
+        reasons.push('lemon + sink is out of scope for Gauntlet 5 (BB)');
+      }
+      if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+        reasons.push('lemon + targets is out of scope for Gauntlet 5 (BB)');
+      }
+      if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+        reasons.push('lemon + tasting is out of scope for Gauntlet 5 (BB)');
+      }
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.

@@ -67,8 +67,8 @@ describe('rollout 17–24 (Gauntlet 3 guest-cup introduction)', () => {
         expect(cfg.targetTeaIds).toEqual([]);
       }
     }
-    expect(mechanicPlanForLevel(18)).toEqual({ teapot: false, targets: false, sink: true, tasting: false });
-    expect(mechanicPlanForLevel(22)).toEqual({ teapot: true, targets: false, sink: true, tasting: false });
+    expect(mechanicPlanForLevel(18)).toEqual({ teapot: false, targets: false, sink: true, tasting: false, lemon: false });
+    expect(mechanicPlanForLevel(22)).toEqual({ teapot: true, targets: false, sink: true, tasting: false, lemon: false });
   });
 
   it('level 18/19/22 subtitles match the specified product copy', () => {
@@ -87,10 +87,15 @@ describe('rollout invariants 1–200', () => {
         cfg.hasSinkGuestCup,
         cfg.targetTeaIds.length > 0,
         cfg.hasMysteryLayer,
+        cfg.hasTastingBowl,
+        cfg.floatingIngredient !== undefined,
       ].filter(Boolean).length;
       expect(specials).toBeLessThanOrEqual(2);
       // Never combine sink + targets.
       expect(cfg.hasSinkGuestCup && cfg.targetTeaIds.length > 0).toBe(false);
+      expect(cfg.floatingIngredient !== undefined && cfg.hasSinkGuestCup).toBe(false);
+      expect(cfg.floatingIngredient !== undefined && cfg.hasTastingBowl).toBe(false);
+      expect(cfg.floatingIngredient !== undefined && cfg.targetTeaIds.length > 0).toBe(false);
       // Never triple-special (covered by max-2, asserted explicitly).
       const triple =
         [cfg.hasSourceOnlyTeapot, cfg.hasSinkGuestCup, cfg.targetTeaIds.length > 0].filter(Boolean)
@@ -108,9 +113,10 @@ describe('rollout invariants 1–200', () => {
   });
 
   it('later-cycle rotation uses sink without targets', () => {
-    // Challenge rotation must include all four combos over a cycle window.
+    // Challenge rotation must include pure sink and teapot+targets over a
+    // cycle window (pure sink recurs every 8 cycles from level 70).
     const seen = new Set<string>();
-    for (let lvl = 25; lvl <= 60; lvl++) {
+    for (let lvl = 25; lvl <= 100; lvl++) {
       const cfg = getLevelConfig(lvl);
       if (cfg.phase !== 'challenge') continue;
       seen.add(

@@ -264,6 +264,7 @@ describe('F. teapot regression with targets', () => {
       ],
       hiddenCounts: [0, 0, 0, 0],
       cupConstraints: [{ mode: 'source-only', targetTeaId: LAV }, N(), N(), N()],
+      floatingIngredients: [null, null, null, null],
       seed: 'f:bad-combo',
       minMoves: 5,
       visitedStates: 10,
@@ -523,7 +524,7 @@ describe('P. level rollout 1–16', () => {
       expect(cfg.totalCups).toBeLessThanOrEqual(7);
     }
     expect(getLevelConfig(10).phaseSubtitle).toContain('сервировка');
-    expect(mechanicPlanForLevel(10)).toEqual({ teapot: false, targets: true, sink: false, tasting: false });
+    expect(mechanicPlanForLevel(10)).toEqual({ teapot: false, targets: true, sink: false, tasting: false, lemon: false });
     expect(pickTargetPair(['saffron', 'lavender', 'karkade', 'milk_oolong'])).toEqual([
       'lavender',
       'karkade',

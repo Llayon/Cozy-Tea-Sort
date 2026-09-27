@@ -65,8 +65,8 @@ describe('rollout 25–32 (Gauntlet 4 tasting-bowl introduction)', () => {
       if (lvl === 31) expect(cfg.targetTeaIds.length).toBe(2);
       else expect(cfg.targetTeaIds).toEqual([]);
     }
-    expect(mechanicPlanForLevel(26)).toEqual({ teapot: false, targets: false, sink: false, tasting: true });
-    expect(mechanicPlanForLevel(30)).toEqual({ teapot: true, targets: false, sink: false, tasting: true });
+    expect(mechanicPlanForLevel(26)).toEqual({ teapot: false, targets: false, sink: false, tasting: true, lemon: false });
+    expect(mechanicPlanForLevel(30)).toEqual({ teapot: true, targets: false, sink: false, tasting: true, lemon: false });
   });
 
   it('level 26/27/30 subtitles match the specified product copy', () => {
@@ -80,23 +80,29 @@ describe('rollout invariants 1–300', () => {
   it('warmup/relax clean; max 2 specials; no forbidden pairs/triples; <=7 vessels', () => {
     for (let lvl = 1; lvl <= 300; lvl++) {
       const cfg = getLevelConfig(lvl);
-      // Special categories: mystery, teapot, sink, targets (pair = ONE), tasting.
+      // Special categories: mystery, teapot, sink, targets (pair = ONE),
+      // tasting, lemon.
       const specials = [
         cfg.hasSourceOnlyTeapot,
         cfg.hasSinkGuestCup,
         cfg.targetTeaIds.length > 0,
         cfg.hasMysteryLayer,
         cfg.hasTastingBowl,
+        cfg.floatingIngredient !== undefined,
       ].filter(Boolean).length;
       expect(specials).toBeLessThanOrEqual(2);
       expect(cfg.hasSinkGuestCup && cfg.targetTeaIds.length > 0).toBe(false);
       expect(cfg.hasTastingBowl && cfg.targetTeaIds.length > 0).toBe(false);
       expect(cfg.hasTastingBowl && cfg.hasSinkGuestCup).toBe(false);
+      expect(cfg.floatingIngredient !== undefined && cfg.hasSinkGuestCup).toBe(false);
+      expect(cfg.floatingIngredient !== undefined && cfg.hasTastingBowl).toBe(false);
+      expect(cfg.floatingIngredient !== undefined && cfg.targetTeaIds.length > 0).toBe(false);
       expect(cfg.totalCups).toBeLessThanOrEqual(7);
       if (cfg.phase === 'warmup' || cfg.phase === 'relax') {
         expect(cfg.hasSourceOnlyTeapot).toBe(false);
         expect(cfg.hasSinkGuestCup).toBe(false);
         expect(cfg.hasTastingBowl).toBe(false);
+        expect(cfg.floatingIngredient).toBe(undefined);
         expect(cfg.targetTeaIds).toEqual([]);
         expect(cfg.hasMysteryLayer).toBe(false);
       }
@@ -113,6 +119,7 @@ describe('rollout invariants 1–300', () => {
         cfg.hasSinkGuestCup ? 'sink' : '',
         cfg.targetTeaIds.length > 0 ? 'targets' : '',
         cfg.hasTastingBowl ? 'tasting' : '',
+        cfg.floatingIngredient ?? '',
       ].filter(Boolean).join('+');
       if (cfg.phase === 'challenge') seenChallenge.add(key || 'clean');
       if (cfg.phase === 'peak') seenPeak.add(key || 'clean');

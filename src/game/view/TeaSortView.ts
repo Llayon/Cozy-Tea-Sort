@@ -16,6 +16,8 @@ import { Application, Container, Graphics, Rectangle } from 'pixi.js';
 import {
   CupConstraint,
   CupSkinId,
+  FloatingIngredientId,
+  FloatingIngredientSlot,
   TEA_TYPES,
   TeaId,
   cloneCupConstraint,
@@ -23,7 +25,12 @@ import {
   isTastingCupConstraint,
 } from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
-import { canActAsSource, isCompleteCup, targetCupState } from '../logic/rules';
+import {
+  canActAsSource,
+  floatingIngredientHostSatisfied,
+  isCompleteCup,
+  targetCupState,
+} from '../logic/rules';
 
 /**
  * Tasting-bowl body height (Gauntlet 4): the shallow bowl is bottom-aligned
@@ -46,6 +53,53 @@ export function fullVesselHint(constraint: CupConstraint): string {
   }
   const cap = cupCapacity(constraint);
   return `Стакан полон (${cap}/${cap})! Выберите другой сосуд или пустой стакан.`;
+}
+
+/** Visual radius of the floating lemon slice (~16px diameter). */
+export const LEMON_SLICE_R = 8;
+
+/**
+ * Liquid surface Y in container-local coords for a given layer count
+ * (Gauntlet 5 §65): derived from actual vessel slot geometry and the
+ * actual rim — never a fixed global y. Empty vessels report a rim-ish
+ * fallback (unreachable in production: legal outflow always carries the
+ * lemon, so it never strands on empty).
+ */
+export function lemonSurfaceLocalY(
+  layerCount: number,
+  constraint: CupConstraint,
+  height = 142,
+): number {
+  const bottomY = height - 6;
+  if (layerCount <= 0) return height - TASTING_BOWL_BODY_H + 6;
+  const slotH = isTastingCupConstraint(constraint)
+    ? (bottomY - (height - TASTING_BOWL_BODY_H + 4)) / cupCapacity(constraint)
+    : STANDARD_SLOT_H;
+  return bottomY - layerCount * slotH;
+}
+
+/**
+ * Restrained floating lemon slice (Gauntlet 5 §64): warm golden rind,
+ * pale center, subtle segment lines, slight tilt. Cozy illustrated
+ * style — readable, never sticker-like, no emoji, no text.
+ */
+export function drawLemonSlice(g: Graphics, cx: number, cy: number, r = LEMON_SLICE_R): void {
+  const tilt = -0.35;
+  // Rind + pale flesh.
+  g.circle(cx, cy, r).fill({ color: 0xe8b93c, alpha: 1 });
+  g.circle(cx, cy, r).stroke({ width: 1.4, color: 0xc9962e, alpha: 1 });
+  g.circle(cx, cy, r - 2.2).fill({ color: 0xf7e08b, alpha: 1 });
+  // Segment lines fanning from the center (slight tilt).
+  for (let k = 0; k < 3; k++) {
+    const a = tilt + (k * Math.PI) / 3;
+    g.beginPath();
+    g.moveTo(cx, cy);
+    g.lineTo(cx + Math.cos(a) * (r - 2.6), cy + Math.sin(a) * (r - 2.6));
+    g.stroke({ width: 1.1, color: 0xe3c566, alpha: 0.95 });
+  }
+  g.circle(cx, cy, 1.1).fill({ color: 0xfbf3c4, alpha: 1 });
+  // Gloss highlight.
+  g.ellipse(cx - r * 0.3, cy - r * 0.38, 2.2, 1.3).fill({ color: 0xffffff, alpha: 0.55 });
 }
 import { audioSynth } from '../audio/audioSynth';
 import { telegram } from '../telegram/telegramHaptics';
@@ -124,8 +178,21 @@ export class CupView {
   liquidContainer: Container;
   liquidGraphics: Graphics;
   liquidMask: Graphics;
+  /**
+   * Floating-ingredient layer (Gauntlet 5): the lemon slice riding the
+   * liquid surface. Above the liquid, below the skin rim work and the
+   * target motif. Driven solely by `Cup.floatingIngredient` — no
+   * parallel view state.
+   */
+  lemonGraphics: Graphics;
   glassOverlay: Graphics;
   glowGraphics: Graphics;
+  /**
+   * Transit suppression (Gauntlet 5 §66): while the pour-arc lemon is
+   * flying, the destination's static slice stays hidden so two lemons
+   * never show simultaneously. Owned by the pour flow, cleared on land.
+   */
+  suppressLemonTransit = false;
   /**
    * Target-motif layer (gold medallion), above liquid so the destination
    * stays readable even when the cup holds another tea. Separate graphics
@@ -245,6 +312,9 @@ export class CupView {
 
     this.glassOverlay = new Graphics();
     this.cupBodyContainer.addChild(this.glassOverlay);
+
+    this.lemonGraphics = new Graphics();
+    this.cupBodyContainer.addChild(this.lemonGraphics);
 
     this.targetGraphics = new Graphics();
     this.cupBodyContainer.addChild(this.targetGraphics);
@@ -721,9 +791,39 @@ export class CupView {
       .stroke({ width: 2, color: 0xd4af37, alpha: 0.6 });
   }
 
+  /**
+   * Floating lemon slice (Gauntlet 5 §64–68): drawn from the authoritative
+   * `Cup.floatingIngredient` at the actual liquid surface for the current
+   * (possibly fill-animating) layer count. Hidden while a pour-arc transit
+   * is flying so two lemons never show. A correctly served lemon (full
+   * homogeneous sea_buckthorn) gets a soft warm-gold halo — no checkmark,
+   * no red state, no punishment.
+   */
+  renderLemon(cup: Cup) {
+    const g = this.lemonGraphics;
+    g.clear();
+    if (this.suppressLemonTransit) return;
+    const ing = cup.floatingIngredient;
+    if (ing == null || ing !== 'lemon') return;
+    // During a fill animation the logic is already post-move: ride the
+    // animated surface (pre-pour base + grown fraction) instead of
+    // jumping to the final level.
+    let effCount = cup.layers.length;
+    if (this.fillingCount > 0 && this.fillingLayer) {
+      effCount = cup.layers.length - this.fillingCount + this.fillingCount * this.fillAmount;
+    }
+    const cx = this.width / 2;
+    const cy = lemonSurfaceLocalY(effCount, cup.constraint, this.height) - 3;
+    if (floatingIngredientHostSatisfied('lemon', cup.layers, cup.constraint)) {
+      g.circle(cx, cy, LEMON_SLICE_R + 5).fill({ color: 0xffe9a8, alpha: 0.3 });
+    }
+    drawLemonSlice(g, cx, cy, LEMON_SLICE_R);
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
     this.renderTargetMotif(cup);
+    this.renderLemon(cup);
     // Sink glow lives in glowGraphics (behind the liquid, like the
     // selection ring); re-apply it on every liquid redraw unless a
     // selection ring is active (setSelection owns the layer then).
@@ -928,6 +1028,24 @@ export class TeaSortView {
   selectedCupIndex: number | null = null;
   isAnimating = false;
 
+  transitGraphics = new Graphics();
+  /**
+   * Active lemon pour-arc transit (Gauntlet 5 §66): exactly one flying
+   * slice, drawn by the existing ticker loop (no second ticker).
+   * Stage-space quadratic arc, synchronized with the pour duration.
+   */
+  private lemonTransit: {
+    ingredient: FloatingIngredientId;
+    fromX: number;
+    fromY: number;
+    ctrlX: number;
+    ctrlY: number;
+    toX: number;
+    toY: number;
+    startMs: number;
+    durMs: number;
+  } | null = null;
+
   particles: Particle[] = [];
   ambientSteamTimer = 0;
 
@@ -1037,6 +1155,8 @@ export class TeaSortView {
     this.rootContainer.addChild(this.tableGraphics);
     this.rootContainer.addChild(this.cupsContainer);
     this.rootContainer.addChild(this.streamGraphics);
+    this.transitGraphics.eventMode = 'none';
+    this.rootContainer.addChild(this.transitGraphics);
     this.rootContainer.addChild(this.particlesGraphics);
 
     this.setupInteractivity();
@@ -1328,7 +1448,14 @@ export class TeaSortView {
       const res = this.logic.makeMove(sourceIdx, clickedIdx);
       if (res) {
         this.deselectCurrent(false);
-        this.animatePour(sourceIdx, clickedIdx, res.move.layer, res.move.count, res.sourceUncovered);
+        this.animatePour(
+          sourceIdx,
+          clickedIdx,
+          res.move.layer,
+          res.move.count,
+          res.sourceUncovered,
+          res.floatingIngredientMoved ?? null,
+        );
       }
     } else {
       const decision = decideSecondTap(
@@ -1414,12 +1541,63 @@ export class TeaSortView {
     });
   }
 
+  /**
+   * Lemon surface point in stage space for a vessel holding `layerCount`
+   * layers (pre- or post-move — the caller supplies the count, since logic
+   * is already post-move when animation runs).
+   */
+  private lemonStagePoint(view: CupView, layerCount: number): { x: number; y: number } {
+    return {
+      x: view.container.x + (view.width / 2) * view.scale,
+      y: view.container.y + lemonSurfaceLocalY(layerCount, view.constraint, view.height) * view.scale,
+    };
+  }
+
+  /**
+   * Begin a lemon pour-arc transit (Gauntlet 5 §66): hide the destination
+   * static slice while exactly one lemon flies a quadratic arc,
+   * synchronized with the existing pour duration. The source static slice
+   * is already gone (logic updated immediately); landing reveals the
+   * destination static slice via the post-loop `renderAllCups`.
+   */
+  private startLemonTransit(
+    ingredient: FloatingIngredientId,
+    sourceView: CupView,
+    targetView: CupView,
+    sourcePreCount: number,
+    targetPreCount: number,
+    durMs: number,
+  ): void {
+    const from = this.lemonStagePoint(sourceView, sourcePreCount);
+    const to = this.lemonStagePoint(targetView, targetPreCount);
+    targetView.suppressLemonTransit = true;
+    const toCup = this.logic.cups[targetView.index];
+    if (toCup) targetView.renderLemon(toCup);
+    this.lemonTransit = {
+      ingredient,
+      fromX: from.x,
+      fromY: from.y,
+      ctrlX: (from.x + to.x) / 2,
+      ctrlY: Math.min(from.y, to.y) - 46,
+      toX: to.x,
+      toY: to.y,
+      startMs: performance.now(),
+      durMs: Math.max(1, durMs),
+    };
+  }
+
+  private clearLemonTransit(): void {
+    this.lemonTransit = null;
+    this.transitGraphics.clear();
+  }
+
   async animatePour(
     fromIdx: number,
     toIdx: number,
     layer: TeaId,
     count: number,
     sourceUncovered = false,
+    floatingIngredientMoved: FloatingIngredientSlot = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -1455,6 +1633,23 @@ export class TeaSortView {
     sourceView.drainingLayer = layer;
     targetView.fillingCount = count;
     targetView.fillingLayer = layer;
+
+    // Lemon transit: logic is already post-move, so reconstruct the
+    // pre-move surface counts from the recorded transfer.
+    if (floatingIngredientMoved != null) {
+      const fromCup = this.logic.cups[fromIdx];
+      const toCup = this.logic.cups[toIdx];
+      const sourcePre = (fromCup?.layers.length ?? 0) + count;
+      const targetPre = Math.max(0, (toCup?.layers.length ?? 0) - count);
+      this.startLemonTransit(
+        floatingIngredientMoved,
+        sourceView,
+        targetView,
+        sourcePre,
+        targetPre,
+        POUR_DURATION_SEC * 1000,
+      );
+    }
 
     const tea = TEA_TYPES[layer];
     const startTime = performance.now();
@@ -1502,6 +1697,9 @@ export class TeaSortView {
     sourceView.drainingCount = 0;
     targetView.fillAmount = 0;
     targetView.fillingCount = 0;
+    // Landing: reveal the destination static lemon, then redraw.
+    targetView.suppressLemonTransit = false;
+    this.clearLemonTransit();
 
     this.renderAllCups();
 
@@ -1538,6 +1736,17 @@ export class TeaSortView {
               view.homeX + view.visualWidth / 2,
               view.homeY + view.visualHeight / 2,
             );
+          }
+        }
+        // Correctly served lemon: a small sparkle around the slice.
+        if (
+          cup.floatingIngredient != null &&
+          floatingIngredientHostSatisfied(cup.floatingIngredient, cup.layers, cup.constraint)
+        ) {
+          const view = this.cupViews[idx];
+          if (view) {
+            const p = this.lemonStagePoint(view, cup.layers.length);
+            this.triggerRevealSparkles(p.x, p.y);
           }
         }
       });
@@ -1657,8 +1866,21 @@ export class TeaSortView {
     }
   }
 
+  /** Draw the in-flight lemon slice along its arc (existing ticker). */
+  private drawLemonTransit(): void {
+    const t = this.lemonTransit;
+    if (!t) return;
+    const progress = Math.min(1, Math.max(0, (performance.now() - t.startMs) / t.durMs));
+    const u = 1 - progress;
+    const x = u * u * t.fromX + 2 * u * progress * t.ctrlX + progress * progress * t.toX;
+    const y = u * u * t.fromY + 2 * u * progress * t.ctrlY + progress * progress * t.toY;
+    this.transitGraphics.clear();
+    if (t.ingredient === 'lemon') drawLemonSlice(this.transitGraphics, x, y, LEMON_SLICE_R);
+  }
+
   update(delta: number) {
     this.cupViews.forEach((c) => c.update(delta));
+    this.drawLemonTransit();
 
     this.ambientSteamTimer += delta;
     if (this.ambientSteamTimer > 0.4) {
@@ -1719,6 +1941,9 @@ export class TeaSortView {
 
   resetLevel() {
     this.deselectCurrent(false);
+    // A level swap mid-flight must never strand a flying lemon or a
+    // suppressed destination slice (fresh CupViews default suppression off).
+    this.clearLemonTransit();
     this.setupCups();
     this.layoutCups();
     this.renderAllCups();

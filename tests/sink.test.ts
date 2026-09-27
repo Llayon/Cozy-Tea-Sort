@@ -135,6 +135,7 @@ describe('C. unsupported sink+target combos fail loudly', () => {
       cups: [[A, A, A, A], [B, B, B, B], [C, C, C, C], [D, D, D, D], [], []],
       hiddenCounts: [0, 0, 0, 0, 0, 0],
       cupConstraints: [N, N, N, N, N, { mode: 'sink-only', targetTeaId: A } as CupConstraint],
+      floatingIngredients: [null, null, null, null, null, null],
       seed: 'x',
       minMoves: 5,
       visitedStates: 5,

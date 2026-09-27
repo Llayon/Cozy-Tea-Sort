@@ -27,8 +27,9 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CupConstraint, TEA_TYPES, TeaId, cloneCupConstraint } from './game/types';
+import { CupConstraint, FloatingIngredientSlot, TEA_TYPES, TeaId, cloneCupConstraint } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
+import { isWonState } from './game/logic/rules';
 import { TeaSortView } from './game/view/TeaSortView';
 import { audioSynth } from './game/audio/audioSynth';
 import { telegram } from './game/telegram/telegramHaptics';
@@ -48,6 +49,7 @@ interface LevelBackupState {
   cups: TeaId[][];
   hiddenCounts: number[];
   cupConstraints: CupConstraint[];
+  floatingIngredients: FloatingIngredientSlot[];
 }
 
 export default function App() {
@@ -67,6 +69,9 @@ export default function App() {
   const [canUndo, setCanUndo] = useState<boolean>(false);
   const [isWon, setIsWon] = useState<boolean>(false);
   const [isDeadlocked, setIsDeadlocked] = useState<boolean>(false);
+  // Lemon-wrong deadlock variant: tea sorted but the lemon sits on the
+  // wrong tea (derived accurately from the live logic at deadlock time).
+  const [deadlockDetail, setDeadlockDetail] = useState<null | 'lemon'>(null);
   const [isMuted, setIsMuted] = useState<boolean>(() => audioSynth.muted);
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [showRecipeBook, setShowRecipeBook] = useState<boolean>(false);
@@ -110,7 +115,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [] });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [] });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -131,6 +136,7 @@ export default function App() {
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
         sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
         tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
+        floatingIngredient: cfg.floatingIngredient,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -142,9 +148,15 @@ export default function App() {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
       cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
+      floatingIngredients: [...generated.floatingIngredients],
     };
 
-    return new TeaSortLogic(generated.cups, generated.hiddenCounts, generated.cupConstraints);
+    return new TeaSortLogic(
+      generated.cups,
+      generated.hiddenCounts,
+      generated.cupConstraints,
+      generated.floatingIngredients,
+    );
   };
 
   const bindLogicToView = (logic: TeaSortLogic, lvlNum: number) => {
@@ -162,6 +174,7 @@ export default function App() {
     setCanUndo(false);
     setIsWon(false);
     setIsDeadlocked(false);
+    setDeadlockDetail(null);
     setSelectedCupIndex(null);
     setJustUnlockedRecipe(undefined);
     setJustUnlockedSkin(undefined);
@@ -205,6 +218,7 @@ export default function App() {
         sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
         sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
         tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
+        floatingIngredient: cfg.floatingIngredient,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -216,12 +230,14 @@ export default function App() {
       cups: generated.cups.map((c) => [...c]),
       hiddenCounts: [...generated.hiddenCounts],
       cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
+      floatingIngredients: [...generated.floatingIngredients],
     };
 
     const logic = new TeaSortLogic(
       generated.cups,
       generated.hiddenCounts,
       generated.cupConstraints,
+      generated.floatingIngredients,
     );
     logicRef.current = logic;
 
@@ -283,6 +299,21 @@ export default function App() {
       },
       onDeadlock: () => {
         if (isDisposed) return;
+        // Lemon-wrong variant, derived accurately from live logic (Gauntlet
+        // 5 §70): tea sorted, puzzle not won, an ingredient still present.
+        const active = logicRef.current;
+        let detail: null | 'lemon' = null;
+        if (active) {
+          const st = active.toState();
+          if (
+            isWonState(st.cups, st.cupConstraints) &&
+            !active.isWon() &&
+            st.floatingIngredients.some((s) => s !== null)
+          ) {
+            detail = 'lemon';
+          }
+        }
+        setDeadlockDetail(detail);
         setIsDeadlocked(true);
       },
       onSelectCup: (idx) => {
@@ -333,6 +364,7 @@ export default function App() {
     setMoves(logicRef.current.movesCount);
     setCanUndo(logicRef.current.canUndo);
     setIsDeadlocked(false);
+    setDeadlockDetail(null);
   };
 
   const handleRestart = () => {
@@ -341,8 +373,9 @@ export default function App() {
     const restoredCups = backup.cups.map((c) => [...c]);
     const restoredHidden = [...backup.hiddenCounts];
     const restoredConstraints = (backup.cupConstraints ?? []).map(cloneCupConstraint);
+    const restoredSlots = [...(backup.floatingIngredients ?? [])];
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -351,6 +384,7 @@ export default function App() {
     setCanUndo(false);
     setIsWon(false);
     setIsDeadlocked(false);
+    setDeadlockDetail(null);
     setSelectedCupIndex(null);
     audioSynth.playSelect();
     telegram.hapticSelection();
@@ -498,10 +532,10 @@ export default function App() {
       </div>
 
       {/* Teapot first-encounter onboarding (Level 6): one compact cozy hint, never blocking.
-          Suppressed beside the guest-cup / tasting banners (L22, L30): the
-          teapot was already taught at L6/7/14/15 — no overlapping banners
-          on combined levels. */}
-      {currentConfig.hasSourceOnlyTeapot && !currentConfig.hasSinkGuestCup && !currentConfig.hasTastingBowl && moves === 0 && !isWon && (
+          Suppressed beside the guest-cup / tasting / lemon banners (L22,
+          L30, L38): the teapot was already taught at L6/7/14/15 — no
+          overlapping banners on combined levels. */}
+      {currentConfig.hasSourceOnlyTeapot && !currentConfig.hasSinkGuestCup && !currentConfig.hasTastingBowl && !currentConfig.floatingIngredient && moves === 0 && !isWon && (
         <div
           id="teapot-tutorial-hint"
           className="shrink-0 px-3 py-1.5 bg-[#2B2115]/95 border-b border-[#5A4426] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8C98A] z-10 text-center"
@@ -530,6 +564,17 @@ export default function App() {
         >
           <Coffee className="w-3.5 h-3.5 text-[#8AC9A8] shrink-0" />
           <span>Дегустационная пиала: в неё помещается только 2 слоя. Используй её как временное место — к концу она должна быть пустой.</span>
+        </div>
+      )}
+
+      {/* Lemon first-encounter onboarding (Level 34): compact, never blocking. */}
+      {currentConfig.floatingIngredient === 'lemon' && moves === 0 && !isWon && (
+        <div
+          id="lemon-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2E2410]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0DFA8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8C85E] shrink-0" />
+          <span>Долька лимона: лимон плавает сверху и переезжает вместе с переливанием. К концу оставь его на облепиховом чае.</span>
         </div>
       )}
 
@@ -589,7 +634,11 @@ export default function App() {
             <AlertCircle className="w-5 h-5 text-[#F47587] shrink-0" />
             <div>
               <div className="text-xs font-semibold text-[#FFD6DC]">Ходов больше нет!</div>
-              <div className="text-[11px] text-[#E0AAB2]">Отмените последний ход или начните заново</div>
+              <div className="text-[11px] text-[#E0AAB2]">
+                {deadlockDetail === 'lemon'
+                  ? 'Чай собран, но лимон должен остаться на облепиховом.'
+                  : 'Отмените последний ход или начните заново'}
+              </div>
             </div>
           </div>
           <button
@@ -725,6 +774,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#8AC9A8] font-bold">🍶</span>
                 <span>Дегустационная пиала вмещает только 2 слоя и к концу должна быть пустой.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8C85E] font-bold">🍋</span>
+                <span>Лимон переезжает при переливании из его чашки и должен закончить на полном облепиховом чае.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

@@ -152,6 +152,7 @@ describe.each([
         cups,
         hiddenCounts,
         cupConstraints: constraints,
+        floatingIngredients: cups.map(() => null),
         seed: `tpl:${tpl.id}`,
         minMoves: solved.minMoves as number,
         visitedStates: solved.visitedStates,

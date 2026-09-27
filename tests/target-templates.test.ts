@@ -106,6 +106,7 @@ describe('target template bank validation (§33)', () => {
       cups: inst.cups,
       hiddenCounts,
       cupConstraints: constraints,
+      floatingIngredients: inst.cups.map(() => null),
       seed: `bank-audit:${tpl.id}`,
       minMoves: solved.minMoves as number,
       visitedStates: solved.visitedStates,
