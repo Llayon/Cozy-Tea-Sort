@@ -66,6 +66,11 @@ const batches = [
   { name: 'tasting stress challenge', files: ['tests/tasting-stress-challenge.test.ts'] },
   { name: 'tasting stress peak', files: ['tests/tasting-stress-peak.test.ts'] },
   { name: 'teapot + tasting stress', files: ['tests/tasting-stress-teapot.test.ts'] },
+  { name: 'lemon matrix + rollout + view', files: ['tests/lemon.test.ts', 'tests/lemon-rollout.test.ts', 'tests/lemon-view.test.ts'] },
+  { name: 'lemon templates + fast path', files: ['tests/lemon-templates.test.ts', 'tests/lemon-fastpath.test.ts'] },
+  { name: 'lemon stress challenge', files: ['tests/lemon-stress-challenge.test.ts'] },
+  { name: 'lemon stress peak', files: ['tests/lemon-stress-peak.test.ts'] },
+  { name: 'teapot + lemon stress', files: ['tests/lemon-stress-teapot.test.ts'] },
 ];
 
 function runBatch(batch) {
