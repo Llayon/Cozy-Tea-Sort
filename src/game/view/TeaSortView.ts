@@ -104,6 +104,21 @@ export function lemonSurfaceLocalY(
 }
 
 /**
+ * Lemon slice CENTER Y in container-local coords (G5.2): the single
+ * anchor shared by the static slice and the flight endpoints. The slice
+ * sits slightly embedded into the surface (not balanced on top of it),
+ * and both render paths must agree exactly — otherwise takeoff and
+ * landing visibly jump by the embed offset.
+ */
+export function lemonCenterLocalY(
+  layerCount: number,
+  constraint: CupConstraint,
+  height = 142,
+): number {
+  return lemonSurfaceLocalY(layerCount, constraint, height) - 3;
+}
+
+/**
  * Restrained floating lemon slice (Gauntlet 5 §64): warm golden rind,
  * pale center, subtle segment lines, slight tilt. Cozy illustrated
  * style — readable, never sticker-like, no emoji, no text.
@@ -300,7 +315,7 @@ export class CupView {
   surfaceStagePoint(layerCount: number): { x: number; y: number } {
     const pivot = this.cupBodyContainer.pivot;
     const localX = this.width / 2;
-    const localY = lemonSurfaceLocalY(layerCount, this.constraint, this.height);
+    const localY = lemonCenterLocalY(layerCount, this.constraint, this.height);
     const r = rotatePoint2D(
       localX - pivot.x,
       localY - pivot.y,
@@ -862,7 +877,7 @@ export class CupView {
       effCount = cup.layers.length - this.fillingCount + this.fillingCount * this.fillAmount;
     }
     const cx = this.width / 2;
-    const cy = lemonSurfaceLocalY(effCount, cup.constraint, this.height) - 3;
+    const cy = lemonCenterLocalY(effCount, cup.constraint, this.height);
     if (floatingIngredientHostSatisfied('lemon', cup.layers, cup.constraint)) {
       g.circle(cx, cy, LEMON_SLICE_R + 5).fill({ color: 0xffe9a8, alpha: 0.3 });
     }

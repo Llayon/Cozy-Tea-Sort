@@ -11,6 +11,7 @@ import {
   LEMON_SLICE_R,
   decideSecondTap,
   drawLemonSlice,
+  lemonCenterLocalY,
   lemonSurfaceLocalY,
   lemonTransitCounts,
 } from '../src/game/view/TeaSortView';
@@ -82,23 +83,24 @@ describe('selection policy with lemon levels', () => {
 });
 
 describe('G5.1 lemon transit geometry', () => {
-  it('1. target ending with 2 layers (transfer 2 into empty): endpoint == surfaceY(2)', () => {
-    // Post-move target holds 2 layers; the flight must land there.
+  it('1. target ending with 2 layers (transfer 2 into empty): endpoint == centerY(2)', () => {
+    // Post-move target holds 2 layers; the flight must land on the shared
+    // static/flight anchor (G5.2: one lemonCenterLocalY for both).
     expect(lemonTransitCounts(0, 2, 2)).toEqual({ sourcePre: 2, targetFinal: 2 });
     const target = new CupView(1, N);
     const end = target.surfaceStagePoint(2);
     expect(end.x).toBeCloseTo(32, 9);
-    expect(end.y).toBeCloseTo(lemonSurfaceLocalY(2, N), 9);
+    expect(end.y).toBeCloseTo(lemonCenterLocalY(2, N), 9);
     target.destroy();
   });
 
-  it('2. target ending with 2 layers (transfer 1 onto 1): endpoint == surfaceY(2)', () => {
+  it('2. target ending with 2 layers (transfer 1 onto 1): endpoint == centerY(2)', () => {
     expect(lemonTransitCounts(1, 2, 1)).toEqual({ sourcePre: 2, targetFinal: 2 });
     const target = new CupView(1, N);
     target.container.position.set(100, 200);
     const end = target.surfaceStagePoint(2);
     expect(end.x).toBeCloseTo(100 + 32, 9);
-    expect(end.y).toBeCloseTo(200 + lemonSurfaceLocalY(2, N), 9);
+    expect(end.y).toBeCloseTo(200 + lemonCenterLocalY(2, N), 9);
     target.destroy();
   });
 
@@ -145,11 +147,11 @@ describe('G5.1 lemon transit geometry', () => {
     const endpoint = target.surfaceStagePoint(targetFinal);
     const landing = target.surfaceStagePoint(postTargetLen);
     expect(Math.hypot(endpoint.x - landing.x, endpoint.y - landing.y)).toBeLessThan(1e-9);
-    // Static slice center sits on the same anchor (embedded by radius).
-    const staticCy = lemonSurfaceLocalY(postTargetLen, N) - 3;
-    expect(Math.abs(staticCy - (endpoint.y - target.container.y))).toBeLessThanOrEqual(
-      LEMON_SLICE_R,
-    );
+    // Static slice center IS the transit anchor now (G5.2): the shared
+    // lemonCenterLocalY feeds both renderLemon and surfaceStagePoint, so
+    // takeoff and landing have zero jump — not "within radius".
+    const staticCy = lemonCenterLocalY(postTargetLen, N);
+    expect(Math.abs(staticCy - (endpoint.y - target.container.y))).toBeLessThan(1e-9);
     target.destroy();
   });
 
