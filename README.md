@@ -34,6 +34,7 @@ src/game/logic/generator.ts       solver-validated generation, bounded retries +
 src/game/logic/targetTemplates.ts  offline-curated named-serving topologies (fast path)
 src/game/logic/sinkTemplates.ts    offline-curated guest-cup topologies (fast path)
 src/game/logic/tastingTemplates.ts offline-curated tasting-bowl topologies (fast path)
+src/game/logic/lemonTemplates.ts    offline-curated floating-lemon topologies (fast path, c0 fixed to sea_buckthorn)
 src/game/logic/difficulty.ts      solver-depth targets + acceptance bands per rhythm phase
 src/game/logic/progression.ts     pure win application (current vs highest, reward-once)
 src/game/storage.ts               safe localStorage load/save with validation
@@ -58,7 +59,7 @@ The old "100% solvable via reverse shuffle" claim was false: arbitrary single-la
 
 Any level is reproducible from its seed (`seed` is stored on the generated level for bug reports).
 
-Canonical target, sink and tasting production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts`, `tastingTemplates.ts` — topologies discovered offline with the production solver, palette-relative) serve each level with ~1 solver validation (`*_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it.
+Canonical target, sink, tasting and lemon production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts`, `tastingTemplates.ts`, `lemonTemplates.ts` — topologies discovered offline with the production solver, palette-relative; lemon templates fix role c0 to sea_buckthorn) serve each level with ~1 solver validation (`*_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it.
 
 ## Solver
 
@@ -85,6 +86,10 @@ One empty vessel may be a guest cup: it RECEIVES tea but tea can NEVER be poured
 ## Tasting bowl (дегустационная пиала)
 
 A small working vessel with capacity 2 and normal flow in both directions — it changes space management, not flow direction. `AAAA` into an empty bowl moves exactly 2 layers; a `2/2` bowl is full (`Пиала заполнена (2/2)!`); its contents pour back out under ordinary color rules. It starts empty at the stable last slot (replacing one empty vessel, max 7 total, one ordinary standard empty buffer always remains) and MUST finish empty — even a full homogeneous bowl is not complete. The optimal solution of every committed template demonstrably routes tea through the bowl (in and back out). Mystery never lives inside it; tasting + sink and tasting + targets are rejected loudly. Rollout: L26 challenge tasting, L27 peak tasting + mystery (standard cup), L30 challenge teapot + tasting; later cycles rotate tasting / teapot+tasting / sink / teapot+sink / targets / teapot+targets (challenge) and tasting/sink/targets/teapot + mystery or mystery-only (peak); NEVER tasting + sink, NEVER tasting + targets, NEVER three specials (max 2 per level); warmup/relax always clean. Visually a shallow gold-rimmed bowl with foot saucer, bottom-aligned in the standard cell (2 readable liquid slots, pour stream anchored to the real rim, full-cell hit area).
+
+## Floating lemon (долька лимона)
+
+The first dynamic mechanic beyond `TeaId[][]`: a lemon slice floating on the liquid surface, tracked as an aligned `floatingIngredients` array (`PuzzleState = cups + slots`, the one authoritative location — never a tea layer, never capacity, never a constraint). Any legal outflow from its host carries it to the destination (even a partial 1-layer pour); inflow never pushes it away; illegal pours leave it untouched (atomic `applyPourState`). Tea legality is unchanged; a source ingredient meeting an occupied target slot is rejected fail-closed. The solver BFS carries full puzzle states keyed by `canonicalPuzzleKey` (contents + `#lemon` markers, sorted inside signature groups — lemon-free boards keep byte-identical legacy keys, so old BFS counts don't move). Victory requires tea sorted AND the lemon on a full homogeneous standard sea_buckthorn cup (teapot/sink/bowl/target/wrong-tea hosts all fail); tea-sorted-with-lemon-wrong is a real deadlock, not a win. Undo snapshots exact slots; the pour result exposes `floatingIngredientMoved` for the pour-arc transit animation (one flying slice, destination static hidden mid-flight, landing reveal, win sparkle on correct serve). Rollout: L34 challenge lemon, L35 peak lemon + mystery (distinct hosts), L38 challenge teapot + lemon; lemon levels always carry sea_buckthorn in the palette; NEVER lemon + sink/tasting/targets, NEVER three specials (max 2 per level); warmup/relax always clean.
 
 ## Named serving (target cups)
 
