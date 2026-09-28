@@ -59,6 +59,31 @@ export function fullVesselHint(constraint: CupConstraint): string {
 export const LEMON_SLICE_R = 8;
 
 /**
+ * Pure 2D rotation helper (stage-space transform math shared by the tea
+ * spout anchor and the lemon surface anchor).
+ */
+export function rotatePoint2D(x: number, y: number, angle: number): { x: number; y: number } {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { x: x * cos - y * sin, y: x * sin + y * cos };
+}
+
+/**
+ * Transit surface-count rule (G5.1, pure and unit-tested): logic is
+ * already post-move when animation runs, so the flight STARTS from the
+ * reconstructed pre-move source surface — but it must LAND on the FINAL
+ * post-pour destination surface (the tea has arrived when the lemon
+ * lands, and the static slice reappears exactly there).
+ */
+export function lemonTransitCounts(
+  postSourceLen: number,
+  postTargetLen: number,
+  transfer: number,
+): { sourcePre: number; targetFinal: number } {
+  return { sourcePre: postSourceLen + transfer, targetFinal: postTargetLen };
+}
+
+/**
  * Liquid surface Y in container-local coords for a given layer count
  * (Gauntlet 5 §65): derived from actual vessel slot geometry and the
  * actual rim — never a fixed global y. Empty vessels report a rim-ish
@@ -261,6 +286,30 @@ export class CupView {
     if (!isTastingCupConstraint(c)) return STANDARD_SLOT_H;
     const bottomY = this.height - 6;
     return (bottomY - (this.rimLocalY + 4)) / cupCapacity(c);
+  }
+
+  /**
+   * Lemon surface point in stage space for a vessel holding `layerCount`
+   * layers (G5.1): the ACTUAL transformed surface — local surface point
+   * rotated by the live body tilt around the body pivot, shifted by the
+   * live lift, scaled and placed at the container position (same
+   * convention as the tea-spout anchor, which likewise ignores transient
+   * shake). A tilted pouring source therefore launches the slice from
+   * where its surface really is, not from the rest-pose point.
+   */
+  surfaceStagePoint(layerCount: number): { x: number; y: number } {
+    const pivot = this.cupBodyContainer.pivot;
+    const localX = this.width / 2;
+    const localY = lemonSurfaceLocalY(layerCount, this.constraint, this.height);
+    const r = rotatePoint2D(
+      localX - pivot.x,
+      localY - pivot.y,
+      this.cupBodyContainer.rotation,
+    );
+    return {
+      x: this.container.x + (this.width / 2 + r.x) * this.scale,
+      y: this.container.y + (pivot.y + this.currentLift + r.y) * this.scale,
+    };
   }
 
   /** Named-serving destination, if this cup is a target cup. */
@@ -1542,34 +1591,33 @@ export class TeaSortView {
   }
 
   /**
-   * Lemon surface point in stage space for a vessel holding `layerCount`
-   * layers (pre- or post-move — the caller supplies the count, since logic
-   * is already post-move when animation runs).
+   * Lemon surface point in stage space (G5.1): delegates to the vessel's
+   * transform-aware anchor (pivot/rotation/lift/scale). The caller
+   * supplies the layer count since logic is already post-move when
+   * animation runs.
    */
   private lemonStagePoint(view: CupView, layerCount: number): { x: number; y: number } {
-    return {
-      x: view.container.x + (view.width / 2) * view.scale,
-      y: view.container.y + lemonSurfaceLocalY(layerCount, view.constraint, view.height) * view.scale,
-    };
+    return view.surfaceStagePoint(layerCount);
   }
 
   /**
-   * Begin a lemon pour-arc transit (Gauntlet 5 §66): hide the destination
-   * static slice while exactly one lemon flies a quadratic arc,
-   * synchronized with the existing pour duration. The source static slice
-   * is already gone (logic updated immediately); landing reveals the
-   * destination static slice via the post-loop `renderAllCups`.
+   * Begin a lemon pour-arc transit (Gauntlet 5 §66, geometry fixed G5.1):
+   * the flight starts at the transformed pre-move source surface and
+   * LANDS on the FINAL post-pour destination surface (the tea has arrived
+   * when the lemon lands — the static slice reappears at exactly that
+   * point via the post-loop `renderAllCups`). Destination static stays
+   * hidden mid-flight so two lemons never show.
    */
   private startLemonTransit(
     ingredient: FloatingIngredientId,
     sourceView: CupView,
     targetView: CupView,
     sourcePreCount: number,
-    targetPreCount: number,
+    targetFinalCount: number,
     durMs: number,
   ): void {
     const from = this.lemonStagePoint(sourceView, sourcePreCount);
-    const to = this.lemonStagePoint(targetView, targetPreCount);
+    const to = this.lemonStagePoint(targetView, targetFinalCount);
     targetView.suppressLemonTransit = true;
     const toCup = this.logic.cups[targetView.index];
     if (toCup) targetView.renderLemon(toCup);
@@ -1634,19 +1682,23 @@ export class TeaSortView {
     targetView.fillingCount = count;
     targetView.fillingLayer = layer;
 
-    // Lemon transit: logic is already post-move, so reconstruct the
-    // pre-move surface counts from the recorded transfer.
+    // Lemon transit (G5.1): logic is already post-move. The flight
+    // starts at the reconstructed pre-move source surface but lands on
+    // the FINAL post-pour destination surface.
     if (floatingIngredientMoved != null) {
       const fromCup = this.logic.cups[fromIdx];
       const toCup = this.logic.cups[toIdx];
-      const sourcePre = (fromCup?.layers.length ?? 0) + count;
-      const targetPre = Math.max(0, (toCup?.layers.length ?? 0) - count);
+      const { sourcePre, targetFinal } = lemonTransitCounts(
+        fromCup?.layers.length ?? 0,
+        toCup?.layers.length ?? 0,
+        count,
+      );
       this.startLemonTransit(
         floatingIngredientMoved,
         sourceView,
         targetView,
         sourcePre,
-        targetPre,
+        targetFinal,
         POUR_DURATION_SEC * 1000,
       );
     }
@@ -1799,12 +1851,7 @@ export class TeaSortView {
   }
 
   private rotatePoint(x: number, y: number, angle: number): { x: number; y: number } {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    return {
-      x: x * cos - y * sin,
-      y: x * sin + y * cos,
-    };
+    return rotatePoint2D(x, y, angle);
   }
 
   private spawnBubble(x: number, y: number, color: number) {

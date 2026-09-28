@@ -12,6 +12,7 @@ import {
   decideSecondTap,
   drawLemonSlice,
   lemonSurfaceLocalY,
+  lemonTransitCounts,
 } from '../src/game/view/TeaSortView';
 
 const M = 'matcha' as const;
@@ -77,5 +78,90 @@ describe('selection policy with lemon levels', () => {
     expect(res?.floatingIngredientMoved).toBe('lemon');
     const plain = new TeaSortLogic([[M], [M]], [0, 0], [N, N], [null, null]);
     expect(plain.makeMove(0, 1)?.floatingIngredientMoved).toBe(null);
+  });
+});
+
+describe('G5.1 lemon transit geometry', () => {
+  it('1. target ending with 2 layers (transfer 2 into empty): endpoint == surfaceY(2)', () => {
+    // Post-move target holds 2 layers; the flight must land there.
+    expect(lemonTransitCounts(0, 2, 2)).toEqual({ sourcePre: 2, targetFinal: 2 });
+    const target = new CupView(1, N);
+    const end = target.surfaceStagePoint(2);
+    expect(end.x).toBeCloseTo(32, 9);
+    expect(end.y).toBeCloseTo(lemonSurfaceLocalY(2, N), 9);
+    target.destroy();
+  });
+
+  it('2. target ending with 2 layers (transfer 1 onto 1): endpoint == surfaceY(2)', () => {
+    expect(lemonTransitCounts(1, 2, 1)).toEqual({ sourcePre: 2, targetFinal: 2 });
+    const target = new CupView(1, N);
+    target.container.position.set(100, 200);
+    const end = target.surfaceStagePoint(2);
+    expect(end.x).toBeCloseTo(100 + 32, 9);
+    expect(end.y).toBeCloseTo(200 + lemonSurfaceLocalY(2, N), 9);
+    target.destroy();
+  });
+
+  it('3. tilted source: transformed start differs per pivot/rotation (radius preserved)', () => {
+    const view = new CupView(0, N);
+    view.container.position.set(100, 200);
+    const rest = view.surfaceStagePoint(3);
+    view.cupBodyContainer.rotation = 0.88;
+    const tilted = view.surfaceStagePoint(3);
+    // The tilt must move the anchor (regression: unrotated rest-pose point).
+    expect(Math.hypot(tilted.x - rest.x, tilted.y - rest.y)).toBeGreaterThan(5);
+    // Rotation preserves the radius around the pivot (independent math).
+    const pivotStageX = 100 + 32;
+    const pivotStageY = 200 + 10;
+    const restR = Math.hypot(rest.x - pivotStageX, rest.y - pivotStageY);
+    const tiltR = Math.hypot(tilted.x - pivotStageX, tilted.y - pivotStageY);
+    expect(tiltR).toBeCloseTo(restR, 6);
+    // Positive tilt swings the surface point toward the pour side.
+    expect(tilted.x).toBeLessThan(rest.x);
+    // Lift shifts the anchor too.
+    view.cupBodyContainer.rotation = 0;
+    view.currentLift = -12;
+    const lifted = view.surfaceStagePoint(3);
+    expect(lifted.y).toBeCloseTo(rest.y - 12, 9);
+    expect(lifted.x).toBeCloseTo(rest.x, 9);
+    view.destroy();
+  });
+
+  it('4. landing static lemon coincides with the transit endpoint (epsilon)', () => {
+    // Full move simulation: the endpoint count is the post-pour target
+    // count, and the static slice reappears at exactly that anchor.
+    const logic = new TeaSortLogic([[M, SB, SB], [SB]], [0, 0], [N, N], ['lemon', null]);
+    const res = logic.makeMove(0, 1);
+    expect(res?.floatingIngredientMoved).toBe('lemon');
+    const postTargetLen = logic.cups[1]?.layers.length ?? -1;
+    expect(postTargetLen).toBe(3);
+    const { targetFinal } = lemonTransitCounts(
+      logic.cups[0]?.layers.length ?? 0,
+      postTargetLen,
+      res?.move.count ?? 0,
+    );
+    expect(targetFinal).toBe(postTargetLen);
+    const target = new CupView(1, N);
+    const endpoint = target.surfaceStagePoint(targetFinal);
+    const landing = target.surfaceStagePoint(postTargetLen);
+    expect(Math.hypot(endpoint.x - landing.x, endpoint.y - landing.y)).toBeLessThan(1e-9);
+    // Static slice center sits on the same anchor (embedded by radius).
+    const staticCy = lemonSurfaceLocalY(postTargetLen, N) - 3;
+    expect(Math.abs(staticCy - (endpoint.y - target.container.y))).toBeLessThanOrEqual(
+      LEMON_SLICE_R,
+    );
+    target.destroy();
+  });
+
+  it('5. no-lemon pour: no transit metadata, static rendering untouched', () => {
+    const logic = new TeaSortLogic([[M, M], [M]], [0, 0], [N, N], [null, null]);
+    const res = logic.makeMove(0, 1);
+    expect(res?.floatingIngredientMoved).toBe(null);
+    expect(logic.toState().floatingIngredients).toEqual([null, null]);
+    // Static layer renders fine with no ingredient present.
+    const view = new CupView(0, N);
+    view.renderLemon(logic.cups[0] as import('../src/game/logic/teaSortLogic').Cup);
+    view.renderLemon(logic.cups[1] as import('../src/game/logic/teaSortLogic').Cup);
+    view.destroy();
   });
 });
