@@ -157,6 +157,26 @@ async function runCfg(cfgKey: string, numSeeds: number, startSeed: number) {
               rescued: !woS && !wo.truncated,
             });
           }
+          if (EMIT_JSONL && distinct.has(key)) {
+            const fs = await import('node:fs');
+            const sol = (w.solution ?? []) as Array<{ kind: string; strained?: boolean }>;
+            const az2 = analyzeSolution(sol);
+            fs.appendFileSync(
+              EMIT_JSONL,
+              JSON.stringify({
+                kind: cfgKey,
+                seed: s,
+                depth: w.minMoves,
+                withVisited: w.visitedStates,
+                woVisited: wo.visitedStates,
+                cups: relativize(cups, cfg.palette),
+                teapot: cfg.hasTeapot ? 0 : null,
+                catches: az2.catches,
+                releases: az2.releases,
+                firstUse: az2.firstUseDepth,
+              }) + '\n',
+            );
+          }
         }
       }
     }
@@ -185,6 +205,12 @@ async function runCfg(cfgKey: string, numSeeds: number, startSeed: number) {
   console.log(`visitedMult(with/without) avg=${avg(mult).toFixed(2)} p50=${pct(mult, 50).toFixed(2)} p95=${pct(mult, 95).toFixed(2)} max=${mult.length ? Math.max(...mult).toFixed(2) : 0}`);
   const ex = [...distinct.values()].slice(0, 5);
   for (const v of ex) console.log(`  strong seed=${v.seed} with=${v.withD} without=${v.woD === null ? 'UNSOLV' : v.woD} rescued=${v.rescued}`);
+}
+
+const EMIT_JSONL = process.env.EMIT_JSONL ?? '';
+
+function relativize(cups: TeaId[][], palette: TeaId[]): string[][] {
+  return cups.map((cup) => cup.map((t) => `c${palette.indexOf(t)}`));
 }
 
 const [arg = 'all', numArg = '1000', startArg = '0'] = process.argv.slice(2);

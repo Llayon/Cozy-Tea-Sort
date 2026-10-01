@@ -57,9 +57,10 @@ interface MechanicPlan {
   sink: boolean;
   tasting: boolean;
   lemon: boolean;
+  strainer: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -140,43 +141,65 @@ const PINNED_ROLLOUT_33_40: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–40, then a deterministic
+ * Pinned rollout 41–48 (Gauntlet 6 — catch-one strainer, tight topology):
+ * 41 warmup clean · 42 challenge STRAINER · 43 peak STRAINER+mystery ·
+ * 44 relax clean · 45 warmup clean · 46 challenge TEAPOT+STRAINER ·
+ * 47 peak LEMON+mystery (familiar combo, no strainer) · 48 relax clean.
+ */
+const PINNED_ROLLOUT_41_48: Record<number, MechanicPlan> = {
+  41: { ...CLEAN },
+  42: { ...CLEAN, strainer: true },
+  43: { ...CLEAN, strainer: true },
+  44: { ...CLEAN },
+  45: { ...CLEAN },
+  46: { ...CLEAN, teapot: true, strainer: true },
+  47: { ...CLEAN, lemon: true },
+  48: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–48, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
- * combos, never lemon + sink / lemon + tasting / lemon + targets /
- * sink + targets / tasting + sink / tasting + targets, never three
- * specials together).
+ * combos, never strainer + lemon / sink / tasting / targets, never lemon +
+ * sink / lemon + tasting / lemon + targets / sink + targets /
+ * tasting + sink / tasting + targets, never three specials together).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
     PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ??
-    PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum];
+    PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum] ??
+    PINNED_ROLLOUT_41_48[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // challenge (no mystery): lemon → teapot+lemon → tasting →
-    // teapot+tasting → sink → teapot+sink → targets → teapot+targets.
-    switch (cycleNumber % 8) {
-      case 0: return { ...CLEAN, lemon: true };
-      case 1: return { ...CLEAN, teapot: true, lemon: true };
-      case 2: return { ...CLEAN, tasting: true };
-      case 3: return { ...CLEAN, teapot: true, tasting: true };
-      case 4: return { ...CLEAN, sink: true };
-      case 5: return { ...CLEAN, teapot: true, sink: true };
-      case 6: return { ...CLEAN, targets: true };
+    // challenge (no mystery): strainer → teapot+strainer → lemon →
+    // teapot+lemon → tasting → teapot+tasting → sink → teapot+sink →
+    // targets → teapot+targets.
+    switch (cycleNumber % 10) {
+      case 0: return { ...CLEAN, strainer: true };
+      case 1: return { ...CLEAN, teapot: true, strainer: true };
+      case 2: return { ...CLEAN, lemon: true };
+      case 3: return { ...CLEAN, teapot: true, lemon: true };
+      case 4: return { ...CLEAN, tasting: true };
+      case 5: return { ...CLEAN, teapot: true, tasting: true };
+      case 6: return { ...CLEAN, sink: true };
+      case 7: return { ...CLEAN, teapot: true, sink: true };
+      case 8: return { ...CLEAN, targets: true };
       default: return { ...CLEAN, teapot: true, targets: true };
     }
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
-  // lemon+mystery → tasting+mystery → sink+mystery → targets+mystery →
-  // teapot+mystery → mystery-only.
-  switch (cycleNumber % 6) {
-    case 0: return { ...CLEAN, lemon: true };
-    case 1: return { ...CLEAN, tasting: true };
-    case 2: return { ...CLEAN, sink: true };
-    case 3: return { ...CLEAN, targets: true };
-    case 4: return { ...CLEAN, teapot: true };
+  // strainer+mystery → lemon+mystery → tasting+mystery → sink+mystery →
+  // targets+mystery → teapot+mystery → mystery-only.
+  switch (cycleNumber % 7) {
+    case 0: return { ...CLEAN, strainer: true };
+    case 1: return { ...CLEAN, lemon: true };
+    case 2: return { ...CLEAN, tasting: true };
+    case 3: return { ...CLEAN, sink: true };
+    case 4: return { ...CLEAN, targets: true };
+    case 5: return { ...CLEAN, teapot: true };
     default: return { ...CLEAN };
   }
 }
@@ -270,12 +293,24 @@ export function getLevelConfig(levelNum: number): LevelConfig {
 
 
   // Special-mechanic overlay: single source of truth for
-  // teapot/targets/sink/tasting/lemon.
+  // teapot/targets/sink/tasting/lemon/strainer.
   const plan = mechanicPlanForLevel(levelNum);
   hasSourceOnlyTeapot = plan.teapot;
   const targetTeaIds: TeaId[] = plan.targets ? pickTargetPair(colors) : [];
   const hasSinkGuestCup = plan.sink;
   const hasTastingBowl = plan.tasting;
+  const hasStrainer = plan.strainer;
+  // Tight G6 topology override (§24): strainer levels use exactly one
+  // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
+  // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
+  if (hasStrainer) {
+    emptyCups = 1;
+    if (phase === 'challenge') {
+      phaseSubtitle = 'Просчет на 2–3 хода вперед • 5 сосудов';
+    } else if (phase === 'peak') {
+      phaseSubtitle = 'Таинственный настой • 6 сосудов';
+    }
+  }
   // Lemon levels require sea_buckthorn in the active palette (validated
   // loudly at generation). Later-cycle palettes may lack it, so swap it
   // into slot 0 deterministically — reshuffles keep the same palette.
@@ -283,7 +318,12 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   if (floatingIngredient !== undefined && !colors.includes('sea_buckthorn')) {
     colors = ['sea_buckthorn', ...colors.slice(1)];
   }
-  if (plan.lemon && plan.teapot) {
+  if (plan.strainer && plan.teapot) {
+    phaseSubtitle = 'Чайник и ситечко • 5 сосудов';
+  } else if (plan.strainer) {
+    phaseSubtitle =
+      phase === 'challenge' ? 'Переносное ситечко • 5 сосудов' : 'Ситечко и таинственный настой • 6 сосудов';
+  } else if (plan.lemon && plan.teapot) {
     phaseSubtitle = 'Чайник и лимон • 6 сосудов';
   } else if (plan.lemon) {
     phaseSubtitle =
@@ -339,6 +379,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasSourceOnlyTeapot,
     hasSinkGuestCup,
     hasTastingBowl,
+    hasStrainer,
     floatingIngredient,
     targetTeaIds,
     rewardRecipeId,
