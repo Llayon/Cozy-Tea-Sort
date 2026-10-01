@@ -64,6 +64,7 @@ export function checkLemonStressSeed(
   const at = (b: typeof board) => b.floatingIngredients.findIndex((s) => s === 'lemon');
   let relocations = 0;
   for (const step of solution) {
+    if (step.kind !== 'pour') continue;
     const before = at(board);
     const res = applyPourState(board, step.from, step.to, level.cupConstraints);
     expect(res).not.toBeNull();

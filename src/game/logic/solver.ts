@@ -1,22 +1,14 @@
 /**
- * Deterministic BFS solver for the actual game rules.
+ * Deterministic 0-1 BFS solver for the actual game rules (catch-one spike).
  *
- * Pure: operates on puzzle state, never touches Pixi/React.
- * Uses the shared `rules.ts` move table so solver, UI, generator
- * and deadlock detection can never diverge.
+ * Pure: operates on puzzle state, never touches Pixi/React. Uses the shared
+ * `rules.ts` action table so solver, UI, generator and deadlock detection
+ * can never diverge. Costs: place-strainer 0, pour 1, release-strainer 1;
+ * minMoves = minimum tea-transfer actions (pours + releases).
  *
- * Constraint-aware (Gauntlet 1): vessel constraints travel with the
- * puzzle and are threaded through EVERY rule call. Canonicalization
- * groups cups by identical constraint signature — normal and
- * source-only vessels are never interchangeable. The constructive-move
- * pruning (`homogeneous -> empty`) is likewise applied only within
- * identical-constraint groups (see `rules.isConstructiveMoveState`).
- *
- * Floating ingredients (Gauntlet 5): the BFS queue carries full
- * `PuzzleState` (tea + ingredient slots) and keys on
- * `canonicalPuzzleKey`. Callers without ingredients get byte-identical
- * legacy behavior (same keys, same verdicts). Ingredient movement is
- * deterministic from state + move, so `SolverMove` is unchanged.
+ * Legacy behavior: callers without strainer get byte-identical keys and
+ * identical minMoves (only cost-1 pour edges exist, so 0-1 BFS reduces to
+ * plain BFS).
  */
 
 import {
@@ -24,17 +16,23 @@ import {
   FloatingIngredientSlot,
   PuzzleState,
   ReadonlyPuzzleState,
+  SolverAction,
   TeaId,
+  isPlaceStrainerAction,
+  isReleaseStrainerAction,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeStrainerState,
 } from '../types';
 import {
   applyPour,
   applyPourState,
+  applyPuzzleActionState,
   canonicalPuzzleKey,
   isHomogeneous,
   isPuzzleWonState,
-  listLegalMovesState,
+  listConstructiveActionsState,
+  puzzleActionCost,
 } from './rules';
 
 export interface SolverMove {
@@ -46,29 +44,25 @@ export interface SolverMove {
 
 export interface SolverResult {
   solvable: boolean;
-  /** Minimum number of pours (BFS depth). Present only when solvable. */
+  /** Minimum tea-transfer actions (pours + releases). Present when solvable. */
   minMoves?: number;
   visitedStates: number;
-  /** One optimal path when solvable (may be omitted for very long paths). */
-  solution?: SolverMove[];
-  /** True when the search hit the visit budget without a verdict. */
+  solution?: SolverAction[];
   truncated?: boolean;
+  totalActions?: number;
+  placementCount?: number;
+  releaseCount?: number;
+  strainedPourCount?: number;
 }
 
 export interface SolverOptions {
-  /** Safety budget for mobile/dev use. Default 200_000. */
   maxVisited?: number;
-  /** Hard depth cap. Default 60. */
+  /** Hard tea-move cap (pours + releases). Default 60. */
   maxDepth?: number;
-  /** When false, omit the solution path to save memory. Default true. */
   returnSolution?: boolean;
-  /** Per-vessel behavioral constraints, aligned with cup indices. */
   cupConstraints?: readonly CupConstraint[];
-  /**
-   * Floating-ingredient slots, aligned with cup indices (Gauntlet 5).
-   * Omitted (or all null) = legacy tea-only behavior, unchanged.
-   */
   floatingIngredients?: readonly FloatingIngredientSlot[];
+  strainer?: { present: boolean; attachedCupIndex: number | null; heldTea: TeaId | null };
 }
 
 const DEFAULT_MAX_VISITED = 200_000;
@@ -82,90 +76,133 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     ? normalizeCupConstraints(opts.cupConstraints, cups.length)
     : undefined;
 
-  // Never mutate caller input.
   const start: PuzzleState = {
     cups: cups.map((c) => [...c]),
     floatingIngredients: normalizeFloatingIngredients(opts.floatingIngredients, cups.length),
+    strainer: normalizeStrainerState(opts.strainer),
   };
 
   if (isPuzzleWonState(start, constraints)) {
-    return { solvable: true, minMoves: 0, visitedStates: 1, solution: [] };
+    return { solvable: true, minMoves: 0, visitedStates: 1, solution: [], totalActions: 0, placementCount: 0, releaseCount: 0, strainedPourCount: 0 };
   }
 
-  const visited = new Set<string>();
-  visited.add(canonicalPuzzleKey(start, constraints));
-
-  // BFS queue with head pointer (no shift()).
-  const queue: Array<{ state: PuzzleState; depth: number; path: SolverMove[] }> = [
-    { state: start, depth: 0, path: [] },
-  ];
-  let head = 0;
-
-  while (head < queue.length) {
-    if (visited.size >= maxVisited) {
-      return { solvable: false, visitedStates: visited.size, truncated: true };
+  /**
+   * O(1) amortized deque (two-stack): no Array.shift/unshift on the solver
+   * hot path. pushFront/popFront/length only; stale higher-cost entries are
+   * skipped via the dist-map cost check below (§6).
+   */
+  interface DequeNode {
+    state: PuzzleState;
+    cost: number;
+    path: SolverAction[];
+  }
+  const front: DequeNode[] = [];
+  const back: DequeNode[] = [];
+  let dequeLen = 0;
+  const pushFront = (n: DequeNode): void => {
+    front.push(n);
+    dequeLen++;
+  };
+  const pushBack = (n: DequeNode): void => {
+    back.push(n);
+    dequeLen++;
+  };
+  const popFront = (): DequeNode | undefined => {
+    if (front.length > 0) {
+      dequeLen--;
+      return front.pop();
     }
-    const node = queue[head++] as { state: PuzzleState; depth: number; path: SolverMove[] };
-    if (node.depth >= maxDepth) continue;
+    if (back.length === 0) return undefined;
+    while (back.length > 0) front.push(back.pop() as DequeNode);
+    dequeLen--;
+    return front.pop();
+  };
+  pushBack({ state: start, cost: 0, path: [] });
 
-    // Constructive moves only — same set deadlock detection uses.
-    // (Homogeneous stack -> empty only permutes identical cups WITHIN the
-    // same constraint group; cross-group moves stay constructive. The
-    // ingredient marker travels with its contents, so the same argument
-    // covers ingredient-carrying relocations.)
-    const moves = listLegalMovesState(node.state, true, constraints);
+  const startKey = canonicalPuzzleKey(start, constraints);
+  const dist = new Map<string, number>();
+  dist.set(startKey, 0);
 
-    for (const m of moves) {
-      const res = applyPourState(node.state, m.from, m.to, constraints);
+  while (dequeLen > 0) {
+    if (dist.size >= maxVisited) {
+      return { solvable: false, visitedStates: dist.size, truncated: true };
+    }
+    const node = popFront() as DequeNode;
+    const nodeKey = canonicalPuzzleKey(node.state, constraints);
+    const best = dist.get(nodeKey);
+    if (best === undefined || node.cost !== best) continue;
+    if (node.cost >= maxDepth) continue;
+
+    const actions = listConstructiveActionsState(node.state, constraints);
+    for (const a of actions) {
+      const stepCost = puzzleActionCost(a);
+      const nextCost = node.cost + stepCost;
+      if (stepCost > 0 && nextCost > maxDepth) continue;
+      const res = applyPuzzleActionState(node.state, a, constraints);
       if (!res) continue;
       const key = canonicalPuzzleKey(res.state, constraints);
-      if (visited.has(key)) continue;
-      visited.add(key);
+      const known = dist.get(key);
+      if (known !== undefined && nextCost >= known) continue;
+      dist.set(key, nextCost);
 
-      const step: SolverMove = { from: m.from, to: m.to, layer: res.layer, count: res.transferred };
-      const nextDepth = node.depth + 1;
-
-      if (isPuzzleWonState(res.state, constraints)) {
-        const solution = returnSolution ? [...node.path, step] : undefined;
-        return {
-          solvable: true,
-          minMoves: nextDepth,
-          visitedStates: visited.size,
-          solution,
+      let step: SolverAction;
+      if (isPlaceStrainerAction(a)) {
+        step = { kind: 'place-strainer', to: a.to };
+      } else if (isReleaseStrainerAction(a)) {
+        step = { kind: 'release-strainer', to: a.to, layer: res.layer as TeaId };
+      } else {
+        step = {
+          kind: 'pour',
+          from: a.from,
+          to: a.to,
+          layer: res.layer as TeaId,
+          count: res.transferred as number,
+          strained: res.strained === true,
+          ...(res.strained ? { caughtTea: res.caughtTea as TeaId } : {}),
         };
       }
 
-      queue.push({
-        state: res.state,
-        depth: nextDepth,
-        path: returnSolution ? [...node.path, step] : [],
-      });
+      if (isPuzzleWonState(res.state, constraints)) {
+        const solution = returnSolution ? [...node.path, step] : undefined;
+        const placementCount = solution ? solution.filter((s) => s.kind === 'place-strainer').length : 0;
+        const releaseCount = solution ? solution.filter((s) => s.kind === 'release-strainer').length : 0;
+        const strainedPourCount = solution
+          ? solution.filter((s) => s.kind === 'pour' && (s as { strained?: boolean }).strained).length
+          : 0;
+        return {
+          solvable: true,
+          minMoves: nextCost,
+          visitedStates: dist.size,
+          solution,
+          totalActions: solution?.length,
+          placementCount,
+          releaseCount,
+          strainedPourCount,
+        };
+      }
+
+      const entry = { state: res.state, cost: nextCost, path: returnSolution ? [...node.path, step] : [] };
+      if (stepCost === 0) pushFront(entry);
+      else pushBack(entry);
     }
   }
 
-  return { solvable: visited.size >= maxVisited ? false : false, visitedStates: visited.size };
+  return { solvable: false, visitedStates: dist.size };
 }
 
-/**
- * Replay a solver path against a board (test/debug helper).
- * Returns the final board, or null if any step is illegal.
- * Constraint-aware: pass the same `cupConstraints` the solver used.
- * Tea-only: on ingredient levels use `applySolutionState` instead.
- */
 export function applySolution(
   cups: TeaId[][],
-  solution: SolverMove[],
+  solution: ReadonlyArray<SolverAction | SolverMove>,
   cupConstraints?: readonly CupConstraint[],
 ): TeaId[][] | null {
   let board = cups.map((c) => [...c]);
   for (const step of solution) {
-    // Cheap sanity: source top must match recorded layer.
-    const top = board[step.from]?.[board[step.from].length - 1];
-    if (top !== step.layer) {
-      // Still try the pour — legality is decided by rules.
-      void top;
-    }
-    const res = applyPour(board, step.from, step.to, cupConstraints);
+    const kind = (step as SolverAction).kind;
+    if (kind === 'place-strainer' || kind === 'release-strainer') return null;
+    const pour = step as SolverMove & { kind?: string };
+    const top = board[pour.from]?.[board[pour.from].length - 1];
+    if (top !== pour.layer) void top;
+    const res = applyPour(board, pour.from, pour.to, cupConstraints);
     if (!res) return null;
     void isHomogeneous;
     board = res.cups;
@@ -173,25 +210,34 @@ export function applySolution(
   return board;
 }
 
-/**
- * State-aware replay (Gauntlet 5): replays a solver path against a full
- * puzzle state, tracking ingredient rides. Returns the final state, or
- * null if any step is illegal. Lemon tests MUST use this.
- */
 export function applySolutionState(
   state: ReadonlyPuzzleState,
-  solution: SolverMove[],
+  solution: ReadonlyArray<SolverAction | SolverMove>,
   cupConstraints?: readonly CupConstraint[],
 ): PuzzleState | null {
   let board: PuzzleState = {
     cups: state.cups.map((c) => [...c]),
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+    strainer: normalizeStrainerState(state.strainer),
   };
   for (const step of solution) {
-    const res = applyPourState(board, step.from, step.to, cupConstraints);
-    if (!res) return null;
-    void isHomogeneous;
-    board = res.state;
+    const kind = (step as SolverAction).kind;
+    if (kind === 'place-strainer' || kind === 'release-strainer' || kind === 'pour') {
+      const res = applyPuzzleActionState(board, step as SolverAction, cupConstraints);
+      if (!res) return null;
+      void isHomogeneous;
+      board = res.state;
+      continue;
+    }
+    const legacy = step as SolverMove;
+    if (typeof legacy.from === 'number' && typeof legacy.to === 'number') {
+      const res = applyPourState(board, legacy.from, legacy.to, cupConstraints);
+      if (!res) return null;
+      void isHomogeneous;
+      board = res.state;
+      continue;
+    }
+    return null;
   }
   return board;
 }

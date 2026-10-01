@@ -60,6 +60,7 @@ import {
   CupConstraint,
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientId,
+  PuzzleAction,
   PuzzleState,
   ReadonlyPuzzleState,
   STANDARD_CUP_CAPACITY,
@@ -67,9 +68,13 @@ import {
   cupCapacity,
   cupConstraintSignature,
   emptyFloatingIngredients,
+  emptyStrainerState,
+  isPlaceStrainerAction,
+  isReleaseStrainerAction,
   mustEndEmpty,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeStrainerState,
 } from '../types';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
@@ -85,6 +90,29 @@ export type PourRejectCode =
   | 'target-source-only'
   | 'target-floating-occupied'
   | 'complete-to-empty'
+  | 'color-mismatch'
+  | 'strainer-needs-two-layers'
+  | 'strainer-loaded';
+
+/** Machine-readable strainer placement rejection. */
+export type StrainerPlaceRejectCode =
+  | 'ok'
+  | 'no-strainer'
+  | 'strainer-loaded'
+  | 'out-of-range'
+  | 'target-empty'
+  | 'target-sink-only'
+  | 'same-host'
+  | 'target-floating-occupied-by-tool-conflict';
+
+/** Machine-readable strainer release rejection. */
+export type StrainerReleaseRejectCode =
+  | 'ok'
+  | 'no-strainer'
+  | 'strainer-empty'
+  | 'out-of-range'
+  | 'target-full'
+  | 'target-source-only'
   | 'color-mismatch';
 
 /**
@@ -261,11 +289,49 @@ function teaRejectCodeBetween(
 }
 
 /**
+ * Whether the strained catch mode is active for a pour FROM `fromIdx`
+ * (empty tool attached to the source, nothing held).
+ */
+export function isStrainedCatchSource(state: ReadonlyPuzzleState, fromIdx: number): boolean {
+  const s = normalizeStrainerState(state.strainer);
+  return s.present && s.heldTea === null && s.attachedCupIndex === fromIdx;
+}
+
+/**
+ * Ordinary transfer count ignoring any attached tool (the `m` in the
+ * catch-one spec): min(top run, destination free) when the ordinary tea
+ * pour is legal, else 0. Used to gate strained pours (m >= 2) and to
+ * prove meaningfulness.
+ */
+export function unstrainedPourCountState(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): number {
+  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints);
+  if (tea !== 'ok') return 0;
+  const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  if (slots[fromIdx] != null && slots[toIdx] != null) return 0;
+  const source = state.cups[fromIdx] as TeaId[];
+  const target = state.cups[toIdx] as TeaId[];
+  return Math.min(topCountOf(source), cupCapacity(constraints?.[toIdx]) - target.length);
+}
+
+/**
  * State-aware legality (single truth): tea rules first, then
- * floating-ingredient collision. The lemon never alters color/capacity
- * legality — but a source ingredient meeting an already-occupied target
- * slot is rejected fail-closed (`target-floating-occupied`) rather than
- * overwriting. Illegal tea pours leave ingredient state untouched.
+ * floating-ingredient collision, then catch-one strainer gating. The lemon
+ * never alters color/capacity legality — but a source ingredient meeting
+ * an already-occupied target slot is rejected fail-closed
+ * (`target-floating-occupied`) rather than overwriting.
+ *
+ * Catch-one gating (preferred §I semantics — every actual strainer use is
+ * meaningful): when the EMPTY tool is attached to the pour source, the
+ * pour is legal only when the ordinary count m >= 2 (it will catch one).
+ * A would-be single-layer pour while attached is rejected with
+ * `strainer-needs-two-layers` (gentle UX message, no state change, tool
+ * stays attached; relocate the free tool to unblock). Malformed
+ * loaded+attached states fail closed (`strainer-loaded`).
  */
 export function pourRejectCodeState(
   state: ReadonlyPuzzleState,
@@ -279,6 +345,16 @@ export function pourRejectCodeState(
   const srcIng = slots[fromIdx];
   const dstIng = slots[toIdx];
   if (srcIng != null && dstIng != null) return 'target-floating-occupied';
+  const s = normalizeStrainerState(state.strainer);
+  if (!s.present) return 'ok';
+  if (s.heldTea !== null && s.attachedCupIndex !== null) return 'strainer-loaded';
+  if (s.heldTea === null && s.attachedCupIndex === fromIdx) {
+    const m = Math.min(
+      topCountOf(state.cups[fromIdx] as TeaId[]),
+      cupCapacity(constraints?.[toIdx]) - (state.cups[toIdx] as TeaId[]).length,
+    );
+    if (m < 2) return 'strainer-needs-two-layers';
+  }
   return 'ok';
 }
 
@@ -388,6 +464,9 @@ export function isConstructiveMoveState(
   constraints?: readonly CupConstraint[],
 ): boolean {
   if (!canPourState(state, fromIdx, toIdx, constraints)) return false;
+  // Strained catches change the partition AND external hold — never the
+  // symmetry-only full-group relocation the legacy prune targets.
+  if (isStrainedCatchSource(state, fromIdx)) return true;
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
   if (
@@ -446,18 +525,29 @@ export function listLegalMoves(
 
 export interface PourStateResult {
   state: PuzzleState;
+  /** Layers leaving the source (ordinary m; strained m — source exposed equally). */
   transferred: number;
+  /** Layers arriving in the destination (ordinary m; strained m-1). */
+  received: number;
   layer: TeaId;
+  /** True when the tool caught one layer (m >= 2 gated). */
+  strained: boolean;
+  /** Tea caught by the tool, when strained. */
+  caughtTea?: TeaId;
   /** Ingredient that rode this pour, if any (for animation metadata). */
   floatingIngredientMoved?: FloatingIngredientId;
 }
 
 /**
  * Atomic pure state transition (single truth): tea movement plus the
- * ingredient ride in ONE operation. The source's ingredient (if any)
- * moves to the destination; an ingredient-free source leaves slots
- * unchanged; inflow never displaces a destination ingredient (collision
- * is rejected in legality, never overwritten here).
+ * ingredient ride plus the catch-one tool update in ONE operation.
+ *
+ * - Ordinary: source loses m, destination gains m.
+ * - Strained (empty tool attached to source, m >= 2): source loses ALL m,
+ *   destination gains m-1, tool catches exactly 1 of the same tea and
+ *   returns to its stand LOADED (attached null, heldTea set).
+ * - Illegal pours (including would-be single-layer pours while attached,
+ *   `strainer-needs-two-layers`) return null with NO mutation.
  */
 export function applyPourState(
   state: ReadonlyPuzzleState,
@@ -465,16 +555,25 @@ export function applyPourState(
   toIdx: number,
   constraints?: readonly CupConstraint[],
 ): PourStateResult | null {
-  const count = pourCountState(state, fromIdx, toIdx, constraints);
-  if (count <= 0) return null;
+  if (!canPourState(state, fromIdx, toIdx, constraints)) return null;
+  const strained = isStrainedCatchSource(state, fromIdx);
+  const m = unstrainedPourCountState(state, fromIdx, toIdx, constraints);
+  if (m <= 0) return null;
+  if (strained && m < 2) return null;
   const nextCups: TeaId[][] = state.cups.map((c) => [...c]);
   const nextSlots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  const nextStrainer = normalizeStrainerState(state.strainer);
   const source = nextCups[fromIdx] as TeaId[];
   const target = nextCups[toIdx] as TeaId[];
   const layer = topLayerOf(source) as TeaId;
-  for (let i = 0; i < count; i++) {
-    source.pop();
-    target.push(layer);
+  for (let i = 0; i < m; i++) source.pop();
+  const received = strained ? m - 1 : m;
+  for (let i = 0; i < received; i++) target.push(layer);
+  let caughtTea: TeaId | undefined;
+  if (strained) {
+    nextStrainer.attachedCupIndex = null;
+    nextStrainer.heldTea = layer;
+    caughtTea = layer;
   }
   const moved = nextSlots[fromIdx] ?? null;
   let floatingIngredientMoved: FloatingIngredientId | undefined;
@@ -484,9 +583,12 @@ export function applyPourState(
     floatingIngredientMoved = moved;
   }
   return {
-    state: { cups: nextCups, floatingIngredients: nextSlots },
-    transferred: count,
+    state: { cups: nextCups, floatingIngredients: nextSlots, strainer: nextStrainer },
+    transferred: m,
+    received,
     layer,
+    strained,
+    caughtTea,
     floatingIngredientMoved,
   };
 }
@@ -506,6 +608,223 @@ export function applyPour(
   );
   if (!res) return null;
   return { cups: res.state.cups, transferred: res.transferred, layer: res.layer };
+}
+
+// ---------------------------------------------------------------------------
+// Catch-one strainer (feasibility spike) — single authoritative action truth.
+// Costs: place 0, pour 1, release 1. Solver uses 0-1 BFS.
+// ---------------------------------------------------------------------------
+
+export function placeStrainerRejectCodeState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): StrainerPlaceRejectCode {
+  const s = normalizeStrainerState(state.strainer);
+  if (!s.present) return 'no-strainer';
+  if (s.heldTea !== null) return 'strainer-loaded';
+  if (!Number.isInteger(toIdx) || toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+  const host = state.cups[toIdx] as TeaId[] | undefined;
+  if (!host || host.length === 0) return 'target-empty';
+  const c = constraints?.[toIdx];
+  if ((c?.mode ?? 'normal') === 'sink-only') return 'target-sink-only';
+  if (s.attachedCupIndex === toIdx) return 'same-host';
+  const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  if (slots[toIdx] != null) return 'target-floating-occupied-by-tool-conflict';
+  return 'ok';
+}
+
+export function canPlaceStrainerState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  return placeStrainerRejectCodeState(state, toIdx, constraints) === 'ok';
+}
+
+export function applyPlaceStrainerState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): PuzzleState | null {
+  if (!canPlaceStrainerState(state, toIdx, constraints)) return null;
+  return {
+    cups: state.cups.map((c) => [...c]),
+    floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+    strainer: { present: true, attachedCupIndex: toIdx, heldTea: null },
+  };
+}
+
+export function releaseStrainerRejectCodeState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): StrainerReleaseRejectCode {
+  const s = normalizeStrainerState(state.strainer);
+  if (!s.present) return 'no-strainer';
+  if (s.heldTea === null) return 'strainer-empty';
+  if (s.attachedCupIndex !== null) return 'strainer-empty';
+  if (!Number.isInteger(toIdx) || toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+  const dest = state.cups[toIdx] as TeaId[] | undefined;
+  if (!dest) return 'out-of-range';
+  if ((constraints?.[toIdx]?.mode ?? 'normal') === 'source-only') return 'target-source-only';
+  if (dest.length >= cupCapacity(constraints?.[toIdx])) return 'target-full';
+  if (dest.length === 0) return 'ok';
+  return dest[dest.length - 1] === s.heldTea ? 'ok' : 'color-mismatch';
+}
+
+export function canReleaseStrainerState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  return releaseStrainerRejectCodeState(state, toIdx, constraints) === 'ok';
+}
+
+export interface ReleaseStateResult {
+  state: PuzzleState;
+  layer: TeaId;
+}
+
+export function applyReleaseStrainerState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): ReleaseStateResult | null {
+  if (!canReleaseStrainerState(state, toIdx, constraints)) return null;
+  const s = normalizeStrainerState(state.strainer);
+  const held = s.heldTea as TeaId;
+  const nextCups = state.cups.map((c) => [...c]);
+  (nextCups[toIdx] as TeaId[]).push(held);
+  return {
+    state: {
+      cups: nextCups,
+      floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+      strainer: { present: true, attachedCupIndex: null, heldTea: null },
+    },
+    layer: held,
+  };
+}
+
+/**
+ * Productive placement (strong): placing the EMPTY tool onto `toIdx`
+ * enables at least one subsequent legal strained pour with ordinary m>=2
+ * (destination capacity considered; topCount alone insufficient).
+ */
+export function isProductiveStrainerPlacement(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  if (!canPlaceStrainerState(state, toIdx, constraints)) return false;
+  const source = state.cups[toIdx] as TeaId[];
+  if (topCountOf(source) < 2) return false;
+  for (let dest = 0; dest < state.cups.length; dest++) {
+    if (dest === toIdx) continue;
+    if (unstrainedPourCountState(state, toIdx, dest, constraints) >= 2) return true;
+  }
+  return false;
+}
+
+export function isConstructiveReleaseState(
+  state: ReadonlyPuzzleState,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  return canReleaseStrainerState(state, toIdx, constraints);
+}
+
+export function listLegalActionsState(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): PuzzleAction[] {
+  const out: PuzzleAction[] = [];
+  for (let from = 0; from < state.cups.length; from++) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (from === to) continue;
+      if (canPourState(state, from, to, constraints)) out.push({ kind: 'pour', from, to });
+    }
+  }
+  const s = normalizeStrainerState(state.strainer);
+  if (s.present && s.heldTea === null) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (canPlaceStrainerState(state, to, constraints)) out.push({ kind: 'place-strainer', to });
+    }
+  }
+  if (s.present && s.heldTea !== null) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (canReleaseStrainerState(state, to, constraints)) out.push({ kind: 'release-strainer', to });
+    }
+  }
+  return out;
+}
+
+export function listConstructiveActionsState(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): PuzzleAction[] {
+  const out: PuzzleAction[] = [];
+  for (let from = 0; from < state.cups.length; from++) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (from === to) continue;
+      if (isConstructiveMoveState(state, from, to, constraints)) out.push({ kind: 'pour', from, to });
+    }
+  }
+  const s = normalizeStrainerState(state.strainer);
+  if (s.present && s.heldTea === null) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (isProductiveStrainerPlacement(state, to, constraints)) out.push({ kind: 'place-strainer', to });
+    }
+  }
+  if (s.present && s.heldTea !== null) {
+    for (let to = 0; to < state.cups.length; to++) {
+      if (isConstructiveReleaseState(state, to, constraints)) out.push({ kind: 'release-strainer', to });
+    }
+  }
+  return out;
+}
+
+export interface ApplyPuzzleActionResult {
+  state: PuzzleState;
+  transferred?: number;
+  received?: number;
+  layer?: TeaId;
+  strained?: boolean;
+  caughtTea?: TeaId;
+  floatingIngredientMoved?: FloatingIngredientId;
+}
+
+export function applyPuzzleActionState(
+  state: ReadonlyPuzzleState,
+  action: PuzzleAction,
+  constraints?: readonly CupConstraint[],
+): ApplyPuzzleActionResult | null {
+  if (isPlaceStrainerAction(action)) {
+    const next = applyPlaceStrainerState(state, action.to, constraints);
+    if (!next) return null;
+    return { state: next };
+  }
+  if (isReleaseStrainerAction(action)) {
+    const res = applyReleaseStrainerState(state, action.to, constraints);
+    if (!res) return null;
+    return { state: res.state, transferred: 1, received: 1, layer: res.layer, strained: false };
+  }
+  const res = applyPourState(state, action.from, action.to, constraints);
+  if (!res) return null;
+  return {
+    state: res.state,
+    transferred: res.transferred,
+    received: res.received,
+    layer: res.layer,
+    strained: res.strained,
+    caughtTea: res.caughtTea,
+    floatingIngredientMoved: res.floatingIngredientMoved,
+  };
+}
+
+/** Action cost: place 0, pour/release 1. */
+export function puzzleActionCost(action: PuzzleAction): number {
+  return action.kind === 'place-strainer' ? 0 : 1;
 }
 
 /**
@@ -605,15 +924,19 @@ export function floatingIngredientGoalsSatisfied(
 
 /**
  * Canonical puzzle win: tea sorted AND every floating ingredient on its
- * correct completed tea. A tea-sorted board with the lemon on matcha is
- * NOT won.
+ * correct completed tea AND the strainer holding nothing (a caught layer
+ * outside the vessels means tea counts are incomplete). An attached-but-
+ * empty tool may be anywhere at victory.
  */
 export function isPuzzleWonState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
 ): boolean {
   if (!teaWonState(state.cups, constraints)) return false;
-  return floatingIngredientGoalsSatisfied(state, constraints);
+  if (!floatingIngredientGoalsSatisfied(state, constraints)) return false;
+  const s = normalizeStrainerState(state.strainer);
+  if (s.present && s.heldTea !== null) return false;
+  return true;
 }
 
 /**
@@ -632,17 +955,17 @@ export function isDeadlockedState(
 }
 
 /**
- * Puzzle deadlock (single truth for runtime): a tea-sorted board with the
- * lemon on the wrong tea is NOT won — and with no constructive puzzle
- * move left, it IS deadlocked. TeaSortLogic must use this, never the
- * tea-only helper, on ingredient levels.
+ * Puzzle deadlock (single truth): won → false; otherwise deadlocked only
+ * when no constructive pour AND no productive placement AND no
+ * constructive release exist. Free placement alone never rescues — only
+ * productive preparation counts.
  */
 export function isPuzzleDeadlockedState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
 ): boolean {
   if (isPuzzleWonState(state, constraints)) return false;
-  return listLegalMovesState(state, true, constraints).length === 0;
+  return listConstructiveActionsState(state, constraints).length === 0;
 }
 
 /**
@@ -705,33 +1028,72 @@ export function canonicalKey(
 
 /**
  * Canonical puzzle key (single truth for the solver): tea contents +
- * vessel signatures + floating-ingredient markers. With no ingredients
- * present this returns EXACTLY the legacy key (same strings, same BFS
- * state counts — no representation-driven explosion for old levels).
+ * vessel signatures + floating-ingredient markers + strainer tool.
+ *
+ * - NO strainer present → byte-identical legacy/G5 key (lemon-only boards
+ *   keep exact G5 keys; plain boards keep the legacy key).
+ * - Empty tool on stand → base + `||STR:STAND:EMPTY`.
+ * - Empty tool attached → tool marker joins the CUP CONTENT encoding
+ *   (`tea#lemon#STR` vs `#_`), so swapping interchangeable vessels (contents
+ *   + tool together) stays canonical.
+ * - Loaded tool (heldTea, always on stand by invariant) → base +
+ *   `||STR:STAND:HOLD:<tea>`. Malformed loaded+attached states encode both
+ *   markers fail-closed (production validation rejects them).
  */
 export function canonicalPuzzleKey(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
 ): string {
+  const strainer = normalizeStrainerState(state.strainer);
   const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
-  if (!slots.some((s) => s != null)) {
-    return teaCanonicalKey(state.cups, constraints);
+  const hasLemon = slots.some((s) => s != null);
+  const baseKey = (): string => {
+    if (!hasLemon) return teaCanonicalKey(state.cups, constraints);
+    const normalized = normalizeCupConstraints(constraints, state.cups.length);
+    const groups = new Map<string, string[]>();
+    state.cups.forEach((cup, idx) => {
+      const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+      const marker = slots[idx] ?? '_';
+      const enc = `${cup.join(',')}#${marker}`;
+      const arr = groups.get(sig);
+      if (arr) arr.push(enc);
+      else groups.set(sig, [enc]);
+    });
+    const orderedSigs = [...groups.keys()].sort();
+    return orderedSigs
+      .map((sig) => {
+        const arr = groups.get(sig) as string[];
+        arr.sort();
+        return `${sig}:${arr.join('|')}`;
+      })
+      .join('||');
+  };
+  if (!strainer.present) return baseKey();
+  if (strainer.heldTea !== null) {
+    return `${baseKey()}||STR:STAND:HOLD:${strainer.heldTea}`;
+  }
+  if (strainer.attachedCupIndex === null) {
+    return `${baseKey()}||STR:STAND:EMPTY`;
   }
   const normalized = normalizeCupConstraints(constraints, state.cups.length);
   const groups = new Map<string, string[]>();
   state.cups.forEach((cup, idx) => {
     const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
-    const marker = slots[idx] ?? '_';
-    const enc = `${cup.join(',')}#${marker}`;
+    const lemonMarker = slots[idx] ?? '_';
+    const toolMarker = strainer.attachedCupIndex === idx ? 'STR' : '_';
+    const enc = hasLemon
+      ? `${cup.join(',')}#${lemonMarker}#${toolMarker}`
+      : `${cup.join(',')}#${toolMarker}`;
     const arr = groups.get(sig);
     if (arr) arr.push(enc);
     else groups.set(sig, [enc]);
   });
   const orderedSigs = [...groups.keys()].sort();
-  const sections = orderedSigs.map((sig) => {
-    const arr = groups.get(sig) as string[];
-    arr.sort();
-    return `${sig}:${arr.join('|')}`;
-  });
-  return sections.join('||');
+  return orderedSigs
+    .map((sig) => {
+      const arr = groups.get(sig) as string[];
+      arr.sort();
+      return `${sig}:${arr.join('|')}`;
+    })
+    .join('||');
 }

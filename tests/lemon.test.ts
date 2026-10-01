@@ -93,7 +93,7 @@ describe('A–E. pure dynamic state', () => {
   });
 
   it('D. clone does not alias source arrays', () => {
-    const src: PuzzleState = { cups: [[M]], floatingIngredients: ['lemon'] };
+    const src: PuzzleState = { cups: [[M]], floatingIngredients: ['lemon'], strainer: { present: false, attachedCupIndex: null, heldTea: null } };
     const c = clonePuzzleState(src);
     expect(c).toEqual(src);
     expect(c.cups).not.toBe(src.cups);
@@ -342,6 +342,7 @@ describe('AA–AH. hand fixture: lemon must travel', () => {
     let board = { cups: cups.map((c) => [...c]), floatingIngredients: [...slots] };
     let relocations = 0;
     for (const m of solved.solution ?? []) {
+      if (m.kind !== 'pour') continue;
       const before = floatingIngredientIndex(board, 'lemon');
       const res = applyPourState(board, m.from, m.to, cons);
       expect(res).not.toBe(null);

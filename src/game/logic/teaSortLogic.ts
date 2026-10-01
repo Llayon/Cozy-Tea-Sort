@@ -21,22 +21,35 @@
 import {
   CupConstraint,
   FloatingIngredientSlot,
+  PuzzleAction,
+  StrainerState,
   TeaId,
   cloneCupConstraint,
+  cloneStrainerState,
   cupCapacity,
+  emptyStrainerState,
   isTastingCupConstraint,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeStrainerState,
 } from '../types';
 import {
+  applyPlaceStrainerState,
   applyPourState,
+  applyReleaseStrainerState,
+  canPlaceStrainerState,
   canPourState,
+  canReleaseStrainerState,
   cupEndStateSatisfied,
   isHomogeneous,
   isPuzzleDeadlockedState,
   isPuzzleWonState,
+  placeStrainerRejectCodeState,
+  releaseStrainerRejectCodeState,
   topCountOf,
   topLayerOf,
+  type StrainerPlaceRejectCode,
+  type StrainerReleaseRejectCode,
 } from './rules';
 
 /** Named initial state for a level (preferred over long positional lists). */
@@ -45,6 +58,7 @@ export interface LevelInitialState {
   hiddenCounts?: number[];
   cupConstraints?: readonly CupConstraint[];
   floatingIngredients?: readonly FloatingIngredientSlot[];
+  strainer?: StrainerState;
 }
 
 export class Cup {
@@ -219,6 +233,8 @@ export interface GameStateSnapshot {
   cups: TeaId[][];
   hiddenCounts: number[];
   floatingIngredients: FloatingIngredientSlot[];
+  strainer: StrainerState;
+  action: PuzzleAction;
   move: MoveStep;
 }
 
@@ -226,15 +242,17 @@ export class TeaSortLogic {
   cups: Cup[] = [];
   history: GameStateSnapshot[] = [];
   movesCount = 0;
+  private strainer: StrainerState = emptyStrainerState();
 
   constructor(
     initialCups: TeaId[][] = [],
     hiddenCounts: number[] = [],
     cupConstraints?: readonly CupConstraint[],
     floatingIngredients?: readonly FloatingIngredientSlot[],
+    strainer?: StrainerState,
   ) {
     if (initialCups.length > 0) {
-      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients);
+      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer);
     }
   }
 
@@ -243,6 +261,7 @@ export class TeaSortLogic {
     hiddenCounts: number[] = [],
     cupConstraints?: readonly CupConstraint[],
     floatingIngredients?: readonly FloatingIngredientSlot[],
+    strainer?: StrainerState,
   ) {
     const normalized = normalizeCupConstraints(cupConstraints, state.length);
     const slots = normalizeFloatingIngredients(floatingIngredients, state.length);
@@ -250,13 +269,18 @@ export class TeaSortLogic {
       (layers, idx) =>
         new Cup(idx, layers, hiddenCounts[idx] ?? 0, normalized[idx] as CupConstraint, slots[idx] ?? null),
     );
+    this.strainer = normalizeStrainerState(strainer);
     this.history = [];
     this.movesCount = 0;
   }
 
-  /** Initialize from a named state object (preferred for lemon levels). */
+  /** Initialize from a named state object (preferred for lemon/strainer levels). */
   initFromPuzzleState(init: LevelInitialState): void {
-    this.initFromState(init.cups, init.hiddenCounts, init.cupConstraints, init.floatingIngredients);
+    this.initFromState(init.cups, init.hiddenCounts, init.cupConstraints, init.floatingIngredients, init.strainer);
+  }
+
+  get strainerState(): StrainerState {
+    return cloneStrainerState(this.strainer);
   }
 
   /** Immutable per-vessel constraints for the current puzzle (defensive copies). */
@@ -275,12 +299,14 @@ export class TeaSortLogic {
     hiddenCounts: number[];
     cupConstraints: CupConstraint[];
     floatingIngredients: FloatingIngredientSlot[];
+    strainer: StrainerState;
   } {
     return {
       cups: this.cups.map((c) => [...c.layers]),
       hiddenCounts: this.cups.map((c) => c.hiddenCount),
       cupConstraints: this.cupConstraints,
       floatingIngredients: this.floatingIngredients,
+      strainer: cloneStrainerState(this.strainer),
     };
   }
 
@@ -288,11 +314,24 @@ export class TeaSortLogic {
     return this.cups.map((c) => c.constraint);
   }
 
-  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[] } {
+  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; strainer: StrainerState } {
     return {
       cups: this.cups.map((c) => c.layers),
       floatingIngredients: this.floatingIngredients,
+      strainer: cloneStrainerState(this.strainer),
     };
+  }
+
+  private applyBoardState(next: { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; strainer: StrainerState }): void {
+    next.cups.forEach((layers, idx) => {
+      const cup = this.cups[idx];
+      if (cup) cup.layers = [...layers];
+    });
+    const slots = normalizeFloatingIngredients(next.floatingIngredients, this.cups.length);
+    this.cups.forEach((cup, idx) => {
+      cup.floatingIngredient = slots[idx] ?? null;
+    });
+    this.strainer = normalizeStrainerState(next.strainer);
   }
 
   canMakeMove(fromIdx: number, toIdx: number): boolean {
@@ -304,13 +343,15 @@ export class TeaSortLogic {
   makeMove(
     fromIdx: number,
     toIdx: number,
-  ): { move: MoveStep; sourceUncovered: boolean; floatingIngredientMoved?: FloatingIngredientSlot } | null {
+  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
       cups: this.cups.map((c) => [...c.layers]),
       hiddenCounts: this.cups.map((c) => c.hiddenCount),
       floatingIngredients: this.floatingIngredients,
+      strainer: cloneStrainerState(this.strainer),
+      action: { kind: 'pour', from: fromIdx, to: toIdx },
       move: {
         fromCupIndex: fromIdx,
         toCupIndex: toIdx,
@@ -319,8 +360,9 @@ export class TeaSortLogic {
       },
     };
 
-    const res = this.cups[fromIdx]?.pourInto(this.cups[toIdx] as Cup);
+    const res = applyPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints());
     if (!res) return null;
+    this.applyBoardState(res.state);
 
     const sourceUncovered = (this.cups[fromIdx] as Cup).revealTopIfNeeded();
     snapshot.move.count = res.transferred;
@@ -329,11 +371,65 @@ export class TeaSortLogic {
     return {
       move: snapshot.move,
       sourceUncovered,
+      strained: res.strained,
+      caughtTea: res.caughtTea,
       floatingIngredientMoved: res.floatingIngredientMoved ?? null,
     };
   }
 
-  undo(): MoveStep | null {
+  canPlaceStrainer(toIdx: number): boolean {
+    return canPlaceStrainerState(this.puzzleState(), toIdx, this.boardConstraints());
+  }
+
+  placeStrainerRejectCode(toIdx: number): StrainerPlaceRejectCode {
+    return placeStrainerRejectCodeState(this.puzzleState(), toIdx, this.boardConstraints());
+  }
+
+  placeStrainer(toIdx: number): { action: PuzzleAction } | null {
+    if (!this.canPlaceStrainer(toIdx)) return null;
+    const snapshot: GameStateSnapshot = {
+      cups: this.cups.map((c) => [...c.layers]),
+      hiddenCounts: this.cups.map((c) => c.hiddenCount),
+      floatingIngredients: this.floatingIngredients,
+      strainer: cloneStrainerState(this.strainer),
+      action: { kind: 'place-strainer', to: toIdx },
+      move: { fromCupIndex: -1, toCupIndex: toIdx, layer: this.cups[toIdx]?.topLayer as TeaId, count: 0 },
+    };
+    const next = applyPlaceStrainerState(this.puzzleState(), toIdx, this.boardConstraints());
+    if (!next) return null;
+    this.applyBoardState(next);
+    this.history.push(snapshot);
+    return { action: { kind: 'place-strainer', to: toIdx } };
+  }
+
+  canReleaseStrainer(toIdx: number): boolean {
+    return canReleaseStrainerState(this.puzzleState(), toIdx, this.boardConstraints());
+  }
+
+  releaseStrainerRejectCode(toIdx: number): StrainerReleaseRejectCode {
+    return releaseStrainerRejectCodeState(this.puzzleState(), toIdx, this.boardConstraints());
+  }
+
+  releaseStrainer(toIdx: number): { move: MoveStep; layer: TeaId } | null {
+    if (!this.canReleaseStrainer(toIdx)) return null;
+    const held = this.strainer.heldTea as TeaId;
+    const snapshot: GameStateSnapshot = {
+      cups: this.cups.map((c) => [...c.layers]),
+      hiddenCounts: this.cups.map((c) => c.hiddenCount),
+      floatingIngredients: this.floatingIngredients,
+      strainer: cloneStrainerState(this.strainer),
+      action: { kind: 'release-strainer', to: toIdx },
+      move: { fromCupIndex: -1, toCupIndex: toIdx, layer: held, count: 1 },
+    };
+    const res = applyReleaseStrainerState(this.puzzleState(), toIdx, this.boardConstraints());
+    if (!res) return null;
+    this.applyBoardState(res.state);
+    this.history.push(snapshot);
+    this.movesCount++;
+    return { move: snapshot.move, layer: res.layer };
+  }
+
+  undo(): PuzzleAction | MoveStep | null {
     if (this.history.length === 0) return null;
     const last = this.history.pop() as GameStateSnapshot;
     const slots = normalizeFloatingIngredients(last.floatingIngredients, this.cups.length);
@@ -341,11 +437,12 @@ export class TeaSortLogic {
       cup.layers = [...(last.cups[idx] ?? [])];
       cup.hiddenCount = last.hiddenCounts[idx] ?? 0;
       cup.floatingIngredient = slots[idx] ?? null;
-      // Constraints are immutable level-definition data: never restored
-      // from snapshots, the teapot role stays fixed for the whole level.
     });
-    this.movesCount = Math.max(0, this.movesCount - 1);
-    return last.move;
+    this.strainer = cloneStrainerState(last.strainer);
+    if (last.action.kind === 'pour' || last.action.kind === 'release-strainer') {
+      this.movesCount = Math.max(0, this.movesCount - 1);
+    }
+    return last.action.kind === 'pour' ? last.move : last.action;
   }
 
   get canUndo(): boolean {

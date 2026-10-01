@@ -62,6 +62,7 @@ export function checkTargetStressSeed(
   // Target end-state semantics on the replayed solution path.
   let board = level.cups.map((c) => [...c]);
   for (const step of solved.solution ?? []) {
+    if (step.kind !== 'pour') continue;
     const res = applyPour(board, step.from, step.to, level.cupConstraints);
     expect(res).not.toBeNull();
     board = res?.cups ?? board;

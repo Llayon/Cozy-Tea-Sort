@@ -60,6 +60,8 @@ export interface LevelConfig {
   hasSinkGuestCup: boolean;
   /** True when this level includes the tasting bowl (Gauntlet 4). */
   hasTastingBowl: boolean;
+  /** True when this level includes the catch-one movable strainer (Gauntlet 6, tight topology). */
+  hasStrainer: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

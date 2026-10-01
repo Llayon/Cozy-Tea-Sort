@@ -71,6 +71,19 @@ const batches = [
   { name: 'lemon stress challenge', files: ['tests/lemon-stress-challenge.test.ts'] },
   { name: 'lemon stress peak', files: ['tests/lemon-stress-peak.test.ts'] },
   { name: 'teapot + lemon stress', files: ['tests/lemon-stress-teapot.test.ts'] },
+  { name: 'strainer matrix + solver', files: ['tests/strainer.test.ts', 'tests/strainer-solver.test.ts'] },
+  {
+    name: 'strainer templates + fast path + rollout + view',
+    files: [
+      'tests/strainer-templates.test.ts',
+      'tests/strainer-fastpath.test.ts',
+      'tests/strainer-rollout.test.ts',
+      'tests/strainer-view.test.ts',
+    ],
+  },
+  { name: 'strainer stress challenge', files: ['tests/strainer-stress-challenge.test.ts'] },
+  { name: 'strainer stress peak', files: ['tests/strainer-stress-peak.test.ts'] },
+  { name: 'teapot + strainer stress', files: ['tests/strainer-stress-teapot.test.ts'] },
 ];
 
 function runBatch(batch) {

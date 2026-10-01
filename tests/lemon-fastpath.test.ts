@@ -91,6 +91,7 @@ function expectLemonLevel(req: GenerateRequest, seed: string, opts: { mystery: b
   const at = (b: typeof board) => b.floatingIngredients.findIndex((s) => s === 'lemon');
   let relocations = 0;
   for (const step of solution) {
+    if (step.kind !== 'pour') continue;
     const before = at(board);
     const res = applyPourState(board, step.from, step.to, lvl.cupConstraints);
     expect(res).not.toBeNull();
@@ -178,11 +179,12 @@ describe('lemon fallback branch (direct fallbackLevel)', () => {
     // Participation on the fallback branch too.
     const solution = solved.solution ?? [];
     const host = lemonHostOf(lvl);
-    expect(solution.some((m) => m.to === host || m.from === host)).toBe(true);
+    expect(solution.some((m) => m.to === host || (m.kind === 'pour' && m.from === host))).toBe(true);
     let board = { cups: lvl.cups.map((c) => [...c]), floatingIngredients: [...lvl.floatingIngredients] };
     const at = (b: typeof board) => b.floatingIngredients.findIndex((s) => s === 'lemon');
     let relocations = 0;
     for (const step of solution) {
+      if (step.kind !== 'pour') continue;
       const before = at(board);
       const res = applyPourState(board, step.from, step.to, lvl.cupConstraints);
       expect(res).not.toBeNull();

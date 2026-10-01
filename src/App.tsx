@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CupConstraint, FloatingIngredientSlot, TEA_TYPES, TeaId, cloneCupConstraint } from './game/types';
+import { CupConstraint, FloatingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeStrainerState } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { isWonState } from './game/logic/rules';
 import { TeaSortView } from './game/view/TeaSortView';
@@ -50,6 +50,7 @@ interface LevelBackupState {
   hiddenCounts: number[];
   cupConstraints: CupConstraint[];
   floatingIngredients: FloatingIngredientSlot[];
+  strainer: StrainerState;
 }
 
 export default function App() {
@@ -115,7 +116,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [] });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null } });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -137,6 +138,7 @@ export default function App() {
         sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
         tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
         floatingIngredient: cfg.floatingIngredient,
+        hasStrainer: cfg.hasStrainer,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -149,6 +151,7 @@ export default function App() {
       hiddenCounts: [...generated.hiddenCounts],
       cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
       floatingIngredients: [...generated.floatingIngredients],
+      strainer: normalizeStrainerState(generated.strainer),
     };
 
     return new TeaSortLogic(
@@ -156,6 +159,7 @@ export default function App() {
       generated.hiddenCounts,
       generated.cupConstraints,
       generated.floatingIngredients,
+      normalizeStrainerState(generated.strainer),
     );
   };
 
@@ -219,6 +223,7 @@ export default function App() {
         sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
         tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
         floatingIngredient: cfg.floatingIngredient,
+        hasStrainer: cfg.hasStrainer,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -231,6 +236,7 @@ export default function App() {
       hiddenCounts: [...generated.hiddenCounts],
       cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
       floatingIngredients: [...generated.floatingIngredients],
+      strainer: normalizeStrainerState(generated.strainer),
     };
 
     const logic = new TeaSortLogic(
@@ -238,6 +244,7 @@ export default function App() {
       generated.hiddenCounts,
       generated.cupConstraints,
       generated.floatingIngredients,
+      normalizeStrainerState(generated.strainer),
     );
     logicRef.current = logic;
 
@@ -374,8 +381,9 @@ export default function App() {
     const restoredHidden = [...backup.hiddenCounts];
     const restoredConstraints = (backup.cupConstraints ?? []).map(cloneCupConstraint);
     const restoredSlots = [...(backup.floatingIngredients ?? [])];
+    const restoredStrainer = normalizeStrainerState(backup.strainer);
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -575,6 +583,17 @@ export default function App() {
         >
           <Coffee className="w-3.5 h-3.5 text-[#E8C85E] shrink-0" />
           <span>Долька лимона: лимон плавает сверху и переезжает вместе с переливанием. К концу оставь его на облепиховом чае.</span>
+        </div>
+      )}
+
+      {/* Strainer first-encounter onboarding (Level 42): compact, never blocking. */}
+      {currentConfig.hasStrainer && moves === 0 && !isWon && (
+        <div
+          id="strainer-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#1E2A30]/95 border-b border-[#3E5A66] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#C9E4E8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#8AC9D4] shrink-0" />
+          <span>Ситечко задерживает 1 слой при переливании. Поставь его на чашку, перелей чай, а задержанный слой потом верни в подходящий сосуд.</span>
         </div>
       )}
 
@@ -778,6 +797,14 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C85E] font-bold">🍋</span>
                 <span>Лимон переезжает при переливании из его чашки и должен закончить на полном облепиховом чае.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#8AC9D4] font-bold">🥄</span>
+                <span>Ситечко задерживает один слой во время переливания. Пока слой остаётся в ситечке, его нужно отдельно вернуть в подходящий сосуд.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#8AC9D4] font-bold">🥄</span>
+                <span>Перестановка пустого ситечка не считается ходом.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

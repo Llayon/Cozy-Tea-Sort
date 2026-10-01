@@ -75,6 +75,7 @@ import {
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientSlot,
   STANDARD_CUP_CAPACITY,
+  StrainerState,
   TASTING_BOWL_CAPACITY,
   TEA_UNITS_PER_COLOR,
   TeaId,
@@ -83,13 +84,19 @@ import {
   cupCapacity,
   defaultCupConstraints,
   emptyFloatingIngredients,
+  emptyStrainerState,
   floatingIngredientIndex,
+  isReleaseStrainerAction,
   isTastingCupConstraint,
   mustEndEmpty,
   normalizeFloatingIngredients,
+  normalizeStrainerState,
+  standStrainerState,
   type FloatingIngredientId,
+  type SolverAction,
 } from '../types';
 import {
+  applyPuzzleActionState,
   floatingIngredientHostSatisfied,
   isHomogeneous,
   isInFinalState,
@@ -123,6 +130,13 @@ import {
   LemonTemplateKind,
   instantiateLemonTemplate,
 } from './lemonTemplates';
+import {
+  STRAINER_DEPTH_ACCEPT,
+  STRAINER_TEMPLATE_ATTEMPTS,
+  STRAINER_TEMPLATE_BANK,
+  StrainerTemplateKind,
+  instantiateStrainerTemplate,
+} from './strainerTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -175,6 +189,13 @@ export interface GenerateRequest {
    * Count >1 is out of scope (no count field exists yet on purpose).
    */
   floatingIngredient?: FloatingIngredientId;
+  /**
+   * Catch-one movable strainer requested (Gauntlet 6). `true` = exactly
+   * ONE empty tool on its stand. Tight dedicated topologies only
+   * (4c/5v/1e, 5c/6v/1e+mystery, teapot 4c/5v/1e); lemon / sink / tasting
+   * / targets are rejected loudly (future Gauntlets).
+   */
+  hasStrainer?: boolean;
 }
 
 export interface GeneratedLevel {
@@ -188,6 +209,13 @@ export interface GeneratedLevel {
    * guesses whether the field exists.
    */
   floatingIngredients: FloatingIngredientSlot[];
+  /**
+   * Movable strainer state (Gauntlet 6). Production ALWAYS returns it so
+   * runtime never guesses: absent for ordinary levels, empty-on-stand
+   * initially for G6. Optional only for legacy manual constructions in
+   * older tests (normalized as absent).
+   */
+  strainer?: StrainerState;
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -261,6 +289,33 @@ export function requestedTargetTeas(req: GenerateRequest): TeaId[] {
 /** Requested floating ingredient (`undefined` = classic level). */
 export function requestedFloatingIngredient(req: GenerateRequest): FloatingIngredientId | undefined {
   return req.floatingIngredient ?? undefined;
+}
+
+/** Requested catch-one strainer (`true` = exactly one empty tool on stand). */
+export function requestedHasStrainer(req: GenerateRequest): boolean {
+  return req.hasStrainer === true;
+}
+
+/**
+ * Fail-fast request validation for the catch-one strainer (programming
+ * errors, not generation luck). Tight dedicated topologies only; rejects
+ * loudly: lemon, sink, tasting, targets, multiple strainers (boolean).
+ * Mystery and one teapot MAY coexist (the three canonical configs).
+ */
+export function validateStrainerRequest(req: GenerateRequest): void {
+  if (!requestedHasStrainer(req)) return;
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error('validateStrainerRequest: strainer + lemon is out of scope for Gauntlet 6');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateStrainerRequest: strainer + sink-only is out of scope for Gauntlet 6');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateStrainerRequest: strainer + tasting bowl is out of scope for Gauntlet 6');
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateStrainerRequest: strainer + targets is out of scope for Gauntlet 6');
+  }
 }
 
 /**
@@ -746,6 +801,7 @@ function finalizeCandidate(
   cupConstraints: readonly CupConstraint[],
   stats?: GenerateStats,
   floatingIngredients?: readonly FloatingIngredientSlot[],
+  strainer?: StrainerState,
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -891,28 +947,127 @@ function finalizeCandidate(
     if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
     if (countTastingCups(normalized) > 0) return null;
   }
+  // BF–BO: strainer initial-state invariant (tight G6 topologies).
+  const wantStrainer = requestedHasStrainer(req);
+  const strainerState: StrainerState = normalizeStrainerState(strainer);
+  if (!wantStrainer) {
+    if (strainerState.present) return null; // BG
+  } else {
+    if (!strainerState.present) return null; // BH
+    if (strainerState.attachedCupIndex !== null) return null; // BI
+    if (strainerState.heldTea !== null) return null; // BJ
+    if (presentIds.length > 0) return null; // BO (no lemon)
+    if (countSinkOnly(normalized) > 0) return null; // BO
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null; // BO
+    if (countTastingCups(normalized) > 0) return null; // BO
+    // BK–BN: exact tight vessel counts.
+    const totalCups = cups.length;
+    if (requestedSourceOnlyCount(req) === 0 && !req.hasMysteryLayer) {
+      if (!(req.numColors === 4 && totalCups === 5 && req.emptyCups === 1)) return null; // BL
+    } else if (requestedSourceOnlyCount(req) === 0 && req.hasMysteryLayer) {
+      if (!(req.numColors === 5 && totalCups === 6 && req.emptyCups === 1)) return null; // BM
+    } else if (requestedSourceOnlyCount(req) === 1) {
+      if (!(req.numColors === 4 && totalCups === 5 && req.emptyCups === 1)) return null; // BN
+    } else {
+      return null;
+    }
+  }
   if (isWonState(cups, normalized)) return null; // D
-  if (isPuzzleWonState({ cups, floatingIngredients: slots }, normalized)) return null; // D (lemon-aware)
+  if (isPuzzleWonState({ cups, floatingIngredients: slots, strainer: strainerState }, normalized)) return null; // D (lemon/strainer-aware)
+  if (!wantStrainer) {
+    if (stats) stats.solverCalls++;
+    const solved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+    });
+    if (!solved.solvable || solved.truncated) return null; // BC, BD
+    if (solved.minMoves === undefined) return null; // I
+    if (!depthAccepted(solved.minMoves, req.phase)) return null; // BE
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      strainer: strainerState,
+      seed,
+      minMoves: solved.minMoves,
+      visitedStates: solved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null; // A–F, K–BE
+    return level;
+  }
+  // BP–CA: strainer production gate (rescued necessity standard).
   if (stats) stats.solverCalls++;
   const solved = solvePuzzle(cups, {
     maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
     cupConstraints: normalized,
     floatingIngredients: slots,
+    strainer: strainerState,
   });
-  if (!solved.solvable || solved.truncated) return null; // BC, BD
-  if (solved.minMoves === undefined) return null; // I
-  if (!depthAccepted(solved.minMoves, req.phase)) return null; // BE
+  if (!solved.solvable || solved.truncated) return null; // BP, BQ
+  if (solved.minMoves === undefined) return null;
+  if (!strainerDepthAccepted(solved.minMoves, req)) return null; // BR
+  // BS: WITHOUT-tool proof must be NON-TRUNCATED UNSOLVABLE (necessity).
+  if (stats) stats.solverCalls++;
+  const wo = solvePuzzle(cups, {
+    maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+    cupConstraints: normalized,
+    floatingIngredients: slots,
+  });
+  if (wo.solvable || wo.truncated) return null; // BS
+  // BT–BZ: optimal path must contain free placement + meaningful catch (m>=2)
+  // with correct dest inflow (m-1), correct held layer, eventual release,
+  // final hold null.
+  const solution = (solved.solution ?? []) as SolverAction[];
+  if (!solution.some((a) => a.kind === 'place-strainer')) return null; // BT
+  let rcups = cups.map((c) => [...c]);
+  let rslots = [...slots];
+  let rstrainer = normalizeStrainerState(strainerState);
+  let sawCatch = false;
+  let sawRelease = false;
+  for (const a of solution) {
+    const res = applyPuzzleActionState({ cups: rcups, floatingIngredients: rslots, strainer: rstrainer }, a, normalized);
+    if (!res) return null;
+    if (a.kind === 'pour' && res.strained === true) {
+      if ((res.transferred ?? 0) < 2) return null; // BV
+      if (res.received !== (res.transferred as number) - 1) return null; // BW
+      if (res.caughtTea === undefined || res.layer !== res.caughtTea) return null; // BX
+      if ((rstrainer as StrainerState).heldTea !== null) return null;
+      sawCatch = true; // BU
+    }
+    if (a.kind === 'release-strainer') sawRelease = true; // BY
+    rcups = res.state.cups;
+    rslots = res.state.floatingIngredients;
+    rstrainer = res.state.strainer;
+  }
+  if (!sawCatch || !sawRelease) return null; // BU, BY
+  if (rstrainer.heldTea !== null) return null; // BZ
+  if (!isPuzzleWonState({ cups: rcups, floatingIngredients: rslots, strainer: rstrainer }, normalized)) return null; // CA
   const level: GeneratedLevel = {
     cups,
     hiddenCounts,
     cupConstraints: normalized,
     floatingIngredients: slots,
+    strainer: strainerState,
     seed,
     minMoves: solved.minMoves,
     visitedStates: solved.visitedStates,
   };
-  if (!validateLevelStructure(level, req).ok) return null; // A–F, K–BE
+  if (!validateLevelStructure(level, req).ok) return null;
   return level;
+}
+
+/** Strainer-specific depth acceptance (measured G6 bands; globals untouched). */
+function strainerDepthAccepted(depth: number, req: GenerateRequest): boolean {
+  const kind = strainerTemplateKindFor(req);
+  if (!kind) {
+    // Non-canonical strainer requests: fall back to the phase band so
+    // exotic configs stay bounded (canonical kinds use measured bands).
+    return depthAccepted(depth, req.phase);
+  }
+  const band = STRAINER_DEPTH_ACCEPT[kind];
+  return depth >= band.min && depth <= band.max;
 }
 
 /**
@@ -1318,26 +1473,66 @@ function constraintsForShape(
  * Throws loudly if nothing validates: that is a programming error, and
  * lying about difficulty is worse than failing fast in dev/tests.
  */
+/**
+ * Pinned strong strainer fallback topology per kind (drawn from the curated
+ * rescued pool): plain 13 (lowest visited), peak 16 (lowest visited),
+ * teapot 12. Instantiated with the identity role mapping so recorded
+ * depths hold exactly. Passes through `finalizeCandidate` — never trusted
+ * blindly.
+ */
+const STRAINER_FALLBACK_TEMPLATE_ID: Record<StrainerTemplateKind, string> = {
+  'strainer-challenge': 'strainer-challenge-13-519',
+  'strainer-mystery-peak': 'strainer-mystery-peak-16-406',
+  'teapot-strainer-challenge': 'teapot-strainer-challenge-12-416',
+};
+
+function primaryStrainerFallback(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[] } | null {
+  if (!requestedHasStrainer(req)) return null;
+  const kind = strainerTemplateKindFor(req);
+  if (!kind) return null;
+  const tpl = STRAINER_TEMPLATE_BANK[kind].find((t) => t.id === STRAINER_FALLBACK_TEMPLATE_ID[kind]);
+  if (!tpl) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  const inst = instantiateStrainerTemplate(tpl, palette, [...palette]);
+  const constraints = defaultCupConstraints(inst.cups.length);
+  if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+  return { cups: inst.cups, constraints };
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
   validateTastingRequest(req);
   validateFloatingIngredientRequest(req);
+  validateStrainerRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
   const wantSink = requestedSinkOnlyCount(req);
   const wantTasting = requestedTastingCupCount(req);
   const wantIngredient = requestedFloatingIngredient(req);
+  const wantStrainer = requestedHasStrainer(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
     `${wantSink > 0 ? ':sink' : ''}${wantTasting > 0 ? ':tasting' : ''}` +
-    `${wantIngredient !== undefined ? `:${wantIngredient}` : ''}`;
+    `${wantIngredient !== undefined ? `:${wantIngredient}` : ''}` +
+    `${wantStrainer ? ':strainer' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null }> = [];
-  // Dedicated lemon shapes go first for lemon requests (1 solve on hit).
-  if (wantIngredient !== undefined) {
+  // Dedicated strainer shapes go first for strainer requests.
+  if (wantStrainer) {
+    const dedicatedStrainer = primaryStrainerFallback(req);
+    if (dedicatedStrainer) shapeEntries.push(dedicatedStrainer);
+    const strainerRot = rotationCups(req);
+    shapeEntries.push({
+      cups: strainerRot,
+      constraints: constraintsForShape(strainerRot.length, wantSourceOnly),
+    });
+  } else if (wantIngredient !== undefined) {
     const dedicatedLemon = primaryLemonFallback(req);
     if (dedicatedLemon) shapeEntries.push(dedicatedLemon);
     const lemonRot = lemonRotationEntry(req);
@@ -1429,7 +1624,16 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       if (idx === null) continue;
       hiddenCounts[idx] = 1;
     }
-    const level = finalizeCandidate(req, cups, hiddenCounts, `${tag}#${s}`, constraints, stats, shapeSlots);
+    const level = finalizeCandidate(
+      req,
+      cups,
+      hiddenCounts,
+      `${tag}#${s}`,
+      constraints,
+      stats,
+      shapeSlots,
+      wantStrainer ? standStrainerState() : undefined,
+    );
     if (level) {
       if (stats) stats.usedFallback = true;
       return level;
@@ -1452,6 +1656,9 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       wantIngredient,
     );
     if (!deal) continue;
+    // Strainer requests never produce lemon hosts; tight random deals are
+    // gated by the rescued-necessity check (plain/peak hit fast at ~30%).
+    if (wantStrainer && deal.lemonHost !== null) continue;
     const hiddenCounts = deal.cups.map(() => 0);
     const scanSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(deal.cups.length);
     if (deal.lemonHost !== null) scanSlots[deal.lemonHost] = wantIngredient ?? null;
@@ -1478,6 +1685,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       deal.cupConstraints,
       stats,
       scanSlots,
+      wantStrainer ? standStrainerState() : undefined,
     );
     if (level) {
       if (stats) stats.usedFallback = true;
@@ -1764,6 +1972,84 @@ function generateFromLemonTemplateBank(
 }
 
 /**
+ * Match a request against a strainer-bank kind (Gauntlet 6 tight
+ * topologies only). Strainer + lemon/sink/tasting/targets never qualifies
+ * (rejected loudly at validation).
+ */
+export function strainerTemplateKindFor(req: GenerateRequest): StrainerTemplateKind | null {
+  if (!requestedHasStrainer(req)) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  const teapot = requestedSourceOnlyCount(req);
+  if (req.numColors === 4 && req.emptyCups === 1 && !req.hasMysteryLayer && teapot === 0) {
+    return 'strainer-challenge';
+  }
+  if (req.numColors === 5 && req.emptyCups === 1 && req.hasMysteryLayer && teapot === 0) {
+    return 'strainer-mystery-peak';
+  }
+  if (req.numColors === 4 && req.emptyCups === 1 && !req.hasMysteryLayer && teapot === 1) {
+    return 'teapot-strainer-challenge';
+  }
+  return null;
+}
+
+/**
+ * Bounded strainer fast path (Gauntlet 6 §18): seeded template choice →
+ * full palette permutation (a complete color isomorphism, so the rescued
+ * depth is preserved) → teapot role → Mystery assignment → empty-stand
+ * strainer → single `finalizeCandidate` validation (with + without solves).
+ * At most STRAINER_TEMPLATE_ATTEMPTS validations, never a 150-scan.
+ */
+function generateFromStrainerTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = strainerTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = STRAINER_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  for (let a = 0; a < STRAINER_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateStrainerTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+    const hiddenCounts = inst.cups.map(() => 0);
+    if (req.hasMysteryLayer) {
+      const idx = selectMysteryCup(
+        inst.cups,
+        (candidates) => {
+          const at = Math.floor(rng() * candidates.length);
+          return candidates[at] ?? null;
+        },
+        constraints,
+      );
+      if (idx === null) continue;
+      hiddenCounts[idx] = 1;
+    }
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#strainer:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      standStrainerState(),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Bounded target fast path (Gauntlet 2.1 §9): seeded template choice →
  * palette-relative instantiation (seeded t-swap + o-permutation, both
  * full isomorphisms so the bank depth is preserved) → mystery assignment
@@ -1835,6 +2121,7 @@ export function generateLevel(
   validateSinkRequest(req);
   validateTastingRequest(req);
   validateFloatingIngredientRequest(req);
+  validateStrainerRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -1883,6 +2170,16 @@ export function generateLevel(
   // or the validated fallback ladder.
   if (lemonTemplateKindFor(req) !== null) {
     const fast = generateFromLemonTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical strainer configs skip the random scan entirely (Gauntlet 6
+  // §18): bounded STRAINER_TEMPLATE_ATTEMPTS validations, never a 150-deal
+  // scan. maxRetries: 0 still yields a valid level through the fast path
+  // or the validated fallback ladder.
+  if (strainerTemplateKindFor(req) !== null) {
+    const fast = generateFromStrainerTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -2252,6 +2549,48 @@ export function validateLevelStructure(
         reasons.push('lemon + tasting is out of scope for Gauntlet 5 (BB)');
       }
     }
+  }
+  // BF–BO: strainer structural invariant (solver items BP–CA live in
+  // finalizeCandidate, not here).
+  const wantStrainer = requestedHasStrainer(req);
+  const strainerState = normalizeStrainerState(level.strainer);
+  if (!wantStrainer) {
+    if (strainerState.present) reasons.push('unexpected strainer without request (BG)');
+  } else {
+    if (!strainerState.present) reasons.push('expected strainer present (BH)');
+    if (strainerState.present && strainerState.attachedCupIndex !== null) {
+      reasons.push('strainer must start on its stand (BI)');
+    }
+    if (strainerState.present && strainerState.heldTea !== null) {
+      reasons.push('strainer must start empty (BJ)');
+    }
+    if (req.numColors === 4 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+      if (!(req.numColors === 4 && level.cups.length === 5 && req.emptyCups === 1)) {
+        reasons.push('strainer challenge must be 4c/5v/1e (BL)');
+      }
+    } else if (req.numColors === 5 && req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+      if (!(req.numColors === 5 && level.cups.length === 6 && req.emptyCups === 1)) {
+        reasons.push('strainer peak must be 5c/6v/1e (BM)');
+      }
+    } else if (requestedSourceOnlyCount(req) === 1) {
+      if (!(req.numColors === 4 && level.cups.length === 5 && req.emptyCups === 1)) {
+        reasons.push('teapot strainer challenge must be 4c/5v/1e + teapot0 (BN)');
+      }
+    } else {
+      reasons.push('unsupported strainer request shape (BK–BN)');
+    }
+    if (presentIds.length > 0) reasons.push('strainer + lemon is out of scope for Gauntlet 6 (BO)');
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('strainer + sink is out of scope for Gauntlet 6 (BO)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('strainer + tasting is out of scope for Gauntlet 6 (BO)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('strainer + targets is out of scope for Gauntlet 6 (BO)');
+    }
+    const emptyStarts = level.cups.filter((c) => c.length === 0).length;
+    if (emptyStarts !== 1) reasons.push(`strainer levels must start with exactly 1 empty vessel, got ${emptyStarts} (BL–BN)`);
   }
   // Homogeneity helper stays referenced for future mixed-block checks.
   void isHomogeneous;
