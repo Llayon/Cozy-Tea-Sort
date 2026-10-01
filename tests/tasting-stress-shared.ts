@@ -60,9 +60,10 @@ export function checkTastingStressSeed(
   const solution = solved.solution ?? [];
   expect(solution.some((m) => m.to === tastingIdx)).toBe(true);
   const firstIn = solution.findIndex((m) => m.to === tastingIdx);
-  expect(solution.slice(firstIn + 1).some((m) => m.from === tastingIdx)).toBe(true);
+  expect(solution.slice(firstIn + 1).some((m) => m.kind === 'pour' && m.from === tastingIdx)).toBe(true);
   let board = level.cups.map((c) => [...c]);
   for (const step of solution) {
+    if (step.kind !== 'pour') continue;
     const res = applyPour(board, step.from, step.to, level.cupConstraints);
     expect(res).not.toBeNull();
     board = res?.cups ?? board;

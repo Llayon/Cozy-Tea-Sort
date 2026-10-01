@@ -293,7 +293,7 @@ describe('T–Y. hand fixture: the bowl works as a buffer', () => {
     expect(solution.some((m) => m.to === TASTING)).toBe(true);
     // U: later pours tea back out.
     const firstIn = solution.findIndex((m) => m.to === TASTING);
-    expect(solution.slice(firstIn + 1).some((m) => m.from === TASTING)).toBe(true);
+    expect(solution.slice(firstIn + 1).some((m) => m.kind === 'pour' && m.from === TASTING)).toBe(true);
     // X/Y: exact replay, not truncated.
     const final = applySolution(cups, solution, constraints);
     expect(final).not.toBe(null);
@@ -306,6 +306,7 @@ describe('T–Y. hand fixture: the bowl works as a buffer', () => {
     const solved = solvePuzzle(cups, { cupConstraints: constraints });
     let board = cups.map((c) => [...c]);
     for (const step of solved.solution ?? []) {
+      if (step.kind !== 'pour') continue;
       const res = applyPour(board, step.from, step.to, constraints);
       expect(res).not.toBe(null);
       board = res?.cups ?? board;
@@ -319,6 +320,7 @@ describe('T–Y. hand fixture: the bowl works as a buffer', () => {
     const solved = solvePuzzle(cups, { cupConstraints: constraints });
     const logic = new TeaSortLogic(cups.map((c) => [...c]), [0, 0, 0, 0, 0], constraints);
     for (const m of solved.solution ?? []) {
+      if (m.kind !== 'pour') continue;
       expect(logic.makeMove(m.from, m.to)).not.toBe(null);
     }
     expect(logic.isWon()).toBe(true);

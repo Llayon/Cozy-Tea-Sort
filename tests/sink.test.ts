@@ -342,7 +342,10 @@ describe('I. known sink fixture: solution must serve the guest', () => {
     const solution = solved.solution ?? [];
     expect(solution.length).toBeGreaterThan(0);
     // Required invariant: NO solution move pours OUT of the sink.
-    for (const m of solution) expect(m.from).not.toBe(3);
+    for (const m of solution) {
+      if (m.kind !== 'pour') continue;
+      expect(m.from).not.toBe(3);
+    }
     // The guest must be served (final winning pour into the sink).
     expect(solution.some((m) => m.to === 3)).toBe(true);
     const final = applySolution(cups, solution, constraints);
@@ -355,6 +358,7 @@ describe('I. known sink fixture: solution must serve the guest', () => {
     const solved = solvePuzzle(cups, { cupConstraints: constraints });
     const logic = new TeaSortLogic(cups.map((c) => [...c]), [0, 0, 0, 0], constraints);
     for (const m of solved.solution ?? []) {
+      if (m.kind !== 'pour') continue;
       expect(logic.makeMove(m.from, m.to)).not.toBe(null);
     }
     expect(logic.isWon()).toBe(true);
@@ -378,8 +382,11 @@ describe('J. combined teapot+sink fixture: inverse roles interoperate', () => {
     expect(solved.solvable).toBe(true);
     expect(solved.truncated).not.toBe(true);
     const solution = solved.solution ?? [];
-    for (const m of solution) expect(m.from).not.toBe(3);
-    expect(solution.some((m) => m.from === 0 && m.to === 3)).toBe(true);
+    for (const m of solution) {
+      if (m.kind !== 'pour') continue;
+      expect(m.from).not.toBe(3);
+    }
+    expect(solution.some((m) => m.kind === 'pour' && m.from === 0 && m.to === 3)).toBe(true);
     const final = applySolution(cups, solution, constraints);
     expect(final).not.toBe(null);
     expect(isWonState(final as TeaId[][], constraints)).toBe(true);

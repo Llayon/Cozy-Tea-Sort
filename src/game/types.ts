@@ -145,25 +145,98 @@ export const FLOATING_INGREDIENT_TYPES = {
 export type FloatingIngredientSlot = FloatingIngredientId | null;
 
 /**
+ * Movable strainer tool state — CATCH-ONE semantics (Gauntlet 6 feasibility
+ * spike): the strainer CATCHES exactly one layer during an otherwise-normal
+ * pour and holds it externally until released.
+ *
+ * - `present === false` → no strainer in this puzzle.
+ * - `present === true, attachedCupIndex === null, heldTea === null` →
+ *   EMPTY on its stand.
+ * - `present === true, attachedCupIndex === number, heldTea === null` →
+ *   EMPTY attached to that vessel (free preparation).
+ * - `present === true, attachedCupIndex === null, heldTea === TeaId` →
+ *   LOADED on its stand holding one layer (must release before winning).
+ *
+ * Invariant: heldTea !== null implies attachedCupIndex === null (a loaded
+ * tool can never be attached). ONE authoritative state; no Cup.hasStrainer.
+ */
+export interface StrainerState {
+  present: boolean;
+  attachedCupIndex: number | null;
+  heldTea: TeaId | null;
+}
+
+export interface ReadonlyStrainerState {
+  present: boolean;
+  attachedCupIndex: number | null;
+  heldTea: TeaId | null;
+}
+
+/**
+ * Player action vocabulary (catch-one spike): explicit place, pour, and
+ * release. Costs: place 0, pour 1, release 1 (moves = tea-transfer actions).
+ */
+export type PuzzleAction =
+  | { kind: 'pour'; from: number; to: number }
+  | { kind: 'place-strainer'; to: number }
+  | { kind: 'release-strainer'; to: number };
+
+/** Solver path metadata (pour enriched with strained/catch info). */
+export type SolverPourAction = {
+  kind: 'pour';
+  from: number;
+  to: number;
+  layer: TeaId;
+  count: number;
+  strained: boolean;
+  caughtTea?: TeaId;
+};
+
+export type SolverPlaceAction = { kind: 'place-strainer'; to: number };
+export type SolverReleaseAction = { kind: 'release-strainer'; to: number; layer: TeaId };
+
+export type SolverAction = SolverPourAction | SolverPlaceAction | SolverReleaseAction;
+
+export function isPourAction(
+  a: PuzzleAction | SolverAction,
+): a is { kind: 'pour'; from: number; to: number } | SolverPourAction {
+  return a.kind === 'pour';
+}
+
+export function isPlaceStrainerAction(
+  a: PuzzleAction | SolverAction,
+): a is { kind: 'place-strainer'; to: number } {
+  return a.kind === 'place-strainer';
+}
+
+export function isReleaseStrainerAction(
+  a: PuzzleAction | SolverAction,
+): a is { kind: 'release-strainer'; to: number } | SolverReleaseAction {
+  return a.kind === 'release-strainer';
+}
+
+/**
  * Full dynamic puzzle state: tea layers plus independent floating-object
- * positions. Immutable level data (CupConstraint[], ingredient TYPE
- * metadata, Mystery definition, difficulty) lives elsewhere; hiddenCounts
- * stay presentation-only.
+ * positions plus the movable strainer tool. Immutable level data
+ * (CupConstraint[], ingredient TYPE metadata, Mystery definition,
+ * difficulty) lives elsewhere; hiddenCounts stay presentation-only.
  */
 export interface PuzzleState {
   cups: TeaId[][];
   floatingIngredients: FloatingIngredientSlot[];
+  strainer: StrainerState;
 }
 
 /**
  * Read-only view of puzzle state accepted by every state-aware rule,
  * solver and generator helper (callers may hold mutable or readonly
  * arrays; legacy tea-only arrays are never accepted here — normalize
- * first).
+ * first). `strainer` optional for legacy callers (absent = no tool).
  */
 export interface ReadonlyPuzzleState {
   cups: readonly TeaId[][];
   floatingIngredients: readonly FloatingIngredientSlot[] | undefined;
+  strainer?: ReadonlyStrainerState | undefined;
 }
 
 /** All-null slots for a vessel count (ordinary old levels). */
@@ -188,11 +261,45 @@ export function normalizeFloatingIngredients(
   return out;
 }
 
+/** No-strainer state (ordinary old levels). */
+export function emptyStrainerState(): StrainerState {
+  return { present: false, attachedCupIndex: null, heldTea: null };
+}
+
+/** Empty strainer on its stand (initial position for catch-one levels). */
+export function standStrainerState(): StrainerState {
+  return { present: true, attachedCupIndex: null, heldTea: null };
+}
+
+/**
+ * Backwards-compatible strainer normalization: legacy callers without the
+ * field synthesize absence. Malformed loaded+attached states are preserved
+ * here (production validation rejects them loudly); null attached always
+ * means STAND, never absence (presence is the separate flag).
+ */
+export function normalizeStrainerState(s: ReadonlyStrainerState | undefined): StrainerState {
+  if (!s) return emptyStrainerState();
+  if (!s.present) return { present: false, attachedCupIndex: null, heldTea: null };
+  const attached =
+    s.attachedCupIndex === null || s.attachedCupIndex === undefined ? null : s.attachedCupIndex;
+  const held = s.heldTea ?? null;
+  if (attached !== null && !Number.isInteger(attached)) {
+    return { present: true, attachedCupIndex: null, heldTea: null };
+  }
+  return { present: true, attachedCupIndex: attached, heldTea: held };
+}
+
+export function cloneStrainerState(s: ReadonlyStrainerState): StrainerState {
+  return { present: s.present, attachedCupIndex: s.attachedCupIndex ?? null, heldTea: s.heldTea ?? null };
+}
+
 /** Defensive deep copy of a puzzle state (no shared arrays). */
-export function clonePuzzleState(state: PuzzleState): PuzzleState {
+export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
+  const cups = (state.cups as TeaId[][]).map((c) => [...c]);
   return {
-    cups: state.cups.map((c) => [...c]),
-    floatingIngredients: [...state.floatingIngredients],
+    cups,
+    floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, cups.length),
+    strainer: normalizeStrainerState(state.strainer),
   };
 }
 

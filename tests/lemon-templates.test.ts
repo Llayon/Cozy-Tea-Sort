@@ -3,7 +3,7 @@
  * relocation distribution.
  */
 import { describe, expect, it } from 'vitest';
-import type { FloatingIngredientSlot, TeaId } from '../src/game/types';
+import type { FloatingIngredientSlot, SolverAction, TeaId } from '../src/game/types';
 import { defaultCupConstraints, type CupConstraint } from '../src/game/types';
 import { applyPourState, canonicalPuzzleKey, isPuzzleWonState } from '../src/game/logic/rules';
 import { solvePuzzle } from '../src/game/logic/solver';
@@ -78,13 +78,14 @@ function requestFor(kind: LemonTemplateKind, palette: TeaId[]): GenerateRequest 
 function countRelocations(
   cups: TeaId[][],
   slots: (string | null)[],
-  solution: Array<{ from: number; to: number }>,
+  solution: SolverAction[],
   constraints: readonly CupConstraint[],
 ): number {
   let board = { cups: cups.map((c) => [...c]), floatingIngredients: [...slots] as (string | null)[] };
   const at = (b: typeof board) => b.floatingIngredients.findIndex((s) => s === 'lemon');
   let n = 0;
   for (const m of solution) {
+    if (m.kind !== 'pour') continue;
     const before = at(board);
     const res = applyPourState(
       { cups: board.cups, floatingIngredients: board.floatingIngredients as FloatingIngredientSlot[] },
@@ -189,6 +190,7 @@ describe.each([
       void finalIdx;
       let board = { cups: cups.map((c) => [...c]), floatingIngredients: [...slots] as FloatingIngredientSlot[] };
       for (const step of solved.solution ?? []) {
+        if (step.kind !== 'pour') continue;
         const res = applyPourState(board, step.from, step.to, constraints);
         expect(res).not.toBeNull();
         board = { cups: res?.state.cups ?? [], floatingIngredients: res?.state.floatingIngredients ?? [] };

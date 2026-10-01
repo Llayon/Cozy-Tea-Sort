@@ -161,7 +161,10 @@ describe.each([
       // Solution serves the guest and never sources it.
       const solution = solved.solution ?? [];
       expect(solution.some((m) => m.to === sinkIdx)).toBe(true);
-      for (const m of solution) expect(m.from).not.toBe(sinkIdx);
+      for (const m of solution) {
+        if (m.kind !== 'pour') continue;
+        expect(m.from).not.toBe(sinkIdx);
+      }
     }
   });
 

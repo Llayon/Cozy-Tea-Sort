@@ -96,9 +96,10 @@ function expectTastingLevel(req: GenerateRequest, seed: string, opts: { mystery:
   const solution = solved.solution ?? [];
   expect(solution.some((m) => m.to === tastingIdx)).toBe(true);
   const firstIn = solution.findIndex((m) => m.to === tastingIdx);
-  expect(solution.slice(firstIn + 1).some((m) => m.from === tastingIdx)).toBe(true);
+  expect(solution.slice(firstIn + 1).some((m) => m.kind === 'pour' && m.from === tastingIdx)).toBe(true);
   let board = lvl.cups.map((c) => [...c]);
   for (const step of solution) {
+    if (step.kind !== 'pour') continue;
     const res = applyPour(board, step.from, step.to, lvl.cupConstraints);
     expect(res).not.toBeNull();
     board = res?.cups ?? board;
@@ -187,9 +188,10 @@ describe('tasting fallback branch (direct fallbackLevel)', () => {
     const solution = solved.solution ?? [];
     expect(solution.some((m) => m.to === tastingIdx)).toBe(true);
     const firstIn = solution.findIndex((m) => m.to === tastingIdx);
-    expect(solution.slice(firstIn + 1).some((m) => m.from === tastingIdx)).toBe(true);
+    expect(solution.slice(firstIn + 1).some((m) => m.kind === 'pour' && m.from === tastingIdx)).toBe(true);
     let board = lvl.cups.map((c) => [...c]);
     for (const step of solution) {
+      if (step.kind !== 'pour') continue;
       const res = applyPour(board, step.from, step.to, lvl.cupConstraints);
       expect(res).not.toBeNull();
       board = res?.cups ?? board;

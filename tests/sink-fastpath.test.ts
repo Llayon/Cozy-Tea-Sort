@@ -87,7 +87,10 @@ function expectSinkLevel(req: GenerateRequest, seed: string, opts: { mystery: bo
   expect(solved.solvable).toBe(true);
   expect(solved.truncated).not.toBe(true);
   expect(solved.minMoves).toBe(lvl.minMoves);
-  for (const m of solved.solution ?? []) expect(m.from).not.toBe(sinkIdx);
+  for (const m of solved.solution ?? []) {
+    if (m.kind !== 'pour') continue;
+    expect(m.from).not.toBe(sinkIdx);
+  }
   expect(validateLevelStructure(lvl, req).ok).toBe(true);
   return { lvl, stats };
 }
@@ -207,7 +210,10 @@ describe('sink fallback branch (direct fallbackLevel, Gauntlet 3.1)', () => {
     expect(solved.minMoves).toBe(lvl.minMoves);
     const sinkIdx = lvl.cupConstraints.findIndex((c) => c.mode === 'sink-only');
     expect(sinkIdx).toBe(lvl.cups.length - 1);
-    for (const m of solved.solution ?? []) expect(m.from).not.toBe(sinkIdx);
+    for (const m of solved.solution ?? []) {
+      if (m.kind !== 'pour') continue;
+      expect(m.from).not.toBe(sinkIdx);
+    }
     if (flags.mystery) {
       const midx = lvl.hiddenCounts.findIndex((h) => h > 0);
       expect(midx).not.toBe(sinkIdx);

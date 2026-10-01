@@ -57,6 +57,7 @@ export function checkSinkStressSeed(
   // Replay: solution never sources the sink; guest ends full homogeneous.
   let board = level.cups.map((c) => [...c]);
   for (const step of solved.solution ?? []) {
+    if (step.kind !== 'pour') continue;
     expect(step.from).not.toBe(sinkIdx);
     const res = applyPour(board, step.from, step.to, level.cupConstraints);
     expect(res).not.toBeNull();
