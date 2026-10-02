@@ -214,6 +214,31 @@ export function shouldExitToolModeOnTeaSelect(mode: StrainerToolMode): boolean {
   return mode !== 'off';
 }
 
+/**
+ * Placement-transit plan (pure, G6.1): where the tool flight starts and
+ * which static marker must stay hidden during travel.
+ * - attached==null (tool on stand) → flight starts at the stand anchor;
+ *   nothing is hidden (stand visual stays pre during travel, lands post).
+ * - attached==A (relocation to a legal host B; the caller pre-checks
+ *   legality so A≠B) → flight starts at A's rim anchor and A's static
+ *   marker is hidden for the flight, so exactly one mesh is ever visible.
+ *   On failure the caller restores via refreshStrainerVisuals() (logic is
+ *   untouched until landing, so refresh redraws the old host marker).
+ */
+export interface StrainerPlaceTransitPlan {
+  /** True when the flight starts at the stand; false when at the old host. */
+  fromStand: boolean;
+  /** Old host whose static marker must be hidden during travel (null=none). */
+  suppressCupIndex: number | null;
+}
+
+export function strainerPlaceTransitPlan(
+  attachedCupIndex: number | null,
+): StrainerPlaceTransitPlan {
+  if (attachedCupIndex === null) return { fromStand: true, suppressCupIndex: null };
+  return { fromStand: false, suppressCupIndex: attachedCupIndex };
+}
+
 /** Visual radius of the floating lemon slice (~16px diameter). */
 export const LEMON_SLICE_R = 8;
 
@@ -1934,9 +1959,12 @@ export class TeaSortView {
   }
 
   /**
-   * Placement transit (free): short arc stand→host, exactly ONE
-   * `onMoveComplete`, no win/deadlock check (tea unchanged). Mutates AFTER
-   * the flight so the stand visual stays pre during travel and lands post.
+   * Placement transit (free): short arc stand/current-host→new-host,
+   * exactly ONE `onMoveComplete`, no win/deadlock check (tea unchanged).
+   * Mutates AFTER the flight so visuals stay pre during travel and land
+   * post. Relocation flights start at the CURRENT host rim (G6.1), never
+   * at the stand, and the old host marker stays hidden until landing so
+   * exactly one mesh is visible mid-flight.
    */
   private async animatePlaceStrainer(toIdx: number): Promise<void> {
     const targetView = this.cupViews[toIdx];
@@ -1945,9 +1973,21 @@ export class TeaSortView {
       return;
     }
     this.isAnimating = true;
-    const from = this.strainerStandCenter();
+    const plan = strainerPlaceTransitPlan(this.logic.strainerState.attachedCupIndex);
+    let from = this.strainerStandCenter();
+    if (!plan.fromStand) {
+      const oldView = this.cupViews[plan.suppressCupIndex as number];
+      if (oldView) {
+        from = oldView.strainerStagePoint();
+        oldView.renderAttachedStrainer(false);
+      } else {
+        // Stale host index: fail closed to stand anchor + pre visuals.
+        this.refreshStrainerVisuals();
+      }
+    } else {
+      this.refreshStrainerVisuals();
+    }
     const to = targetView.strainerStagePoint();
-    this.refreshStrainerVisuals();
     this.startStrainerTransit('tool', from.x, from.y, to.x, to.y, 300, null);
     audioSynth.playSelect();
     telegram.hapticSelection();

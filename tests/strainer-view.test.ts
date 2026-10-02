@@ -30,6 +30,7 @@ import {
   shouldExitToolModeOnTeaSelect,
   strainedPourHint,
   strainerPlaceHint,
+  strainerPlaceTransitPlan,
   strainerReleaseHint,
   strainerToolModeForStandTap,
 } from '../src/game/view/TeaSortView';
@@ -244,6 +245,37 @@ describe('no duplicate truth: logic.strainerState is the only tool state', () =>
     // exits the mode, but the attached tool stays until a real strained pour.
     expect(shouldExitToolModeOnTeaSelect('place')).toBe(true);
     expect(logic.strainerState.attachedCupIndex).toBe(0);
+  });
+
+  it('G6.1 relocation starts at the CURRENT host rim, never the stand', () => {
+    // Stand placement: flight anchor is the stand, nothing is hidden.
+    expect(strainerPlaceTransitPlan(null)).toEqual({ fromStand: true, suppressCupIndex: null });
+    // Relocation A → B: the flight anchor is A's rim (fromStand false),
+    // never the stand — the animation must fly A → B, not stand → B.
+    expect(strainerPlaceTransitPlan(0)).toEqual({ fromStand: false, suppressCupIndex: 0 });
+    expect(strainerPlaceTransitPlan(3)).toEqual({ fromStand: false, suppressCupIndex: 3 });
+  });
+
+  it('G6.1 exactly one mesh is visible mid-relocation (old host suppressed)', () => {
+    // The plan names exactly one cup to suppress — the animation hides
+    // precisely that static marker before the flight. Refresh on failure
+    // restores it (logic untouched until landing); on success the marker
+    // moves to the new host. No plan ever names two cups or the stand.
+    const plan = strainerPlaceTransitPlan(0);
+    expect(plan.suppressCupIndex).toBe(0);
+    expect(plan.fromStand).toBe(false);
+    const fromStand = strainerPlaceTransitPlan(null);
+    expect(fromStand.suppressCupIndex).toBeNull();
+    // Logic round-trip: relocation keeps a single attached truth A → B.
+    const logic = new TeaSortLogic([[M, M], [K, K], []], [0, 0, 0], [N, N, N], [null, null, null], {
+      present: true,
+      attachedCupIndex: null,
+      heldTea: null,
+    });
+    expect(logic.placeStrainer(0)).not.toBeNull();
+    expect(logic.placeStrainer(1)).not.toBeNull();
+    expect(logic.strainerState).toEqual({ present: true, attachedCupIndex: 1, heldTea: null });
+    expect(logic.movesCount).toBe(0);
   });
 
   it('guest cups and teapots keep their host rules (no view duplication)', () => {
