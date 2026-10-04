@@ -2682,6 +2682,21 @@ export class TeaSortView {
     }
   }
 
+  /**
+   * Clear lemon suppression on every cup (reset / undo / failure path,
+   * lemon mirror of `clearHoneySuppression`). Layer-specific: never touches
+   * honey suppression — joint moves clear both by calling both helpers.
+   */
+  private clearLemonSuppression(): void {
+    for (const v of this.cupViews) {
+      try {
+        v.suppressLemonTransit = false;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   /** Whether any honey is currently visible or in flight (early-out gate). */
   private needsHoneyPass(): boolean {
     if (this.honeyTransit !== null) return true;
@@ -2784,6 +2799,9 @@ export class TeaSortView {
     // Lemon transit (G5.1): logic is already post-move. The flight
     // starts at the reconstructed pre-move source surface but lands on
     // the FINAL post-pour destination surface.
+    // Layer-specific (§85): only the moving layer suppresses its own
+    // statics — a stationary honey blob keeps rendering (no flicker).
+    const lemonMoving = floatingIngredientMoved != null;
     if (floatingIngredientMoved != null) {
       const fromCup = this.logic.cups[fromIdx];
       const toCup = this.logic.cups[toIdx];
@@ -2809,6 +2827,9 @@ export class TeaSortView {
     // (`=== 'honey'`) hide the destination static until the drop lands.
     // Source suppression mirrors the lemon pattern (post-move source is
     // already empty; the flag keeps it empty after departure).
+    // Honey transit signal (§83-84): metadata only (`sinkingIngredientMoved
+    // === 'honey'`), never a view-owned index. Partial outflows (null) keep
+    // the static blob at the shared bottom anchor with no transit/flicker.
     const honeyMoving = sinkingIngredientMoved === 'honey';
     if (honeyMoving) {
       sourceView.suppressHoneyTransit = true;
@@ -2817,6 +2838,19 @@ export class TeaSortView {
       const toCupH = this.logic.cups[toIdx];
       if (fromCupH) sourceView.renderHoney(fromCupH);
       if (toCupH) targetView.renderHoney(toCupH);
+      // Joint-move concurrency (§84/87): start the amber ARC now so it
+      // flies CONCURRENTLY with the lemon surface flight + tea stream
+      // under the single existing ticker (separate graphics layers, so
+      // neither flight erases the other). The straight sink leg follows
+      // after the pour. Honey-only moves likewise arc during the pour.
+      try {
+        const from = this.honeyStagePoint(sourceView);
+        const rim = this.honeyRimStagePoint(targetView);
+        this.startHoneyTransit(from.x, from.y, rim.x, rim.y, HONEY_ARC_MS, 28);
+      } catch {
+        // Start failure: the landing block re-establishes the arc from
+        // logic state so the drop is still seen (no strand, no duplicate).
+      }
     }
 
     const tea = TEA_TYPES[layer];
@@ -2866,22 +2900,39 @@ export class TeaSortView {
     targetView.fillAmount = 0;
     targetView.fillingCount = 0;
     // Landing: reveal the destination static lemon, then redraw.
-    targetView.suppressLemonTransit = false;
-    this.clearLemonTransit();
+    // Layer-specific (§85): lemon-only pours must not touch honey
+    // suppression and vice versa — joint moves clear both via both paths.
+    if (lemonMoving) {
+      targetView.suppressLemonTransit = false;
+      this.clearLemonTransit();
+    }
 
-    // Honey landing (G7 §82): near pour end, ONE amber drop arcs from the
-    // TRANSFORMED source bottom (actual tilt/lift, never rest pose) to the
-    // destination rim, then sinks straight to the shared bottom anchor
-    // (~180-260ms). Static destination honey stays hidden until landing,
-    // when it appears exactly at the shared anchor. Same ticker, same
-    // isAnimating lock — never a second onMoveComplete.
+    // Honey landing (G7 §82/87): the amber ARC already flew concurrently
+    // with the tea + lemon flight (started pre-pour from the TRANSFORMED
+    // source bottom — actual tilt/lift, never rest pose). Finish with the
+    // short straight sink rim → shared bottom anchor (~180-260ms). The
+    // static destination honey stays hidden until landing, when it appears
+    // exactly at the shared anchor. Same single ticker, same single
+    // isAnimating lock — never a second ticker, never a second
+    // onMoveComplete (the sole completion fires at the end of animatePour).
     if (honeyMoving) {
       try {
-        const from = this.honeyStagePoint(sourceView);
         const rim = this.honeyRimStagePoint(targetView);
         const bottom = this.honeyStagePoint(targetView);
-        this.startHoneyTransit(from.x, from.y, rim.x, rim.y, HONEY_ARC_MS, 28);
-        await this.wait(HONEY_ARC_MS);
+        const active = this.honeyTransit;
+        if (active != null) {
+          // Concurrent arc in flight (normal path): wait out any remainder
+          // so the drop reaches the rim before sinking (normally already
+          // there — pour 420ms > arc 300ms — so this is a no-op).
+          const remain = active.durMs - (performance.now() - active.startMs);
+          if (remain > 0) await this.wait(remain);
+        } else {
+          // Pre-pour arc never started (start failure): run it now so the
+          // drop is still seen travelling source → rim before sinking.
+          const from = this.honeyStagePoint(sourceView);
+          this.startHoneyTransit(from.x, from.y, rim.x, rim.y, HONEY_ARC_MS, 28);
+          await this.wait(HONEY_ARC_MS);
+        }
         this.startHoneyTransit(rim.x, rim.y, bottom.x, bottom.y, HONEY_SINK_MS, 0);
         await this.wait(HONEY_SINK_MS);
       } catch {
@@ -3201,8 +3252,10 @@ export class TeaSortView {
     this.strainerStandShake = 0;
     this.clearStrainerTransit();
     // A level swap mid-flight must never strand a flying lemon or a
-    // suppressed destination slice (fresh CupViews default suppression off).
+    // suppressed destination slice (fresh CupViews default suppression off,
+    // cleared explicitly here too for the §88 audit).
     this.clearLemonTransit();
+    this.clearLemonSuppression();
     // Honey never strands either: clear the drop flight + suppression flags.
     this.clearHoneyTransit();
     this.clearHoneySuppression();
@@ -3225,8 +3278,12 @@ export class TeaSortView {
     this.toolMode = 'off';
     this.strainerStandShake = 0;
     this.clearStrainerTransit();
-    // Undo restores logic sinking slots; a stranded honey flight or stale
-    // suppression would hide the restored static blob — clear both first.
+    // Undo restores logic ingredient slots; a stranded flight or stale
+    // suppression would hide the restored static slice/blob — clear BOTH
+    // transit states + BOTH suppression flags first (§88). Guarded by
+    // isAnimating above, so this only clears steady-state residue.
+    this.clearLemonTransit();
+    this.clearLemonSuppression();
     this.clearHoneyTransit();
     this.clearHoneySuppression();
     const move = this.logic.undo();

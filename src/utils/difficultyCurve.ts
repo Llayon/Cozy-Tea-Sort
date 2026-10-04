@@ -176,18 +176,38 @@ const PINNED_ROLLOUT_49_56: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–56, then a deterministic
+ * Pinned rollout 57–64 (Gauntlet 8 — lemon+honey interaction):
+ * 57 warmup clean · 58 challenge LEMON+HONEY · 59 peak HONEY+mystery
+ * (familiar combination) · 60 relax clean · 61 warmup clean ·
+ * 62 challenge LEMON+HONEY (no tutorial repeat) · 63 peak STRAINER+mystery
+ * (familiar combination) · 64 relax clean.
+ */
+const PINNED_ROLLOUT_57_64: Record<number, MechanicPlan> = {
+  57: { ...CLEAN },
+  58: { ...CLEAN, lemon: true, honey: true },
+  59: { ...CLEAN, honey: true },
+  60: { ...CLEAN },
+  61: { ...CLEAN },
+  62: { ...CLEAN, lemon: true, honey: true },
+  63: { ...CLEAN, strainer: true },
+  64: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–64, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
- * combos, never honey + lemon / strainer / sink / tasting / targets,
- * never strainer + lemon / sink / tasting / targets, never lemon +
- * sink / lemon + tasting / lemon + targets / sink + targets /
- * tasting + sink / tasting + targets, never three specials together).
+ * combos, never honey + lemon / strainer / sink / tasting / targets except
+ * the dedicated lemon+honey interaction, never strainer + lemon / sink /
+ * tasting / targets, never lemon + sink / lemon + tasting / lemon +
+ * targets / sink + targets / tasting + sink / tasting + targets, never
+ * three specials together).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
     PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ??
     PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum] ??
-    PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum];
+    PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum] ??
+    PINNED_ROLLOUT_57_64[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
@@ -195,8 +215,9 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   if (cycleIndex === 1) {
     // challenge (no mystery): honey → teapot+honey → strainer →
     // teapot+strainer → lemon → teapot+lemon → tasting → teapot+tasting →
-    // sink → teapot+sink → targets → teapot+targets.
-    switch (cycleNumber % 12) {
+    // sink → teapot+sink → targets → teapot+targets → lemon+honey.
+    // (Cases 0–11 preserve the pre-G8 mapping exactly; G8 appends case 12.)
+    switch (cycleNumber % 13) {
       case 0: return { ...CLEAN, honey: true };
       case 1: return { ...CLEAN, teapot: true, honey: true };
       case 2: return { ...CLEAN, strainer: true };
@@ -208,7 +229,8 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
       case 8: return { ...CLEAN, sink: true };
       case 9: return { ...CLEAN, teapot: true, sink: true };
       case 10: return { ...CLEAN, targets: true };
-      default: return { ...CLEAN, teapot: true, targets: true };
+      case 11: return { ...CLEAN, teapot: true, targets: true };
+      default: return { ...CLEAN, lemon: true, honey: true };
     }
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
@@ -337,16 +359,29 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   // loudly at generation). Later-cycle palettes may lack it, so swap it
   // into slot 0 deterministically — reshuffles keep the same palette.
   const floatingIngredient = plan.lemon ? ('lemon' as const) : undefined;
-  if (floatingIngredient !== undefined && !colors.includes('sea_buckthorn')) {
-    colors = ['sea_buckthorn', ...colors.slice(1)];
-  }
   // Honey levels require buckwheat in the active palette (validated loudly
   // at generation). Same deterministic slot-0 injection as lemon.
   const sinkingIngredient = plan.honey ? ('honey' as const) : undefined;
-  if (sinkingIngredient !== undefined && !colors.includes('buckwheat')) {
-    colors = ['buckwheat', ...colors.slice(1)];
+  if (plan.lemon && plan.honey) {
+    // Interaction levels need BOTH target teas: sequential single-slot
+    // injection would evict the first, so inject both deterministically
+    // (buckwheat slot 0, sea_buckthorn slot 1, remaining palette order
+    // preserved) — reshuffles keep the same palette.
+    if (!colors.includes('sea_buckthorn') || !colors.includes('buckwheat')) {
+      const rest = colors.filter((c) => c !== 'sea_buckthorn' && c !== 'buckwheat');
+      colors = ['buckwheat', 'sea_buckthorn', ...rest].slice(0, numColors) as TeaId[];
+    }
+  } else {
+    if (floatingIngredient !== undefined && !colors.includes('sea_buckthorn')) {
+      colors = ['sea_buckthorn', ...colors.slice(1)];
+    }
+    if (sinkingIngredient !== undefined && !colors.includes('buckwheat')) {
+      colors = ['buckwheat', ...colors.slice(1)];
+    }
   }
-  if (plan.honey && plan.teapot) {
+  if (plan.lemon && plan.honey) {
+    phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if (plan.honey && plan.teapot) {
     phaseSubtitle = 'Чайник с мёдом • 6 сосудов';
   } else if (plan.honey) {
     phaseSubtitle =

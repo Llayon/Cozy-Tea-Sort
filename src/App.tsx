@@ -583,8 +583,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Lemon first-encounter onboarding (Level 34): compact, never blocking. */}
-      {currentConfig.floatingIngredient === 'lemon' && moves === 0 && !isWon && (
+      {/* Lemon first-encounter onboarding (Level 34): compact, never blocking.
+          Suppressed on lemon+honey interaction levels (58/62) — those use the
+          combined banner below. */}
+      {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient !== 'honey' && moves === 0 && !isWon && (
         <div
           id="lemon-tutorial-hint"
           className="shrink-0 px-3 py-1.5 bg-[#2E2410]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0DFA8] z-10 text-center"
@@ -605,14 +607,28 @@ export default function App() {
         </div>
       )}
 
-      {/* Sinking-honey first-encounter onboarding (Level 50): compact, never blocking. */}
-      {currentConfig.sinkingIngredient === 'honey' && moves === 0 && !isWon && (
+      {/* Sinking-honey first-encounter onboarding (Level 50): compact, never blocking.
+          Suppressed on lemon+honey interaction levels (58/62) — those use the
+          combined banner below. */}
+      {currentConfig.sinkingIngredient === 'honey' && currentConfig.floatingIngredient !== 'lemon' && moves === 0 && !isWon && (
         <div
           id="honey-tutorial-hint"
           className="shrink-0 px-3 py-1.5 bg-[#2E1F0E]/95 border-b border-[#7A5222] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F5D9A0] z-10 text-center"
         >
           <Coffee className="w-3.5 h-3.5 text-[#E8A83E] shrink-0" />
           <span>Мёд остаётся на дне. Он переедет только когда чашка опустеет. К концу оставь его под гречишным чаем.</span>
+        </div>
+      )}
+
+      {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
+          compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
+      {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
+        <div
+          id="lemon-honey-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2E2410]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0DFA8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8C85E] shrink-0" />
+          <span>Лимон уезжает сразу, мёд — только из пустеющей чашки. В финале лимон нужен облепиховому чаю, мёд — гречишному.</span>
         </div>
       )}
 
@@ -828,6 +844,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8A83E] font-bold">🍯</span>
                 <span>Мёд остаётся на дне и переезжает только с последним переливанием из опустевшего сосуда. В финале он должен быть под полным гречишным чаем.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8C85E] font-bold">🍋🍯</span>
+                <span>Если в сосуде встретились лимон и мёд, они всё равно двигаются по своим правилам: лимон уезжает с любым переливанием, а мёд остаётся на дне до полного опустошения сосуда.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>
