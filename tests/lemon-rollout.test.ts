@@ -70,8 +70,8 @@ describe('rollout 33–40 (Gauntlet 5 floating-lemon introduction)', () => {
         expect(cfg.colors).toContain('sea_buckthorn');
       }
     }
-    expect(mechanicPlanForLevel(34)).toEqual({ teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false });
-    expect(mechanicPlanForLevel(38)).toEqual({ teapot: true, targets: false, sink: false, tasting: false, lemon: true, strainer: false });
+    expect(mechanicPlanForLevel(34)).toEqual({ teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false });
+    expect(mechanicPlanForLevel(38)).toEqual({ teapot: true, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false });
   });
 
   it('level 34/35/38 subtitles match the specified product copy', () => {

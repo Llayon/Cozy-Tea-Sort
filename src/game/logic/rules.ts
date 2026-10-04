@@ -60,20 +60,26 @@ import {
   CupConstraint,
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientId,
+  FloatingIngredientSlot,
   PuzzleAction,
   PuzzleState,
   ReadonlyPuzzleState,
+  SINKING_INGREDIENT_TYPES,
+  SinkingIngredientId,
+  SinkingIngredientSlot,
   STANDARD_CUP_CAPACITY,
   TeaId,
   cupCapacity,
   cupConstraintSignature,
   emptyFloatingIngredients,
+  emptySinkingIngredients,
   emptyStrainerState,
   isPlaceStrainerAction,
   isReleaseStrainerAction,
   mustEndEmpty,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeSinkingIngredients,
   normalizeStrainerState,
 } from '../types';
 
@@ -89,6 +95,7 @@ export type PourRejectCode =
   | 'target-full'
   | 'target-source-only'
   | 'target-floating-occupied'
+  | 'target-sinking-occupied'
   | 'complete-to-empty'
   | 'color-mismatch'
   | 'strainer-needs-two-layers'
@@ -315,7 +322,13 @@ export function unstrainedPourCountState(
   if (slots[fromIdx] != null && slots[toIdx] != null) return 0;
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
-  return Math.min(topCountOf(source), cupCapacity(constraints?.[toIdx]) - target.length);
+  const m = Math.min(topCountOf(source), cupCapacity(constraints?.[toIdx]) - target.length);
+  if (m <= 0) return 0;
+  // Fail-closed like the state-aware truth: a honey move into an
+  // already honey-occupied destination is not a legal ordinary transfer.
+  const sink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
+  if (sink[fromIdx] != null && source.length - m === 0 && sink[toIdx] != null) return 0;
+  return m;
 }
 
 /**
@@ -345,6 +358,18 @@ export function pourRejectCodeState(
   const srcIng = slots[fromIdx];
   const dstIng = slots[toIdx];
   if (srcIng != null && dstIng != null) return 'target-floating-occupied';
+  // Honey moves ONLY with the final outflow that completely empties its
+  // host (source loses ALL m layers, strained or not). Such a move into
+  // an already honey-occupied destination is rejected fail-closed
+  // (`target-sinking-occupied`) rather than overwriting. Inflow into a
+  // honey vessel never displaces it (no rejection here — honey stays).
+  const sink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
+  if (sink[fromIdx] != null && sink[toIdx] != null) {
+    const src = state.cups[fromIdx] as TeaId[];
+    const dst = state.cups[toIdx] as TeaId[];
+    const m = Math.min(topCountOf(src), cupCapacity(constraints?.[toIdx]) - dst.length);
+    if (m > 0 && src.length - m === 0) return 'target-sinking-occupied';
+  }
   const s = normalizeStrainerState(state.strainer);
   if (!s.present) return 'ok';
   if (s.heldTea !== null && s.attachedCupIndex !== null) return 'strainer-loaded';
@@ -467,6 +492,22 @@ export function isConstructiveMoveState(
   // Strained catches change the partition AND external hold — never the
   // symmetry-only full-group relocation the legacy prune targets.
   if (isStrainedCatchSource(state, fromIdx)) return true;
+  // Honey audit (§30): a move that relocates honey is constructive UNLESS
+  // the COMPLETE canonical state is invariant (e.g. AAAA+honey into an
+  // empty identical normal cup merely swaps the whole decorated vessel
+  // between interchangeable cups). Never disable the legacy prune
+  // globally — compare keys for honey-moving pours only.
+  const sink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
+  if (sink[fromIdx] != null) {
+    const src = state.cups[fromIdx] as TeaId[];
+    const dst = state.cups[toIdx] as TeaId[];
+    const m = Math.min(topCountOf(src), cupCapacity(constraints?.[toIdx]) - dst.length);
+    if (m > 0 && src.length - m === 0) {
+      const after = applyPourState(state, fromIdx, toIdx, constraints);
+      if (!after) return false;
+      return canonicalPuzzleKey(state, constraints) !== canonicalPuzzleKey(after.state, constraints);
+    }
+  }
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
   if (
@@ -536,18 +577,25 @@ export interface PourStateResult {
   caughtTea?: TeaId;
   /** Ingredient that rode this pour, if any (for animation metadata). */
   floatingIngredientMoved?: FloatingIngredientId;
+  /** Sinking ingredient that moved with the emptying outflow, if any. */
+  sinkingIngredientMoved?: SinkingIngredientId;
 }
 
 /**
  * Atomic pure state transition (single truth): tea movement plus the
- * ingredient ride plus the catch-one tool update in ONE operation.
+ * floating ride, the sinking rule and the catch-one tool update in ONE
+ * operation.
  *
  * - Ordinary: source loses m, destination gains m.
  * - Strained (empty tool attached to source, m >= 2): source loses ALL m,
  *   destination gains m-1, tool catches exactly 1 of the same tea and
  *   returns to its stand LOADED (attached null, heldTea set).
+ * - Honey: the source's sinking ingredient moves to the destination IFF
+ *   this successful pour completely empties the source; outflows that
+ *   leave tea behind (and all inflow) leave honey untouched.
  * - Illegal pours (including would-be single-layer pours while attached,
- *   `strainer-needs-two-layers`) return null with NO mutation.
+ *   `strainer-needs-two-layers`, and `target-sinking-occupied`) return
+ *   null with NO mutation.
  */
 export function applyPourState(
   state: ReadonlyPuzzleState,
@@ -562,10 +610,14 @@ export function applyPourState(
   if (strained && m < 2) return null;
   const nextCups: TeaId[][] = state.cups.map((c) => [...c]);
   const nextSlots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  const nextSink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
   const nextStrainer = normalizeStrainerState(state.strainer);
   const source = nextCups[fromIdx] as TeaId[];
   const target = nextCups[toIdx] as TeaId[];
   const layer = topLayerOf(source) as TeaId;
+  const honey = nextSink[fromIdx] ?? null;
+  const emptiesSource = source.length - m === 0;
+  if (honey != null && emptiesSource && nextSink[toIdx] != null) return null;
   for (let i = 0; i < m; i++) source.pop();
   const received = strained ? m - 1 : m;
   for (let i = 0; i < received; i++) target.push(layer);
@@ -582,14 +634,21 @@ export function applyPourState(
     nextSlots[fromIdx] = null;
     floatingIngredientMoved = moved;
   }
+  let sinkingIngredientMoved: SinkingIngredientId | undefined;
+  if (honey != null && emptiesSource) {
+    nextSink[toIdx] = honey;
+    nextSink[fromIdx] = null;
+    sinkingIngredientMoved = honey;
+  }
   return {
-    state: { cups: nextCups, floatingIngredients: nextSlots, strainer: nextStrainer },
+    state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer },
     transferred: m,
     received,
     layer,
     strained,
     caughtTea,
     floatingIngredientMoved,
+    sinkingIngredientMoved,
   };
 }
 
@@ -651,6 +710,7 @@ export function applyPlaceStrainerState(
   return {
     cups: state.cups.map((c) => [...c]),
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+    sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length),
     strainer: { present: true, attachedCupIndex: toIdx, heldTea: null },
   };
 }
@@ -700,6 +760,7 @@ export function applyReleaseStrainerState(
     state: {
       cups: nextCups,
       floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+      sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length),
       strainer: { present: true, attachedCupIndex: null, heldTea: null },
     },
     layer: held,
@@ -792,6 +853,7 @@ export interface ApplyPuzzleActionResult {
   strained?: boolean;
   caughtTea?: TeaId;
   floatingIngredientMoved?: FloatingIngredientId;
+  sinkingIngredientMoved?: SinkingIngredientId;
 }
 
 export function applyPuzzleActionState(
@@ -819,6 +881,7 @@ export function applyPuzzleActionState(
     strained: res.strained,
     caughtTea: res.caughtTea,
     floatingIngredientMoved: res.floatingIngredientMoved,
+    sinkingIngredientMoved: res.sinkingIngredientMoved,
   };
 }
 
@@ -923,10 +986,56 @@ export function floatingIngredientGoalsSatisfied(
 }
 
 /**
+ * Honey final-host rule, fail-closed (Gauntlet 7 §4): the host must be a
+ * plain standard normal vessel (no target, standard capacity, no
+ * must-end-empty) holding exactly full homogeneous buckwheat. Teapots,
+ * sinks, tasting bowls, named targets, partial/mixed/empty cups and wrong
+ * teas all fail — as do unknown future sinking ids and duplicates.
+ */
+export function sinkingIngredientHostSatisfied(
+  id: SinkingIngredientId,
+  layers: TeaId[],
+  c: CupConstraint | undefined,
+): boolean {
+  const known = (SINKING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[id];
+  if (!known) return false;
+  if (!c || c.mode !== 'normal') return false;
+  if (c.targetTeaId !== undefined) return false;
+  if (cupCapacity(c) !== STANDARD_CUP_CAPACITY) return false;
+  if (mustEndEmpty(c)) return false;
+  if (layers.length !== STANDARD_CUP_CAPACITY) return false;
+  if (!isHomogeneous(layers)) return false;
+  return layers[0] === known.targetTeaId;
+}
+
+/**
+ * Sinking-ingredient victory goals: no-honey boards pass; otherwise the
+ * single present honey must sit under a satisfying host, with no
+ * duplicates and no unknown ids. Malformed states fail closed.
+ */
+export function sinkingIngredientGoalsSatisfied(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  const slots = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
+  const present = slots.filter((s): s is SinkingIngredientId => s != null);
+  if (new Set(present).size !== present.length) return false;
+  for (let i = 0; i < slots.length; i++) {
+    const id = slots[i];
+    if (id == null) continue;
+    if (!sinkingIngredientHostSatisfied(id, state.cups[i] as TeaId[], constraints?.[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Canonical puzzle win: tea sorted AND every floating ingredient on its
  * correct completed tea AND the strainer holding nothing (a caught layer
- * outside the vessels means tea counts are incomplete). An attached-but-
- * empty tool may be anywhere at victory.
+ * outside the vessels means tea counts are incomplete) AND every sinking
+ * ingredient under its correct completed tea. An attached-but-empty tool
+ * may be anywhere at victory.
  */
 export function isPuzzleWonState(
   state: ReadonlyPuzzleState,
@@ -934,6 +1043,7 @@ export function isPuzzleWonState(
 ): boolean {
   if (!teaWonState(state.cups, constraints)) return false;
   if (!floatingIngredientGoalsSatisfied(state, constraints)) return false;
+  if (!sinkingIngredientGoalsSatisfied(state, constraints)) return false;
   const s = normalizeStrainerState(state.strainer);
   if (s.present && s.heldTea !== null) return false;
   return true;
@@ -1039,8 +1149,11 @@ export function canonicalKey(
  * - Loaded tool (heldTea, always on stand by invariant) → base +
  *   `||STR:STAND:HOLD:<tea>`. Malformed loaded+attached states encode both
  *   markers fail-closed (production validation rejects them).
+ *
+ * Honey-free boards take this path verbatim (G6 byte-identity); honey
+ * boards use `canonicalPuzzleKeyHoney` below.
  */
-export function canonicalPuzzleKey(
+export function canonicalPuzzleKeyNoHoney(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
 ): string {
@@ -1096,4 +1209,81 @@ export function canonicalPuzzleKey(
       return `${sig}:${arr.join('|')}`;
     })
     .join('||');
+}
+
+/**
+ * Honey-aware canonical key (Gauntlet 7 §32): the sinking marker joins the
+ * CUP CONTENT encoding (`contents#…#sink:honey`), so it travels WITH the
+ * tea as one unit and sorts inside the same vessel-signature group —
+ * swapping interchangeable vessels (contents + honey together) stays
+ * canonical, while genuinely different placements key differently. Legacy
+ * `#sink:` segments never appear in pre-G7 keys, so honey states can never
+ * collide with honey-free ones; honey+lemon malformed combos compose
+ * deterministically. Strainer suffixes match the honey-free shapes.
+ */
+function groupedHoneyKey(
+  state: ReadonlyPuzzleState,
+  slots: FloatingIngredientSlot[],
+  sinkSlots: SinkingIngredientSlot[],
+  hasLemon: boolean,
+  toolMarkerAt: (idx: number) => string | null,
+  constraints?: readonly CupConstraint[],
+): string {
+  const normalized = normalizeCupConstraints(constraints, state.cups.length);
+  const groups = new Map<string, string[]>();
+  state.cups.forEach((cup, idx) => {
+    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const lemonMarker = slots[idx] ?? '_';
+    const sinkMarker = sinkSlots[idx] ?? '_';
+    let enc = hasLemon ? `${cup.join(',')}#${lemonMarker}` : cup.join(',');
+    const tool = toolMarkerAt(idx);
+    if (tool !== null) enc += `#${tool}`;
+    enc += `#sink:${sinkMarker}`;
+    const arr = groups.get(sig);
+    if (arr) arr.push(enc);
+    else groups.set(sig, [enc]);
+  });
+  const orderedSigs = [...groups.keys()].sort();
+  return orderedSigs
+    .map((sig) => {
+      const arr = groups.get(sig) as string[];
+      arr.sort();
+      return `${sig}:${arr.join('|')}`;
+    })
+    .join('||');
+}
+
+export function canonicalPuzzleKey(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): string {
+  const sinkSlots = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
+  if (!sinkSlots.some((s) => s != null)) {
+    return canonicalPuzzleKeyNoHoney(state, constraints);
+  }
+  const strainer = normalizeStrainerState(state.strainer);
+  const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+  const hasLemon = slots.some((s) => s != null);
+  const noTool = (_idx: number): string | null => null;
+  if (!strainer.present) {
+    return groupedHoneyKey(state, slots, sinkSlots, hasLemon, noTool, constraints);
+  }
+  if (strainer.heldTea !== null) {
+    const base = groupedHoneyKey(state, slots, sinkSlots, hasLemon, noTool, constraints);
+    const host =
+      strainer.attachedCupIndex === null ? 'STAND' : `CUP:${strainer.attachedCupIndex}`;
+    return `${base}||STR:${host}:HOLD:${strainer.heldTea}`;
+  }
+  if (strainer.attachedCupIndex === null) {
+    const base = groupedHoneyKey(state, slots, sinkSlots, hasLemon, noTool, constraints);
+    return `${base}||STR:STAND:EMPTY`;
+  }
+  return groupedHoneyKey(
+    state,
+    slots,
+    sinkSlots,
+    hasLemon,
+    (idx) => (strainer.attachedCupIndex === idx ? 'STR' : '_'),
+    constraints,
+  );
 }
