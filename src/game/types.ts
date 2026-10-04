@@ -216,14 +216,52 @@ export function isReleaseStrainerAction(
 }
 
 /**
+ * Sinking ingredients (Gauntlet 7 — «Мёд на дне»): dynamic puzzle objects
+ * that sink to the vessel bottom. They are NOT tea — they never
+ * participate in topCountOf, tea quantities, color matching, cup capacity
+ * or the TeaId pool, and they never ride partial outflows. Gauntlet 7
+ * ships exactly one (`honey`), destined for full homogeneous buckwheat.
+ *
+ * Contrast with floating ingredients (lemon): lemon rides ANY successful
+ * outflow immediately; honey stays while tea remains and moves ONLY with
+ * the final outflow that completely empties its host.
+ */
+export type SinkingIngredientId = 'honey';
+
+export interface SinkingIngredientType {
+  id: SinkingIngredientId;
+  nameRu: string;
+  /** Tea the ingredient must finish under (full homogeneous standard cup). */
+  targetTeaId: TeaId;
+}
+
+export const SINKING_INGREDIENT_TYPES = {
+  honey: {
+    id: 'honey',
+    nameRu: 'Мёд',
+    targetTeaId: 'buckwheat',
+  },
+} satisfies Record<SinkingIngredientId, SinkingIngredientType>;
+
+/**
+ * Per-vessel sinking-ingredient slot: the ingredient id sunk in that
+ * vessel, or null. This aligned array is the ONE authoritative
+ * honey-location representation — never a second mutable cupIndex stored
+ * on an ingredient object somewhere else.
+ */
+export type SinkingIngredientSlot = SinkingIngredientId | null;
+
+/**
  * Full dynamic puzzle state: tea layers plus independent floating-object
- * positions plus the movable strainer tool. Immutable level data
- * (CupConstraint[], ingredient TYPE metadata, Mystery definition,
- * difficulty) lives elsewhere; hiddenCounts stay presentation-only.
+ * positions, sinking-object positions, plus the movable strainer tool.
+ * Immutable level data (CupConstraint[], ingredient TYPE metadata, Mystery
+ * definition, difficulty) lives elsewhere; hiddenCounts stay
+ * presentation-only.
  */
 export interface PuzzleState {
   cups: TeaId[][];
   floatingIngredients: FloatingIngredientSlot[];
+  sinkingIngredients: SinkingIngredientSlot[];
   strainer: StrainerState;
 }
 
@@ -231,11 +269,13 @@ export interface PuzzleState {
  * Read-only view of puzzle state accepted by every state-aware rule,
  * solver and generator helper (callers may hold mutable or readonly
  * arrays; legacy tea-only arrays are never accepted here — normalize
- * first). `strainer` optional for legacy callers (absent = no tool).
+ * first). `strainer`/`sinkingIngredients` optional for legacy callers
+ * (absent = no tool / no honey).
  */
 export interface ReadonlyPuzzleState {
   cups: readonly TeaId[][];
   floatingIngredients: readonly FloatingIngredientSlot[] | undefined;
+  sinkingIngredients?: readonly SinkingIngredientSlot[] | undefined;
   strainer?: ReadonlyStrainerState | undefined;
 }
 
@@ -293,14 +333,52 @@ export function cloneStrainerState(s: ReadonlyStrainerState): StrainerState {
   return { present: s.present, attachedCupIndex: s.attachedCupIndex ?? null, heldTea: s.heldTea ?? null };
 }
 
+/** All-null sinking slots for a vessel count (ordinary old levels). */
+export function emptySinkingIngredients(count: number): SinkingIngredientSlot[] {
+  return Array.from({ length: count }, () => null);
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers without honey
+ * synthesize all-null slots. Wrong-length arrays are padded/truncated
+ * defensively (production validation rejects them).
+ */
+export function normalizeSinkingIngredients(
+  slots: readonly SinkingIngredientSlot[] | undefined,
+  count: number,
+): SinkingIngredientSlot[] {
+  if (!slots) return emptySinkingIngredients(count);
+  const out: SinkingIngredientSlot[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(slots[i] ?? null);
+  }
+  return out;
+}
+
 /** Defensive deep copy of a puzzle state (no shared arrays). */
 export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
   const cups = (state.cups as TeaId[][]).map((c) => [...c]);
   return {
     cups,
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, cups.length),
+    sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, cups.length),
     strainer: normalizeStrainerState(state.strainer),
   };
+}
+
+/** Vessel index hosting a sinking ingredient id, or -1 when absent. */
+export function sinkingIngredientIndex(
+  state: { sinkingIngredients: readonly SinkingIngredientSlot[] | undefined },
+  id: SinkingIngredientId,
+): number {
+  return (state.sinkingIngredients ?? []).findIndex((s) => s === id);
+}
+
+/** Total sinking ingredients present in a state. */
+export function countSinkingIngredients(state: {
+  sinkingIngredients: readonly SinkingIngredientSlot[] | undefined;
+}): number {
+  return (state.sinkingIngredients ?? []).filter((s) => s !== null).length;
 }
 
 /** Vessel index hosting an ingredient id, or -1 when absent. */

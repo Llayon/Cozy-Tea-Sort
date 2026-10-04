@@ -5,7 +5,7 @@
  */
 
 export type { TeaId, CupSkinId, TeaType } from '../game/types';
-import type { CupSkinId, FloatingIngredientId, TeaId } from '../game/types';
+import type { CupSkinId, FloatingIngredientId, SinkingIngredientId, TeaId } from '../game/types';
 
 export interface CupSkin {
   id: CupSkinId;
@@ -68,6 +68,13 @@ export interface LevelConfig {
    * (new topology, new host) but never advances progression.
    */
   floatingIngredient?: FloatingIngredientId;
+  /**
+   * Sinking ingredient active on this level (Gauntlet 7 — «Мёд на дне»).
+   * `undefined` = classic level. Deterministic per level: reshuffling
+   * keeps the honey (new topology, new host) but never advances
+   * progression.
+   */
+  sinkingIngredient?: SinkingIngredientId;
   /**
    * Named-serving destinations for this level (Gauntlet 2). Empty = none.
    * Deterministic per level: reshuffling keeps the same serving goals.

@@ -361,6 +361,7 @@ describe('H. win requires an empty hold', () => {
       const st: PuzzleState = {
         cups: won.map((c) => [...c]),
         floatingIngredients: noIng(3),
+        sinkingIngredients: [null, null, null],
         strainer: { present: true, attachedCupIndex: host, heldTea: null },
       };
       expect(isPuzzleWonState(st)).toBe(true);

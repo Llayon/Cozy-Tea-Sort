@@ -16,12 +16,14 @@ import {
   FloatingIngredientSlot,
   PuzzleState,
   ReadonlyPuzzleState,
+  SinkingIngredientSlot,
   SolverAction,
   TeaId,
   isPlaceStrainerAction,
   isReleaseStrainerAction,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeSinkingIngredients,
   normalizeStrainerState,
 } from '../types';
 import {
@@ -62,6 +64,7 @@ export interface SolverOptions {
   returnSolution?: boolean;
   cupConstraints?: readonly CupConstraint[];
   floatingIngredients?: readonly FloatingIngredientSlot[];
+  sinkingIngredients?: readonly SinkingIngredientSlot[];
   strainer?: { present: boolean; attachedCupIndex: number | null; heldTea: TeaId | null };
 }
 
@@ -79,6 +82,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
   const start: PuzzleState = {
     cups: cups.map((c) => [...c]),
     floatingIngredients: normalizeFloatingIngredients(opts.floatingIngredients, cups.length),
+    sinkingIngredients: normalizeSinkingIngredients(opts.sinkingIngredients, cups.length),
     strainer: normalizeStrainerState(opts.strainer),
   };
 
@@ -218,6 +222,7 @@ export function applySolutionState(
   let board: PuzzleState = {
     cups: state.cups.map((c) => [...c]),
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
+    sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length),
     strainer: normalizeStrainerState(state.strainer),
   };
   for (const step of solution) {
