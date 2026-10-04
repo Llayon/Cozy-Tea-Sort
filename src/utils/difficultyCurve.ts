@@ -58,9 +58,10 @@ interface MechanicPlan {
   tasting: boolean;
   lemon: boolean;
   strainer: boolean;
+  honey: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -158,9 +159,27 @@ const PINNED_ROLLOUT_41_48: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–48, then a deterministic
+ * Pinned rollout 49–56 (Gauntlet 7 — sinking honey «Мёд на дне»):
+ * 49 warmup clean · 50 challenge HONEY · 51 peak HONEY+mystery ·
+ * 52 relax clean · 53 warmup clean · 54 challenge TEAPOT+HONEY ·
+ * 55 peak STRAINER+mystery (familiar mechanic) · 56 relax clean.
+ */
+const PINNED_ROLLOUT_49_56: Record<number, MechanicPlan> = {
+  49: { ...CLEAN },
+  50: { ...CLEAN, honey: true },
+  51: { ...CLEAN, honey: true },
+  52: { ...CLEAN },
+  53: { ...CLEAN },
+  54: { ...CLEAN, teapot: true, honey: true },
+  55: { ...CLEAN, strainer: true },
+  56: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–56, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
- * combos, never strainer + lemon / sink / tasting / targets, never lemon +
+ * combos, never honey + lemon / strainer / sink / tasting / targets,
+ * never strainer + lemon / sink / tasting / targets, never lemon +
  * sink / lemon + tasting / lemon + targets / sink + targets /
  * tasting + sink / tasting + targets, never three specials together).
  */
@@ -168,38 +187,41 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
     PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ??
     PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum] ??
-    PINNED_ROLLOUT_41_48[levelNum];
+    PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // challenge (no mystery): strainer → teapot+strainer → lemon →
-    // teapot+lemon → tasting → teapot+tasting → sink → teapot+sink →
-    // targets → teapot+targets.
-    switch (cycleNumber % 10) {
-      case 0: return { ...CLEAN, strainer: true };
-      case 1: return { ...CLEAN, teapot: true, strainer: true };
-      case 2: return { ...CLEAN, lemon: true };
-      case 3: return { ...CLEAN, teapot: true, lemon: true };
-      case 4: return { ...CLEAN, tasting: true };
-      case 5: return { ...CLEAN, teapot: true, tasting: true };
-      case 6: return { ...CLEAN, sink: true };
-      case 7: return { ...CLEAN, teapot: true, sink: true };
-      case 8: return { ...CLEAN, targets: true };
+    // challenge (no mystery): honey → teapot+honey → strainer →
+    // teapot+strainer → lemon → teapot+lemon → tasting → teapot+tasting →
+    // sink → teapot+sink → targets → teapot+targets.
+    switch (cycleNumber % 12) {
+      case 0: return { ...CLEAN, honey: true };
+      case 1: return { ...CLEAN, teapot: true, honey: true };
+      case 2: return { ...CLEAN, strainer: true };
+      case 3: return { ...CLEAN, teapot: true, strainer: true };
+      case 4: return { ...CLEAN, lemon: true };
+      case 5: return { ...CLEAN, teapot: true, lemon: true };
+      case 6: return { ...CLEAN, tasting: true };
+      case 7: return { ...CLEAN, teapot: true, tasting: true };
+      case 8: return { ...CLEAN, sink: true };
+      case 9: return { ...CLEAN, teapot: true, sink: true };
+      case 10: return { ...CLEAN, targets: true };
       default: return { ...CLEAN, teapot: true, targets: true };
     }
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
-  // strainer+mystery → lemon+mystery → tasting+mystery → sink+mystery →
-  // targets+mystery → teapot+mystery → mystery-only.
-  switch (cycleNumber % 7) {
-    case 0: return { ...CLEAN, strainer: true };
-    case 1: return { ...CLEAN, lemon: true };
-    case 2: return { ...CLEAN, tasting: true };
-    case 3: return { ...CLEAN, sink: true };
-    case 4: return { ...CLEAN, targets: true };
-    case 5: return { ...CLEAN, teapot: true };
+  // honey+mystery → strainer+mystery → lemon+mystery → tasting+mystery →
+  // sink+mystery → targets+mystery → teapot+mystery → mystery-only.
+  switch (cycleNumber % 8) {
+    case 0: return { ...CLEAN, honey: true };
+    case 1: return { ...CLEAN, strainer: true };
+    case 2: return { ...CLEAN, lemon: true };
+    case 3: return { ...CLEAN, tasting: true };
+    case 4: return { ...CLEAN, sink: true };
+    case 5: return { ...CLEAN, targets: true };
+    case 6: return { ...CLEAN, teapot: true };
     default: return { ...CLEAN };
   }
 }
@@ -318,7 +340,18 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   if (floatingIngredient !== undefined && !colors.includes('sea_buckthorn')) {
     colors = ['sea_buckthorn', ...colors.slice(1)];
   }
-  if (plan.strainer && plan.teapot) {
+  // Honey levels require buckwheat in the active palette (validated loudly
+  // at generation). Same deterministic slot-0 injection as lemon.
+  const sinkingIngredient = plan.honey ? ('honey' as const) : undefined;
+  if (sinkingIngredient !== undefined && !colors.includes('buckwheat')) {
+    colors = ['buckwheat', ...colors.slice(1)];
+  }
+  if (plan.honey && plan.teapot) {
+    phaseSubtitle = 'Чайник с мёдом • 6 сосудов';
+  } else if (plan.honey) {
+    phaseSubtitle =
+      phase === 'challenge' ? 'Мёд на дне • 6 сосудов' : 'Мёд и таинственный настой • 7 сосудов';
+  } else if (plan.strainer && plan.teapot) {
     phaseSubtitle = 'Чайник и ситечко • 5 сосудов';
   } else if (plan.strainer) {
     phaseSubtitle =
@@ -381,6 +414,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasTastingBowl,
     hasStrainer,
     floatingIngredient,
+    sinkingIngredient,
     targetTeaIds,
     rewardRecipeId,
     rewardSkinId,

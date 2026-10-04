@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CupConstraint, FloatingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeStrainerState } from './game/types';
+import { CupConstraint, FloatingIngredientSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeSinkingIngredients, normalizeStrainerState } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { isWonState } from './game/logic/rules';
 import { TeaSortView } from './game/view/TeaSortView';
@@ -51,6 +51,7 @@ interface LevelBackupState {
   cupConstraints: CupConstraint[];
   floatingIngredients: FloatingIngredientSlot[];
   strainer: StrainerState;
+  sinkingIngredients: SinkingIngredientSlot[];
 }
 
 export default function App() {
@@ -116,7 +117,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null } });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [] });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -139,6 +140,7 @@ export default function App() {
         tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
         floatingIngredient: cfg.floatingIngredient,
         hasStrainer: cfg.hasStrainer,
+        sinkingIngredient: cfg.sinkingIngredient,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -152,6 +154,7 @@ export default function App() {
       cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
       floatingIngredients: [...generated.floatingIngredients],
       strainer: normalizeStrainerState(generated.strainer),
+      sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
     };
 
     return new TeaSortLogic(
@@ -160,6 +163,7 @@ export default function App() {
       generated.cupConstraints,
       generated.floatingIngredients,
       normalizeStrainerState(generated.strainer),
+      normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
     );
   };
 
@@ -224,6 +228,7 @@ export default function App() {
         tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
         floatingIngredient: cfg.floatingIngredient,
         hasStrainer: cfg.hasStrainer,
+        sinkingIngredient: cfg.sinkingIngredient,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -237,6 +242,7 @@ export default function App() {
       cupConstraints: generated.cupConstraints.map(cloneCupConstraint),
       floatingIngredients: [...generated.floatingIngredients],
       strainer: normalizeStrainerState(generated.strainer),
+      sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
     };
 
     const logic = new TeaSortLogic(
@@ -245,6 +251,7 @@ export default function App() {
       generated.cupConstraints,
       generated.floatingIngredients,
       normalizeStrainerState(generated.strainer),
+      normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
     );
     logicRef.current = logic;
 
@@ -382,8 +389,9 @@ export default function App() {
     const restoredConstraints = (backup.cupConstraints ?? []).map(cloneCupConstraint);
     const restoredSlots = [...(backup.floatingIngredients ?? [])];
     const restoredStrainer = normalizeStrainerState(backup.strainer);
+    const restoredSinking = normalizeSinkingIngredients(backup.sinkingIngredients, restoredCups.length);
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -597,6 +605,17 @@ export default function App() {
         </div>
       )}
 
+      {/* Sinking-honey first-encounter onboarding (Level 50): compact, never blocking. */}
+      {currentConfig.sinkingIngredient === 'honey' && moves === 0 && !isWon && (
+        <div
+          id="honey-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2E1F0E]/95 border-b border-[#7A5222] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F5D9A0] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8A83E] shrink-0" />
+          <span>Мёд остаётся на дне. Он переедет только когда чашка опустеет. К концу оставь его под гречишным чаем.</span>
+        </div>
+      )}
+
       {/* Named-serving first-encounter onboarding (Level 10): compact, never blocking. */}
       {currentConfig.targetTeaIds.length > 0 && moves === 0 && !isWon && (
         <div
@@ -805,6 +824,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#8AC9D4] font-bold">🥄</span>
                 <span>Перестановка пустого ситечка не считается ходом.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8A83E] font-bold">🍯</span>
+                <span>Мёд остаётся на дне и переезжает только с последним переливанием из опустевшего сосуда. В финале он должен быть под полным гречишным чаем.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

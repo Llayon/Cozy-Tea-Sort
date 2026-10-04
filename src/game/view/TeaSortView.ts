@@ -18,6 +18,7 @@ import {
   CupSkinId,
   FloatingIngredientId,
   FloatingIngredientSlot,
+  SinkingIngredientSlot,
   TEA_TYPES,
   TeaId,
   cloneCupConstraint,
@@ -30,6 +31,7 @@ import {
   floatingIngredientHostSatisfied,
   isCompleteCup,
   pourRejectCodeState,
+  sinkingIngredientHostSatisfied,
   targetCupState,
 } from '../logic/rules';
 import type {
@@ -326,6 +328,94 @@ export function drawLemonSlice(g: Graphics, cx: number, cy: number, r = LEMON_SL
   g.ellipse(cx - r * 0.3, cy - r * 0.38, 2.2, 1.3).fill({ color: 0xffffff, alpha: 0.55 });
 }
 
+/**
+ * Sinking honey «Мёд на дне» (Gauntlet 7 §79-91): ONE shared bottom
+ * anchor used by BOTH static rendering and transit landing — never two
+ * offset truths. Pure, headless-testable, no Pixi.
+ *
+ * - Standard cups: near the glass base (`height - 6 - 10`), i.e. below
+ *   the tea column but above the base shade, so the blob reads through
+ *   tea without hiding tea identity.
+ * - Teapot (source-only): belly anchor derived from the ACTUAL teapot
+ *   geometry in `CupView.drawTeapotFrame` (`bellyR = min(24, cornerR+4)`
+ *   with `cornerR = 18`), never a hardcoded standard y — the wider
+ *   belly sits slightly differently so honey rests in the lower belly.
+ * - Tasting bowl: shallow-body anchor above its foot, same cell.
+ * Goal semantics stay in `rules.ts` (`sinkingIngredientHostSatisfied`) —
+ * the View only calls it for the halo, never reimplements it.
+ */
+export const HONEY_BLOB_W = 34;
+export const HONEY_BLOB_H = 13;
+export const HONEY_DROP_R = 5;
+/** Sink leg duration (spec §82: short ~180-260ms sink). */
+export const HONEY_SINK_MS = 220;
+/** Arc leg duration (short amber arc to the rim before sinking). */
+export const HONEY_ARC_MS = 300;
+
+export function honeyBottomLocalY(constraint: CupConstraint, height = 142): number {
+  if (constraint.mode === 'source-only') {
+    // Mirrors CupView.drawTeapotFrame: bellyR = min(24, cornerRadius + 4).
+    const bellyR = Math.min(24, 18 + 4);
+    return height - bellyR + 2;
+  }
+  if (isTastingCupConstraint(constraint)) {
+    return height - 14;
+  }
+  return height - 6 - 10;
+}
+
+export function honeyBottomLocalPoint(
+  constraint: CupConstraint,
+  width: number,
+  height = 142,
+): { x: number; y: number } {
+  return { x: width / 2, y: honeyBottomLocalY(constraint, height) };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const honeyBottomLocalYN = honeyBottomLocalY;
+export const getHoneyBottomLocalY = honeyBottomLocalY;
+export const getHoneyBottomLocalPoint = honeyBottomLocalPoint;
+export const honeyBottomPoint = honeyBottomLocalPoint;
+
+/**
+ * Procedural warm-amber translucent blob (Gauntlet 7 §80): soft organic
+ * ellipse + glossy highlight + subtle outline. Translucent so the tea
+ * color underneath stays readable — honey tints, never hides. No red,
+ * no checkmark, no text.
+ */
+export function drawHoneyBlob(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  w = HONEY_BLOB_W,
+  h = HONEY_BLOB_H,
+): void {
+  // Soft organic body: main ellipse + smaller side lobe.
+  g.ellipse(cx, cy, w / 2, h / 2).fill({ color: 0xd9962b, alpha: 0.55 });
+  g.ellipse(cx + w * 0.18, cy + h * 0.12, w * 0.16, h * 0.22).fill({
+    color: 0xe8a93c,
+    alpha: 0.45,
+  });
+  g.ellipse(cx, cy, w / 2, h / 2).stroke({ width: 1.4, color: 0xa86a1a, alpha: 0.65 });
+  // Glossy highlight (upper-left, cozy illustrated language).
+  g.ellipse(cx - w * 0.18, cy - h * 0.22, w * 0.2, h * 0.16).fill({
+    color: 0xffffff,
+    alpha: 0.38,
+  });
+}
+
+/**
+ * In-flight amber drop (Gauntlet 7 §82): ONE small bead for the pour-arc
+ * + sink. Same warm-amber family as the static blob, never lemon-yellow
+ * (lemon rides the surface with rind/segments; honey is a bottom bead).
+ */
+export function drawHoneyDrop(g: Graphics, cx: number, cy: number, r = HONEY_DROP_R): void {
+  g.circle(cx, cy, r).fill({ color: 0xd9962b, alpha: 0.92 });
+  g.circle(cx, cy, r).stroke({ width: 1.1, color: 0xa86a1a, alpha: 0.8 });
+  g.circle(cx - 1, cy - 1.1, 1.2).fill({ color: 0xffffff, alpha: 0.6 });
+}
+
 /** Mini brass mesh basket radius for the attached-over-rim marker. */
 export const STRAINER_ATTACHED_R = 9;
 /** Stand basket radius (clearly a tool, never a cup). */
@@ -465,6 +555,15 @@ export class CupView {
    * parallel view state.
    */
   lemonGraphics: Graphics;
+  /**
+   * Sinking-honey layer (Gauntlet 7 §80): warm-amber translucent blob at
+   * the vessel bottom. Positioned at the bottom (below the tea column,
+   * above the base shade) and layered above the liquid with translucency
+   * so tea identity reads through — honey tints, never hides. Driven
+   * solely by `Cup.sinkingIngredient` + `suppressHoneyTransit` — no
+   * view-owned honey index/boolean.
+   */
+  honeyGraphics: Graphics;
   glassOverlay: Graphics;
   glowGraphics: Graphics;
   /**
@@ -473,6 +572,13 @@ export class CupView {
    * never show simultaneously. Owned by the pour flow, cleared on land.
    */
   suppressLemonTransit = false;
+  /**
+   * Honey transit suppression (Gauntlet 7 §82, lemon mirror): while the
+   * amber drop is flying, the destination static blob stays hidden (and
+   * the emptied source stays empty) so two honeys never show. Owned by
+   * the pour flow, cleared on landing / reset / undo / failure refresh.
+   */
+  suppressHoneyTransit = false;
   /**
    * Target-motif layer (gold medallion), above liquid so the destination
    * stays readable even when the cup holds another tea. Separate graphics
@@ -605,6 +711,59 @@ export class CupView {
   }
 
   /**
+   * Honey bottom anchor in container-local coords (Gauntlet 7 §79): the
+   * ONE shared anchor used by BOTH static rendering and transit landing.
+   * Delegates to the pure `honeyBottomLocalPoint` helper — never a second
+   * offset truth.
+   */
+  honeyLocalPoint(): { x: number; y: number } {
+    return honeyBottomLocalPoint(this.constraint, this.width, this.height);
+  }
+
+  /**
+   * Honey bottom anchor in stage space (Gauntlet 7 §82): the ACTUAL
+   * transformed bottom — local bottom point rotated by the live body tilt
+   * around the body pivot, shifted by live lift, scaled and placed at the
+   * container position (same convention as `surfaceStagePoint`/lemon
+   * transit, shake ignored). A tilted pouring source therefore launches
+   * the drop from where its bottom really is, never the rest pose.
+   */
+  honeyStagePoint(): { x: number; y: number } {
+    const pivot = this.cupBodyContainer.pivot;
+    const local = this.honeyLocalPoint();
+    const r = rotatePoint2D(
+      local.x - pivot.x,
+      local.y - pivot.y,
+      this.cupBodyContainer.rotation,
+    );
+    return {
+      x: this.container.x + (this.width / 2 + r.x) * this.scale,
+      y: this.container.y + (pivot.y + this.currentLift + r.y) * this.scale,
+    };
+  }
+
+  /**
+   * Destination rim anchor in stage space (transform-aware like the honey
+   * bottom anchor): the mouth the amber drop falls through before sinking.
+   * Uses the vessel's ACTUAL rim (`rimLocalY`), so tasting bowls receive
+   * at their own shallow rim.
+   */
+  honeyRimStagePoint(): { x: number; y: number } {
+    const pivot = this.cupBodyContainer.pivot;
+    const localX = this.width / 2;
+    const localY = this.rimLocalY + 8;
+    const r = rotatePoint2D(
+      localX - pivot.x,
+      localY - pivot.y,
+      this.cupBodyContainer.rotation,
+    );
+    return {
+      x: this.container.x + (this.width / 2 + r.x) * this.scale,
+      y: this.container.y + (pivot.y + this.currentLift + r.y) * this.scale,
+    };
+  }
+
+  /**
    * Attached empty-tool marker (Gauntlet 6 §35): tiny brass mesh hovering
    * over the host rim. `true` draws, `false` clears. No tea color, no
    * Mystery cover — the mesh floats above the rim, liquid stays visible.
@@ -663,6 +822,13 @@ export class CupView {
     this.cupBodyContainer.addChild(this.liquidMask);
     this.liquidContainer.mask = this.liquidMask;
     this.cupBodyContainer.addChild(this.liquidContainer);
+
+    // Honey sits at the bottom (below the tea column, above the base
+    // shade) but renders translucently ABOVE the liquid so it reads
+    // through tea without hiding tea color; glass highlights + lemon
+    // (surface) + target motif stay above it for readability.
+    this.honeyGraphics = new Graphics();
+    this.cupBodyContainer.addChild(this.honeyGraphics);
 
     this.glassOverlay = new Graphics();
     this.cupBodyContainer.addChild(this.glassOverlay);
@@ -1178,10 +1344,36 @@ export class CupView {
     drawLemonSlice(g, cx, cy, LEMON_SLICE_R);
   }
 
+  /**
+   * Sinking honey (Gauntlet 7 §80-81): drawn from the authoritative
+   * `Cup.sinkingIngredient` at the ONE shared bottom anchor
+   * (`honeyLocalPoint`, never a second offset truth). The blob stays at
+   * the bottom during partial outflows (fixed anchor, no flicker) and
+   * stays hidden while its drop transit is flying. A correctly served
+   * honey (full homogeneous buckwheat per `sinkingIngredientHostSatisfied`
+   * — View only calls it, never reimplements goal logic) gets a very
+   * subtle warm halo, never red, never checkmark.
+   */
+  renderHoney(cup: Cup) {
+    const g = this.honeyGraphics;
+    g.clear();
+    // No-honey fast path: empty vessels (and suppressed flights) leave an
+    // empty layer, so honey-free levels render byte-identical to before.
+    if (this.suppressHoneyTransit) return;
+    const ing = cup.sinkingIngredient;
+    if (ing == null || ing !== 'honey') return;
+    const p = this.honeyLocalPoint();
+    if (sinkingIngredientHostSatisfied(ing, cup.layers, cup.constraint)) {
+      g.circle(p.x, p.y, 13).fill({ color: 0xffe9a8, alpha: 0.26 });
+    }
+    drawHoneyBlob(g, p.x, p.y);
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
     this.renderTargetMotif(cup);
     this.renderLemon(cup);
+    this.renderHoney(cup);
     // Sink glow lives in glowGraphics (behind the liquid, like the
     // selection ring); re-apply it on every liquid redraw unless a
     // selection ring is active (setSelection owns the layer then).
@@ -1427,6 +1619,28 @@ export class TeaSortView {
     durMs: number;
   } | null = null;
 
+  /** In-flight honey drop layer (Gauntlet 7 §82, existing ticker only). */
+  honeyTransitGraphics = new Graphics();
+  /**
+   * Active honey transit (Gauntlet 7 §82): exactly ONE amber drop, drawn
+   * by the EXISTING ticker loop (no second ticker). Two short legs share
+   * this slot: arc (tilted source bottom → dest rim) then sink (rim →
+   * shared bottom anchor). Stage-space; straight sink uses a midpoint
+   * ctrl (no lift), arc uses a lifted ctrl. Reads ONLY logic cups'
+   * `sinkingIngredient` + `sinkingIngredientMoved` metadata — never a
+   * view-owned honey index/boolean.
+   */
+  private honeyTransit: {
+    fromX: number;
+    fromY: number;
+    ctrlX: number;
+    ctrlY: number;
+    toX: number;
+    toY: number;
+    startMs: number;
+    durMs: number;
+  } | null = null;
+
   /**
    * Active strainer transit (Gauntlet 6 §40-41): exactly one flying tool
    * or caught drop, drawn by the EXISTING ticker loop (no second ticker).
@@ -1578,6 +1792,12 @@ export class TeaSortView {
     this.rootContainer.addChild(this.strainerStandContainer);
     this.strainerTransitGraphics.eventMode = 'none';
     this.rootContainer.addChild(this.strainerTransitGraphics);
+    // Honey drop flight (Gauntlet 7 §82): dedicated layer on the EXISTING
+    // ticker (no second ticker), above cups so the amber bead reads, below
+    // particles so landing sparkles read over it. Separate from the lemon
+    // transit layer so a pour moving both never erases the other.
+    this.honeyTransitGraphics.eventMode = 'none';
+    this.rootContainer.addChild(this.honeyTransitGraphics);
 
     this.setupInteractivity();
     this.setupCups();
@@ -2228,6 +2448,7 @@ export class TeaSortView {
           res.floatingIngredientMoved ?? null,
           res.strained,
           res.caughtTea ?? null,
+          res.sinkingIngredientMoved ?? null,
         );
       }
     } else {
@@ -2396,6 +2617,102 @@ export class TeaSortView {
     this.transitGraphics.clear();
   }
 
+  /**
+   * Honey bottom point in stage space (Gauntlet 7 §82): delegates to the
+   * vessel's transform-aware bottom anchor (pivot/rotation/lift/scale).
+   * The caller captures it while the source is still tilted (actual pour
+   * pose, never rest pose).
+   */
+  private honeyStagePoint(view: CupView): { x: number; y: number } {
+    return view.honeyStagePoint();
+  }
+
+  /**
+   * Honey rim point in stage space: the mouth the drop falls through
+   * before sinking to the shared bottom anchor.
+   */
+  private honeyRimStagePoint(view: CupView): { x: number; y: number } {
+    return view.honeyRimStagePoint();
+  }
+
+  /**
+   * Begin a honey leg (Gauntlet 7 §82): stage-space flight from `from` to
+   * `to`. Arc legs use a lifted ctrl (short amber arc); sink legs pass
+   * `lift = 0` for a straight vertical sink to the shared bottom anchor.
+   * The destination static blob stays hidden mid-flight (caller-owned
+   * `suppressHoneyTransit`, lemon mirror) so two honeys never show.
+   */
+  private startHoneyTransit(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    durMs: number,
+    lift = 28,
+  ): void {
+    this.honeyTransit = {
+      fromX,
+      fromY,
+      ctrlX: (fromX + toX) / 2,
+      ctrlY: lift === 0 ? (fromY + toY) / 2 : Math.min(fromY, toY) - lift,
+      toX,
+      toY,
+      startMs: performance.now(),
+      durMs: Math.max(1, durMs),
+    };
+  }
+
+  private clearHoneyTransit(): void {
+    this.honeyTransit = null;
+    try {
+      this.honeyTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Clear honey suppression on every cup (reset / undo / failure path). */
+  private clearHoneySuppression(): void {
+    for (const v of this.cupViews) {
+      try {
+        v.suppressHoneyTransit = false;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  /** Whether any honey is currently visible or in flight (early-out gate). */
+  private needsHoneyPass(): boolean {
+    if (this.honeyTransit !== null) return true;
+    try {
+      const cups = this.logic.cups;
+      for (let i = 0; i < cups.length; i++) {
+        if (cups[i]?.sinkingIngredient != null) return true;
+      }
+    } catch {
+      // ignore — fail closed to drawing (no early-out)
+      return true;
+    }
+    return false;
+  }
+
+  /** Draw the in-flight honey drop along its arc/sink (existing ticker). */
+  private drawHoneyTransit(): void {
+    const t = this.honeyTransit;
+    if (!t) return;
+    const progress = Math.min(1, Math.max(0, (performance.now() - t.startMs) / t.durMs));
+    const u = 1 - progress;
+    const x = u * u * t.fromX + 2 * u * progress * t.ctrlX + progress * progress * t.toX;
+    const y = u * u * t.fromY + 2 * u * progress * t.ctrlY + progress * progress * t.toY;
+    try {
+      this.honeyTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+    drawHoneyDrop(this.honeyTransitGraphics, x, y, HONEY_DROP_R);
+  }
+
   async animatePour(
     fromIdx: number,
     toIdx: number,
@@ -2405,6 +2722,7 @@ export class TeaSortView {
     floatingIngredientMoved: FloatingIngredientSlot = null,
     strained = false,
     caughtTea: TeaId | null = null,
+    sinkingIngredientMoved: SinkingIngredientSlot = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -2484,6 +2802,23 @@ export class TeaSortView {
       );
     }
 
+    // Honey transit (G7 §81-82): logic is already post-move (source empty
+    // of honey, dest holds it). Partial outflows keep honey
+    // (`sinkingIngredientMoved == null` → no transit, static stays at the
+    // bottom, no flicker, no duplicate). Emptying outflows
+    // (`=== 'honey'`) hide the destination static until the drop lands.
+    // Source suppression mirrors the lemon pattern (post-move source is
+    // already empty; the flag keeps it empty after departure).
+    const honeyMoving = sinkingIngredientMoved === 'honey';
+    if (honeyMoving) {
+      sourceView.suppressHoneyTransit = true;
+      targetView.suppressHoneyTransit = true;
+      const fromCupH = this.logic.cups[fromIdx];
+      const toCupH = this.logic.cups[toIdx];
+      if (fromCupH) sourceView.renderHoney(fromCupH);
+      if (toCupH) targetView.renderHoney(toCupH);
+    }
+
     const tea = TEA_TYPES[layer];
     const startTime = performance.now();
 
@@ -2533,6 +2868,31 @@ export class TeaSortView {
     // Landing: reveal the destination static lemon, then redraw.
     targetView.suppressLemonTransit = false;
     this.clearLemonTransit();
+
+    // Honey landing (G7 §82): near pour end, ONE amber drop arcs from the
+    // TRANSFORMED source bottom (actual tilt/lift, never rest pose) to the
+    // destination rim, then sinks straight to the shared bottom anchor
+    // (~180-260ms). Static destination honey stays hidden until landing,
+    // when it appears exactly at the shared anchor. Same ticker, same
+    // isAnimating lock — never a second onMoveComplete.
+    if (honeyMoving) {
+      try {
+        const from = this.honeyStagePoint(sourceView);
+        const rim = this.honeyRimStagePoint(targetView);
+        const bottom = this.honeyStagePoint(targetView);
+        this.startHoneyTransit(from.x, from.y, rim.x, rim.y, HONEY_ARC_MS, 28);
+        await this.wait(HONEY_ARC_MS);
+        this.startHoneyTransit(rim.x, rim.y, bottom.x, bottom.y, HONEY_SINK_MS, 0);
+        await this.wait(HONEY_SINK_MS);
+      } catch {
+        // Failure path: refresh from logic state (no strand, no duplicate).
+      } finally {
+        this.clearHoneyTransit();
+        sourceView.suppressHoneyTransit = false;
+        targetView.suppressHoneyTransit = false;
+        this.renderAllCups();
+      }
+    }
 
     // Strained catch reveal (Gauntlet 6 §40): near completion the caught
     // layer appears in the mesh on the source, then the loaded tool
@@ -2614,6 +2974,18 @@ export class TeaSortView {
           const view = this.cupViews[idx];
           if (view) {
             const p = this.lemonStagePoint(view, cup.layers.length);
+            this.triggerRevealSparkles(p.x, p.y);
+          }
+        }
+        // Correctly served honey: a small warm sparkle at the bottom blob.
+        // View only calls `sinkingIngredientHostSatisfied`, never reimplements.
+        if (
+          cup.sinkingIngredient != null &&
+          sinkingIngredientHostSatisfied(cup.sinkingIngredient, cup.layers, cup.constraint)
+        ) {
+          const view = this.cupViews[idx];
+          if (view) {
+            const p = this.honeyStagePoint(view);
             this.triggerRevealSparkles(p.x, p.y);
           }
         }
@@ -2744,7 +3116,11 @@ export class TeaSortView {
   update(delta: number) {
     this.cupViews.forEach((c) => c.update(delta));
     this.drawLemonTransit();
-    // Strainer flight uses the SAME single ticker (no second ticker).
+    // Honey drop + strainer flights share the SAME single ticker (no second ticker).
+    // No-honey fast path: skip honey work when no cup holds honey and no flight is active.
+    if (this.honeyTransit !== null || this.needsHoneyPass()) {
+      this.drawHoneyTransit();
+    }
     this.drawStrainerTransit();
     if (this.strainerStandShake > 0) {
       this.strainerStandShake = Math.max(0, this.strainerStandShake - delta);
@@ -2827,6 +3203,9 @@ export class TeaSortView {
     // A level swap mid-flight must never strand a flying lemon or a
     // suppressed destination slice (fresh CupViews default suppression off).
     this.clearLemonTransit();
+    // Honey never strands either: clear the drop flight + suppression flags.
+    this.clearHoneyTransit();
+    this.clearHoneySuppression();
     this.setupCups();
     this.layoutCups();
     this.renderAllCups();
@@ -2846,6 +3225,10 @@ export class TeaSortView {
     this.toolMode = 'off';
     this.strainerStandShake = 0;
     this.clearStrainerTransit();
+    // Undo restores logic sinking slots; a stranded honey flight or stale
+    // suppression would hide the restored static blob — clear both first.
+    this.clearHoneyTransit();
+    this.clearHoneySuppression();
     const move = this.logic.undo();
     if (move) {
       audioSynth.playUndo();
