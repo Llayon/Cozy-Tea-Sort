@@ -74,6 +74,7 @@ import {
   CupConstraint,
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientSlot,
+  SINKING_INGREDIENT_TYPES,
   STANDARD_CUP_CAPACITY,
   StrainerState,
   TASTING_BOWL_CAPACITY,
@@ -81,30 +82,38 @@ import {
   TeaId,
   cloneCupConstraint,
   countFloatingIngredients,
+  countSinkingIngredients,
   cupCapacity,
   defaultCupConstraints,
   emptyFloatingIngredients,
+  emptySinkingIngredients,
   emptyStrainerState,
   floatingIngredientIndex,
   isReleaseStrainerAction,
   isTastingCupConstraint,
   mustEndEmpty,
   normalizeFloatingIngredients,
+  normalizeSinkingIngredients,
   normalizeStrainerState,
+  sinkingIngredientIndex,
   standStrainerState,
   type FloatingIngredientId,
+  type SinkingIngredientId,
+  type SinkingIngredientSlot,
   type SolverAction,
 } from '../types';
 import {
+  applyPourState,
   applyPuzzleActionState,
   floatingIngredientHostSatisfied,
   isHomogeneous,
   isInFinalState,
   isPuzzleWonState,
   isWonState,
+  sinkingIngredientHostSatisfied,
 } from './rules';
 import { createRng, Rng, SeedInput, shuffleInPlace } from './rng';
-import { solvePuzzle } from './solver';
+import { applySolutionState, solvePuzzle } from './solver';
 import {
   TARGET_TEMPLATE_ATTEMPTS,
   TARGET_TEMPLATE_BANK,
@@ -137,6 +146,14 @@ import {
   StrainerTemplateKind,
   instantiateStrainerTemplate,
 } from './strainerTemplates';
+import {
+  HONEY_DEPTH_ACCEPT,
+  HONEY_TARGET_TEA,
+  HONEY_TEMPLATE_ATTEMPTS,
+  HONEY_TEMPLATE_BANK,
+  HoneyTemplateKind,
+  instantiateHoneyTemplate,
+} from './honeyTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -196,6 +213,14 @@ export interface GenerateRequest {
    * / targets are rejected loudly (future Gauntlets).
    */
   hasStrainer?: boolean;
+  /**
+   * Sinking ingredient requested (Gauntlet 7 — «Мёд на дне»).
+   * `undefined` = classic level without sinking objects; `'honey'` =
+   * exactly ONE honey blob under the tea of one vessel, destined for
+   * full homogeneous buckwheat. Count >1 is out of scope (no count field
+   * exists yet on purpose).
+   */
+  sinkingIngredient?: SinkingIngredientId;
 }
 
 export interface GeneratedLevel {
@@ -216,6 +241,12 @@ export interface GeneratedLevel {
    * older tests (normalized as absent).
    */
   strainer?: StrainerState;
+  /**
+   * Dynamic sinking-ingredient slots, aligned with `cups` indices.
+   * ALWAYS returned in production (all-null for pre-honey levels) so
+   * runtime never guesses whether the field exists.
+   */
+  sinkingIngredients?: SinkingIngredientSlot[];
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -294,6 +325,53 @@ export function requestedFloatingIngredient(req: GenerateRequest): FloatingIngre
 /** Requested catch-one strainer (`true` = exactly one empty tool on stand). */
 export function requestedHasStrainer(req: GenerateRequest): boolean {
   return req.hasStrainer === true;
+}
+
+/** Requested sinking ingredient (`undefined` = classic level). */
+export function requestedSinkingIngredient(req: GenerateRequest): SinkingIngredientId | undefined {
+  return req.sinkingIngredient ?? undefined;
+}
+
+/**
+ * Fail-fast request validation for sinking honey (programming errors,
+ * not generation luck). Gauntlet 7 supports: honey (+ optional Mystery,
+ * + optional single teapot). Rejected loudly: lemon, strainer, sink,
+ * tasting, targets, multi-teapot, missing buckwheat in the active
+ * palette.
+ */
+export function validateSinkingIngredientRequest(req: GenerateRequest): void {
+  const honey = requestedSinkingIngredient(req);
+  if (honey === undefined) return;
+  const known = (SINKING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[honey];
+  if (!known) {
+    throw new Error(`validateSinkingIngredientRequest: unsupported ingredient ${honey}`);
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (!palette.includes(known.targetTeaId)) {
+    throw new Error(
+      `validateSinkingIngredientRequest: ${honey} target tea ${known.targetTeaId} not in active palette`,
+    );
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(`validateSinkingIngredientRequest: ${honey} + lemon is out of scope for Gauntlet 7`);
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error(`validateSinkingIngredientRequest: ${honey} + strainer is out of scope for Gauntlet 7`);
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error(`validateSinkingIngredientRequest: ${honey} + sink-only is out of scope for Gauntlet 7`);
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error(`validateSinkingIngredientRequest: ${honey} + tasting bowl is out of scope for Gauntlet 7`);
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error(`validateSinkingIngredientRequest: ${honey} + targets is out of scope for Gauntlet 7`);
+  }
+  if (requestedSourceOnlyCount(req) > 1) {
+    throw new Error(
+      `validateSinkingIngredientRequest: sourceOnlyCount ${requestedSourceOnlyCount(req)} unsupported (production max 1)`,
+    );
+  }
 }
 
 /**
@@ -527,6 +605,91 @@ export function selectLemonHost(
   });
   if (candidates.length === 0) return null;
   return pick(candidates);
+}
+
+/**
+ * Honey host selection (Gauntlet 7 §21–22): a FULL MIXED plain-standard
+ * normal vessel — full standard capacity, mixed (never pre-solved, and a
+ * mixed host guarantees the first outflow leaves tea behind, so every
+ * solution naturally demonstrates HONEY-STAY before HONEY-MOVE), no
+ * target, never teapot/sink/tasting. Mystery exclusion happens at the
+ * caller (host must differ from the Mystery cup). Returns null when this
+ * deal cannot host.
+ */
+export function selectHoneyHost(
+  cups: TeaId[][],
+  cupConstraints: readonly CupConstraint[],
+  pick: (candidates: number[]) => number | null,
+  excludeIndices: readonly number[] = [],
+): number | null {
+  const excluded = new Set(excludeIndices);
+  const candidates: number[] = [];
+  cups.forEach((cup, idx) => {
+    if (excluded.has(idx)) return;
+    const c = cupConstraints[idx];
+    if (!c || c.mode !== 'normal' || c.targetTeaId !== undefined) return;
+    if (cupCapacity(c) !== STANDARD_CUP_CAPACITY || mustEndEmpty(c)) return;
+    if (isTastingCupConstraint(c)) return;
+    if (!isMixedFullCup(cup)) return;
+    candidates.push(idx);
+  });
+  if (candidates.length === 0) return null;
+  return pick(candidates);
+}
+
+export interface HoneyParticipation {
+  stays: number;
+  moves: number;
+  firstMoveDepth: number | null;
+}
+
+/**
+ * Replay an optimal WITH-honey solution and count HONEY-STAY events (a
+ * successful pour from the current honey host that leaves the source
+ * non-empty, honey stays) and HONEY-MOVE events (honey relocates because
+ * its host emptied). Production templates require stays >= 1 AND
+ * moves >= 1 AND a satisfied final honey goal (§38–39).
+ */
+export function analyzeHoneyParticipation(
+  startCups: TeaId[][],
+  startHoney: readonly SinkingIngredientSlot[],
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): HoneyParticipation {
+  let cups = startCups.map((c) => [...c]);
+  let slots = normalizeSinkingIngredients(startHoney, startCups.length);
+  let stays = 0;
+  let moves = 0;
+  let firstMoveDepth: number | null = null;
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') {
+      const res = applyPuzzleActionState({ cups, floatingIngredients: emptyFloatingIngredients(cups.length), sinkingIngredients: slots }, a, cupConstraints);
+      if (!res) return { stays, moves, firstMoveDepth };
+      cups = res.state.cups;
+      slots = res.state.sinkingIngredients;
+      continue;
+    }
+    const hostBefore = slots.findIndex((s) => s === 'honey');
+    const res = applyPourState(
+      { cups, floatingIngredients: emptyFloatingIngredients(cups.length), sinkingIngredients: slots },
+      (a as { from: number }).from,
+      (a as { to: number }).to,
+      cupConstraints,
+    );
+    if (!res) return { stays, moves, firstMoveDepth };
+    const hostAfter = res.state.sinkingIngredients.findIndex((s) => s === 'honey');
+    if (hostBefore === (a as { from: number }).from) {
+      if (hostAfter === hostBefore && res.state.cups[(a as { from: number }).from]?.length !== 0) stays++;
+      if (hostAfter !== hostBefore) {
+        moves++;
+        if (firstMoveDepth === null) firstMoveDepth = i;
+      }
+    }
+    cups = res.state.cups;
+    slots = [...res.state.sinkingIngredients];
+  }
+  return { stays, moves, firstMoveDepth };
 }
 
 /**
@@ -802,6 +965,7 @@ function finalizeCandidate(
   stats?: GenerateStats,
   floatingIngredients?: readonly FloatingIngredientSlot[],
   strainer?: StrainerState,
+  sinkingIngredients?: readonly SinkingIngredientSlot[],
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -971,10 +1135,51 @@ function finalizeCandidate(
     } else {
       return null;
     }
+    // Strainer levels never carry honey (production rejects the combo at
+    // request validation; re-checked here so no path slips through).
+    if (countSinkingIngredients({ sinkingIngredients }) > 0) return null;
+  }
+  // CB–CO: sinking-honey initial-state invariant.
+  const wantHoney = requestedSinkingIngredient(req);
+  const sinkSlots: SinkingIngredientSlot[] = normalizeSinkingIngredients(sinkingIngredients, cups.length);
+  if (sinkSlots.length !== cups.length) return null; // CB
+  const sinkPresent = sinkSlots.filter((s): s is SinkingIngredientId => s != null);
+  if (wantHoney === undefined) {
+    if (sinkPresent.length !== 0) return null;
+  } else {
+    const known = (SINKING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[wantHoney];
+    if (!known) return null; // CD
+    const honeyPalette = req.colors.slice(0, req.numColors);
+    if (!honeyPalette.includes(known.targetTeaId)) return null; // CE
+    if (sinkPresent.length !== 1 || sinkPresent[0] !== wantHoney) return null; // CF
+    const host = sinkSlots.findIndex((s) => s === wantHoney);
+    const hostCup = cups[host] as TeaId[];
+    const hostC = normalized[host] as CupConstraint;
+    if (!hostCup || hostCup.length === 0) return null; // CG
+    if (hostCup.length !== STANDARD_CUP_CAPACITY) return null; // CH
+    if (requestedSourceOnlyCount(req) === 1) {
+      if (host !== 0) return null; // CM: honey starts inside the teapot
+      if (normalized[0]?.mode !== 'source-only') return null; // CM: teapot at stable index 0
+      if (!isMixedFullCup(hostCup)) return null; // CN
+    } else {
+      if (!isMixedFullCup(hostCup)) return null; // CI (mixed ⇒ first outflow stays)
+      if (hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) return null; // CJ
+      if (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(hostC)) return null; // CJ
+      if (isTastingCupConstraint(hostC)) return null; // CJ
+    }
+    if (sinkingIngredientHostSatisfied(wantHoney, hostCup, hostC)) return null; // CK
+    if ((hiddenCounts[host] ?? 0) !== 0) return null; // CL
+    // CO: unsupported honey combinations absent (also enforced loudly at
+    // request validation; re-checked here so no path slips through).
+    if (presentIds.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
   }
   if (isWonState(cups, normalized)) return null; // D
-  if (isPuzzleWonState({ cups, floatingIngredients: slots, strainer: strainerState }, normalized)) return null; // D (lemon/strainer-aware)
-  if (!wantStrainer) {
+  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState }, normalized)) return null; // D (lemon/honey/strainer-aware)
+  if (!wantStrainer && wantHoney === undefined) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -989,12 +1194,53 @@ function finalizeCandidate(
       hiddenCounts,
       cupConstraints: normalized,
       floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
       strainer: strainerState,
       seed,
       minMoves: solved.minMoves,
       visitedStates: solved.visitedStates,
     };
     if (!validateLevelStructure(level, req).ok) return null; // A–F, K–BE
+    return level;
+  }
+  if (wantHoney !== undefined) {
+    // CP–CV: honey production gate (stay + move participation standard).
+    // Unlike the strainer rescued-necessity gate, honey is an additional
+    // GOAL — no without-honey unsolvability proof is required.
+    if (stats) stats.solverCalls++;
+    const honeySolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+    });
+    if (!honeySolved.solvable || honeySolved.truncated) return null; // CP, CQ
+    if (honeySolved.minMoves === undefined) return null;
+    if (!honeyDepthAccepted(honeySolved.minMoves, req)) return null; // CR
+    const honeySolution = (honeySolved.solution ?? []) as SolverAction[];
+    const honeyPart = analyzeHoneyParticipation(cups, sinkSlots, honeySolution, normalized);
+    if (honeyPart.stays < 1 || honeyPart.moves < 1) return null; // CS, CT
+    const honeyFinal = applySolutionState(
+      { cups, floatingIngredients: slots, sinkingIngredients: sinkSlots },
+      honeySolution,
+      normalized,
+    );
+    if (!honeyFinal) return null;
+    const honeyFinalHost = honeyFinal.sinkingIngredients.findIndex((s) => s === wantHoney);
+    if (!sinkingIngredientHostSatisfied(wantHoney, honeyFinal.cups[honeyFinalHost] as TeaId[], normalized[honeyFinalHost])) return null; // CU
+    if (!isPuzzleWonState(honeyFinal, normalized)) return null; // CV
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      seed,
+      minMoves: honeySolved.minMoves,
+      visitedStates: honeySolved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null;
     return level;
   }
   // BP–CA: strainer production gate (rescued necessity standard).
@@ -1049,6 +1295,7 @@ function finalizeCandidate(
     hiddenCounts,
     cupConstraints: normalized,
     floatingIngredients: slots,
+    sinkingIngredients: sinkSlots,
     strainer: strainerState,
     seed,
     minMoves: solved.minMoves,
@@ -1056,6 +1303,18 @@ function finalizeCandidate(
   };
   if (!validateLevelStructure(level, req).ok) return null;
   return level;
+}
+
+/** Honey-specific depth acceptance (measured G7 bands; globals untouched). */
+function honeyDepthAccepted(depth: number, req: GenerateRequest): boolean {
+  const kind = honeyTemplateKindFor(req);
+  if (!kind) {
+    // Non-canonical honey requests: fall back to the phase band so
+    // exotic configs stay bounded (canonical kinds use measured bands).
+    return depthAccepted(depth, req.phase);
+  }
+  const band = HONEY_DEPTH_ACCEPT[kind];
+  return depth >= band.min && depth <= band.max;
 }
 
 /** Strainer-specific depth acceptance (measured G6 bands; globals untouched). */
@@ -1502,12 +1761,65 @@ function primaryStrainerFallback(
   return { cups: inst.cups, constraints };
 }
 
+/**
+ * Pinned strong honey fallback topology per kind (drawn from the curated
+ * rescued pool, sweet-spot depths): plain 12, peak 16, teapot 12.
+ * Instantiated with the identity role mapping (c0 → buckwheat) so recorded
+ * depths hold exactly. Passes through `finalizeCandidate` — never trusted
+ * blindly.
+ */
+const HONEY_FALLBACK_TEMPLATE_ID: Record<HoneyTemplateKind, string> = {
+  'honey-challenge': 'honey-challenge-12-27',
+  'honey-mystery-peak': 'honey-mystery-peak-16-292',
+  'teapot-honey-challenge': 'teapot-honey-challenge-12-178',
+};
+
+function primaryHoneyFallback(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[]; honeyHost: number } | null {
+  if (requestedSinkingIngredient(req) === undefined) return null;
+  const kind = honeyTemplateKindFor(req);
+  if (!kind) return null;
+  const tpl = HONEY_TEMPLATE_BANK[kind].find((t) => t.id === HONEY_FALLBACK_TEMPLATE_ID[kind]);
+  if (!tpl) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return null;
+  if (!palette.includes(HONEY_TARGET_TEA)) return null;
+  const others = palette.filter((t) => t !== HONEY_TARGET_TEA);
+  const inst = instantiateHoneyTemplate(tpl, palette, [...others]);
+  const constraints = defaultCupConstraints(inst.cups.length);
+  if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+  return { cups: inst.cups, constraints, honeyHost: inst.honeyHost };
+}
+
+/**
+ * Generic honey rotation shape: rotation cups among filled vessels with
+ * honey on the first eligible (full mixed plain-standard) host, or the
+ * teapot itself for teapot requests. Deterministic backup behind the
+ * pinned topology.
+ */
+function honeyRotationEntry(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[]; honeyHost: number } | null {
+  const wantSourceOnly = requestedSourceOnlyCount(req);
+  const cups = rotationCups({ ...req, sourceOnlyCount: 0 });
+  const constraints = constraintsForShape(cups.length, wantSourceOnly);
+  if (wantSourceOnly > 0) {
+    if (cups[0] === undefined || !isMixedFullCup(cups[0] as TeaId[])) return null;
+    return { cups, constraints, honeyHost: 0 };
+  }
+  const host = selectHoneyHost(cups, constraints, (candidates) => candidates[0] ?? null);
+  if (host === null) return null;
+  return { cups, constraints, honeyHost: host };
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
   validateTastingRequest(req);
   validateFloatingIngredientRequest(req);
   validateStrainerRequest(req);
+  validateSinkingIngredientRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -1515,16 +1827,23 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantTasting = requestedTastingCupCount(req);
   const wantIngredient = requestedFloatingIngredient(req);
   const wantStrainer = requestedHasStrainer(req);
+  const wantHoney = requestedSinkingIngredient(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
     `${wantSink > 0 ? ':sink' : ''}${wantTasting > 0 ? ':tasting' : ''}` +
     `${wantIngredient !== undefined ? `:${wantIngredient}` : ''}` +
-    `${wantStrainer ? ':strainer' : ''}`;
+    `${wantStrainer ? ':strainer' : ''}` +
+    `${wantHoney !== undefined ? `:${wantHoney}` : ''}`;
 
-  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null }> = [];
-  // Dedicated strainer shapes go first for strainer requests.
-  if (wantStrainer) {
+  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null }> = [];
+  // Dedicated honey shapes go first for honey requests (1 solve on hit).
+  if (wantHoney !== undefined) {
+    const dedicatedHoney = primaryHoneyFallback(req);
+    if (dedicatedHoney) shapeEntries.push(dedicatedHoney);
+    const honeyRot = honeyRotationEntry(req);
+    if (honeyRot) shapeEntries.push(honeyRot);
+  } else if (wantStrainer) {
     const dedicatedStrainer = primaryStrainerFallback(req);
     if (dedicatedStrainer) shapeEntries.push(dedicatedStrainer);
     const strainerRot = rotationCups(req);
@@ -1577,6 +1896,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       cups: TeaId[][];
       constraints: CupConstraint[];
       lemonHost?: number | null;
+      honeyHost?: number | null;
     };
     const cups = entry.cups;
     let constraints = entry.constraints;
@@ -1584,6 +1904,11 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     const shapeSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(cups.length);
     if (wantIngredient !== undefined && entry.lemonHost !== undefined && entry.lemonHost !== null) {
       shapeSlots[entry.lemonHost] = wantIngredient;
+    }
+    // Honey slots for this shape (all-null when no honey requested).
+    const shapeSinkSlots: SinkingIngredientSlot[] = emptySinkingIngredients(cups.length);
+    if (wantHoney !== undefined && entry.honeyHost !== undefined && entry.honeyHost !== null) {
+      shapeSinkSlots[entry.honeyHost] = wantHoney;
     }
     // Named serving roles are assigned deterministically (first eligible
     // cup per tea); failure rejects this shape, never forces a bad role.
@@ -1611,12 +1936,15 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     const hiddenCounts = cups.map(() => 0);
     if (req.hasMysteryLayer) {
       // Deterministic first-candidate pick; null => layout rejected, never forced.
-      // Never inside the teapot, a target cup — or on the lemon host.
+      // Never inside the teapot, a target cup — or on the lemon/honey host.
       const lemonIdx = wantIngredient !== undefined ? shapeSlots.findIndex((sl) => sl !== null) : -1;
+      const honeyIdx = wantHoney !== undefined ? shapeSinkSlots.findIndex((sl) => sl !== null) : -1;
       const idx = selectMysteryCup(
         cups,
         (candidates) => {
-          const eligible = lemonIdx >= 0 ? candidates.filter((c) => c !== lemonIdx) : candidates;
+          let eligible = candidates;
+          if (lemonIdx >= 0) eligible = eligible.filter((c) => c !== lemonIdx);
+          if (honeyIdx >= 0) eligible = eligible.filter((c) => c !== honeyIdx);
           return eligible[0] ?? null;
         },
         constraints,
@@ -1633,6 +1961,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       stats,
       shapeSlots,
       wantStrainer ? standStrainerState() : undefined,
+      shapeSinkSlots,
     );
     if (level) {
       if (stats) stats.usedFallback = true;
@@ -1659,16 +1988,38 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     // Strainer requests never produce lemon hosts; tight random deals are
     // gated by the rescued-necessity check (plain/peak hit fast at ~30%).
     if (wantStrainer && deal.lemonHost !== null) continue;
+    // Honey host for this deal: teapot slot 0 when requested (deal teapots
+    // are always full + mixed), else a full mixed plain-standard vessel.
+    // Strainer/lemon hosts never coexist with honey (validated combos).
+    if (wantHoney !== undefined && (wantStrainer || deal.lemonHost !== null)) continue;
     const hiddenCounts = deal.cups.map(() => 0);
     const scanSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(deal.cups.length);
     if (deal.lemonHost !== null) scanSlots[deal.lemonHost] = wantIngredient ?? null;
+    const scanSinkSlots: SinkingIngredientSlot[] = emptySinkingIngredients(deal.cups.length);
+    if (wantHoney !== undefined) {
+      let honeyHost: number | null = null;
+      if (wantSourceOnly > 0) {
+        honeyHost = deal.cups[0] !== undefined && isMixedFullCup(deal.cups[0] as TeaId[]) ? 0 : null;
+      } else {
+        honeyHost = selectHoneyHost(
+          deal.cups,
+          deal.cupConstraints,
+          (candidates) => candidates[Math.floor(rng() * candidates.length)] ?? null,
+        );
+      }
+      if (honeyHost === null) continue;
+      scanSinkSlots[honeyHost] = wantHoney;
+    }
     if (req.hasMysteryLayer) {
       const lemonIdx = scanSlots.findIndex((sl) => sl !== null);
+      const honeyIdx = scanSinkSlots.findIndex((sl) => sl !== null);
       const idx = selectMysteryCup(
         deal.cups,
         (candidates) => {
-          const eligible = lemonIdx >= 0 ? candidates.filter((c) => c !== lemonIdx) : candidates;
-          // Seeded pick among the lemon-safe candidates.
+          let eligible = candidates;
+          if (lemonIdx >= 0) eligible = eligible.filter((c) => c !== lemonIdx);
+          if (honeyIdx >= 0) eligible = eligible.filter((c) => c !== honeyIdx);
+          // Seeded pick among the lemon/honey-safe candidates.
           const at = Math.floor(rng() * eligible.length);
           return eligible[at] ?? null;
         },
@@ -1686,6 +2037,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       stats,
       scanSlots,
       wantStrainer ? standStrainerState() : undefined,
+      scanSinkSlots,
     );
     if (level) {
       if (stats) stats.usedFallback = true;
@@ -2050,6 +2402,95 @@ function generateFromStrainerTemplateBank(
 }
 
 /**
+ * Match a request against a honey-bank kind (Gauntlet 7 fast path).
+ * Only the three canonical production honey configs qualify; any other
+ * honey-bearing request keeps the random-scan path. Honey + lemon /
+ * strainer / sink / tasting / targets never qualifies (rejected loudly
+ * at validation).
+ */
+export function honeyTemplateKindFor(req: GenerateRequest): HoneyTemplateKind | null {
+  if (requestedSinkingIngredient(req) === undefined) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  const teapot = requestedSourceOnlyCount(req);
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 0) {
+    return 'honey-challenge';
+  }
+  if (req.numColors === 5 && req.emptyCups === 2 && req.hasMysteryLayer && teapot === 0) {
+    return 'honey-mystery-peak';
+  }
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 1) {
+    return 'teapot-honey-challenge';
+  }
+  return null;
+}
+
+/**
+ * Bounded honey fast path (Gauntlet 7 §67): seeded template choice →
+ * palette-relative instantiation (c0 fixed to buckwheat, other roles
+ * seeded-permuted — a full isomorphism on non-target teas, so the bank
+ * depth is preserved) → teapot role → Mystery assignment excluding the
+ * honey host → single `finalizeCandidate` validation. At most
+ * HONEY_TEMPLATE_ATTEMPTS solver validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses the fallback
+ * ladder).
+ */
+function generateFromHoneyTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = honeyTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = HONEY_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  const others = palette.filter((t) => t !== HONEY_TARGET_TEA);
+  for (let a = 0; a < HONEY_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const otherOrder = [...others];
+    shuffleInPlace(rng, otherOrder);
+    const inst = instantiateHoneyTemplate(tpl, palette, otherOrder);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    if (inst.teapotSlot !== null) constraints[inst.teapotSlot] = { mode: 'source-only' };
+    const sinkSlots: SinkingIngredientSlot[] = emptySinkingIngredients(inst.cups.length);
+    sinkSlots[inst.honeyHost] = 'honey';
+    const hiddenCounts = inst.cups.map(() => 0);
+    if (req.hasMysteryLayer) {
+      const idx = selectMysteryCup(
+        inst.cups,
+        (candidates) => {
+          const eligible = candidates.filter((c) => c !== inst.honeyHost);
+          const at = Math.floor(rng() * eligible.length);
+          return eligible[at] ?? null;
+        },
+        constraints,
+      );
+      if (idx === null) continue;
+      hiddenCounts[idx] = 1;
+    }
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#honey:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      sinkSlots,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Bounded target fast path (Gauntlet 2.1 §9): seeded template choice →
  * palette-relative instantiation (seeded t-swap + o-permutation, both
  * full isomorphisms so the bank depth is preserved) → mystery assignment
@@ -2122,6 +2563,7 @@ export function generateLevel(
   validateTastingRequest(req);
   validateFloatingIngredientRequest(req);
   validateStrainerRequest(req);
+  validateSinkingIngredientRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -2131,6 +2573,7 @@ export function generateLevel(
   const wantSink = requestedSinkOnlyCount(req);
   const wantTasting = requestedTastingCupCount(req);
   const wantIngredient = requestedFloatingIngredient(req);
+  const wantHoney = requestedSinkingIngredient(req);
 
   // Canonical target configs skip the random scan entirely: the template
   // bank serves bounded, solver-validated topologies (~1 validation per
@@ -2184,6 +2627,16 @@ export function generateLevel(
     return fallbackLevel(req, { stats });
   }
 
+  // Canonical honey configs skip the random scan entirely (Gauntlet 7
+  // §67): bounded HONEY_TEMPLATE_ATTEMPTS validations, never a 150-deal
+  // scan. maxRetries: 0 still yields a valid level through the fast path
+  // or the validated fallback ladder.
+  if (honeyTemplateKindFor(req) !== null) {
+    const fast = generateFromHoneyTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
   // Closest-to-TARGET among ACCEPTED candidates only. Out-of-band deals
   // are rejected outright and never remembered.
   let bestAccepted: GeneratedLevel | null = null;
@@ -2210,16 +2663,37 @@ export function generateLevel(
     const dealSlots: FloatingIngredientSlot[] = emptyFloatingIngredients(deal.cups.length);
     if (deal.lemonHost !== null) dealSlots[deal.lemonHost] = wantIngredient ?? null;
 
+    // Honey slots for non-canonical honey requests (production honey is
+    // always canonical via the template bank; the gate re-validates).
+    const dealSinkSlots: SinkingIngredientSlot[] = emptySinkingIngredients(deal.cups.length);
+    if (wantHoney !== undefined) {
+      let honeyHost: number | null = null;
+      if (wantSourceOnly > 0) {
+        honeyHost = deal.cups[0] !== undefined && isMixedFullCup(deal.cups[0] as TeaId[]) ? 0 : null;
+      } else {
+        honeyHost = selectHoneyHost(
+          deal.cups,
+          deal.cupConstraints,
+          (candidates) => candidates[Math.floor(rng() * candidates.length)] ?? null,
+        );
+      }
+      if (honeyHost === null) continue;
+      dealSinkSlots[honeyHost] = wantHoney;
+    }
+
     // Mystery placement uses the same rng stream (deterministic).
     // Never inside the teapot, guest cup, tasting bowl, a target cup —
-    // or on the lemon host.
+    // or on the lemon/honey host.
     const hiddenCounts = deal.cups.map(() => 0);
     if (req.hasMysteryLayer) {
       const lemonIdx = dealSlots.findIndex((sl) => sl !== null);
+      const honeyIdx = dealSinkSlots.findIndex((sl) => sl !== null);
       const idx = selectMysteryCup(
         deal.cups,
         (candidates) => {
-          const eligible = lemonIdx >= 0 ? candidates.filter((c) => c !== lemonIdx) : candidates;
+          let eligible = candidates;
+          if (lemonIdx >= 0) eligible = eligible.filter((c) => c !== lemonIdx);
+          if (honeyIdx >= 0) eligible = eligible.filter((c) => c !== honeyIdx);
           const at = Math.floor(rng() * eligible.length);
           return eligible[at] ?? null;
         },
@@ -2237,6 +2711,8 @@ export function generateLevel(
       deal.cupConstraints,
       stats,
       dealSlots,
+      undefined,
+      dealSinkSlots,
     );
     if (!level) continue;
 
@@ -2428,12 +2904,22 @@ export function validateLevelStructure(
   for (const t of actualTargets) {
     if (!palette.includes(t)) reasons.push(`targetTeaId ${t} not in palette (P)`);
   }
-  // D: not already solved (lemon-aware: tea-sorted with the lemon on the
-  // wrong tea is NOT a solved start).
+  // D: not already solved (lemon/honey-aware: tea-sorted with an
+  // ingredient on the wrong tea is NOT a solved start).
+  const sinkSlotsForD: SinkingIngredientSlot[] = normalizeSinkingIngredients(
+    level.sinkingIngredients,
+    level.cups.length,
+  );
+  const sinkPresentForD = sinkSlotsForD.filter((s) => s != null);
   const startWon =
-    presentIds.length > 0
+    presentIds.length > 0 || sinkPresentForD.length > 0
       ? isPuzzleWonState(
-          { cups: level.cups, floatingIngredients: slots },
+          {
+            cups: level.cups,
+            floatingIngredients: slots,
+            sinkingIngredients: sinkSlotsForD,
+            strainer: level.strainer,
+          },
           constraints.length > 0 ? constraints : undefined,
         )
       : isWonState(level.cups, constraints.length > 0 ? constraints : undefined);
@@ -2591,6 +3077,83 @@ export function validateLevelStructure(
     }
     const emptyStarts = level.cups.filter((c) => c.length === 0).length;
     if (emptyStarts !== 1) reasons.push(`strainer levels must start with exactly 1 empty vessel, got ${emptyStarts} (BL–BN)`);
+  }
+  // CB–CO: sinking-honey structural invariant (solver items CP–CV live in
+  // finalizeCandidate, not here).
+  const wantHoney = requestedSinkingIngredient(req);
+  const sinkSlots: SinkingIngredientSlot[] = normalizeSinkingIngredients(
+    level.sinkingIngredients,
+    level.cups.length,
+  );
+  if (sinkSlots.length !== level.cups.length) {
+    reasons.push(`sinkingIngredients length mismatch (CB): got ${sinkSlots.length}`);
+  }
+  const sinkPresentIds = sinkSlots.filter((s): s is SinkingIngredientId => s != null);
+  if (wantHoney === undefined) {
+    if (sinkPresentIds.length !== 0) {
+      reasons.push(`unexpected sinking ingredients without request: ${sinkPresentIds.join(',')}`);
+    }
+  } else {
+    const honeyKnown = (SINKING_INGREDIENT_TYPES as Record<string, { targetTeaId: TeaId } | undefined>)[
+      wantHoney
+    ];
+    if (!honeyKnown) {
+      reasons.push(`unsupported sinking ingredient ${wantHoney} (CD)`);
+    } else {
+      const honeyPalette = req.colors.slice(0, req.numColors);
+      if (!honeyPalette.includes(honeyKnown.targetTeaId)) {
+        reasons.push(`honey target tea ${honeyKnown.targetTeaId} not in palette (CE)`);
+      }
+      if (sinkPresentIds.length !== 1 || sinkPresentIds[0] !== wantHoney) {
+        reasons.push(`expected exactly one ${wantHoney} (CF), got [${sinkPresentIds.join(',')}]`);
+      } else {
+        const host = sinkSlots.findIndex((s) => s === wantHoney);
+        const hostCup = level.cups[host] as TeaId[];
+        const hostC = constraints[host] as CupConstraint | undefined;
+        if (!hostCup || hostCup.length === 0) reasons.push(`honey host ${host} starts empty (CG)`);
+        if (hostCup && hostCup.length !== STANDARD_CUP_CAPACITY) {
+          reasons.push(`honey host ${host} must start full standard (CH)`);
+        }
+        if (hostCup && hostCup.length > 0 && !isMixedFullCup(hostCup) && hostCup.length === STANDARD_CUP_CAPACITY) {
+          reasons.push(`honey host ${host} must start mixed (CI/CN)`);
+        }
+        if (requestedSourceOnlyCount(req) === 1) {
+          if (host !== 0) reasons.push(`teapot honey host must be index 0 (CM), got ${host}`);
+          if (constraints[0]?.mode !== 'source-only') reasons.push('teapot honey requires a teapot at index 0 (CM)');
+        } else {
+          if (!hostC || hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) {
+            reasons.push(`honey host ${host} must be untargeted plain normal (CJ)`);
+          }
+          if (hostC && (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(hostC))) {
+            reasons.push(`honey host ${host} must be a standard vessel (CJ)`);
+          }
+          if (hostC && (hostC.mode !== 'normal' || isTastingCupConstraint(hostC))) {
+            reasons.push(`honey host ${host} must not be teapot/sink/tasting (CJ)`);
+          }
+        }
+        if (hostC && sinkingIngredientHostSatisfied(wantHoney, hostCup ?? [], hostC)) {
+          reasons.push('honey must not start already satisfied (CK)');
+        }
+        if ((level.hiddenCounts[host] ?? 0) !== 0) {
+          reasons.push(`honey host ${host} must not be the Mystery cup (CL)`);
+        }
+      }
+      if (presentIds.length > 0) {
+        reasons.push('honey + lemon is out of scope for Gauntlet 7 (CO)');
+      }
+      if (normalizeStrainerState(level.strainer).present) {
+        reasons.push('honey + strainer is out of scope for Gauntlet 7 (CO)');
+      }
+      if (constraints.some((c) => c?.mode === 'sink-only')) {
+        reasons.push('honey + sink is out of scope for Gauntlet 7 (CO)');
+      }
+      if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+        reasons.push('honey + targets is out of scope for Gauntlet 7 (CO)');
+      }
+      if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+        reasons.push('honey + tasting is out of scope for Gauntlet 7 (CO)');
+      }
+    }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.
   void isHomogeneous;
