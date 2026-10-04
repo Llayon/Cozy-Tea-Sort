@@ -97,6 +97,17 @@ const batches = [
   { name: 'honey stress challenge', files: ['tests/honey-stress-challenge.test.ts'] },
   { name: 'honey stress peak', files: ['tests/honey-stress-peak.test.ts'] },
   { name: 'teapot + honey stress', files: ['tests/honey-stress-teapot.test.ts'] },
+  { name: 'interaction matrix + solver', files: ['tests/interaction.test.ts', 'tests/interaction-solver.test.ts'] },
+  {
+    name: 'interaction templates + fast path + rollout + view',
+    files: [
+      'tests/interaction-templates.test.ts',
+      'tests/interaction-fastpath.test.ts',
+      'tests/interaction-rollout.test.ts',
+      'tests/interaction-view.test.ts',
+    ],
+  },
+  { name: 'interaction stress', files: ['tests/interaction-stress.test.ts'] },
 ];
 
 function runBatch(batch) {

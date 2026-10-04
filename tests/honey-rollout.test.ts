@@ -242,8 +242,20 @@ describe('rollout invariants 1–600', () => {
         cfg.sinkingIngredient !== undefined,
       ].filter(Boolean).length;
       expect(specials).toBeLessThanOrEqual(2);
-      // Honey exclusives (Gauntlet 7 tight scope).
-      expect(cfg.sinkingIngredient !== undefined && cfg.floatingIngredient !== undefined).toBe(false);
+      // Honey exclusives (Gauntlet 7 scope, Gauntlet 8 interaction carve-out:
+      // lemon+honey is allowed ONLY as exactly {lemon, honey} on challenge
+      // with no third special — levels 58/62 and the post-64 rotation).
+      if (cfg.sinkingIngredient !== undefined && cfg.floatingIngredient !== undefined) {
+        expect(cfg.floatingIngredient).toBe('lemon');
+        expect(cfg.sinkingIngredient).toBe('honey');
+        expect(cfg.phase).toBe('challenge');
+        expect(cfg.hasSourceOnlyTeapot).toBe(false);
+        expect(cfg.hasSinkGuestCup).toBe(false);
+        expect(cfg.hasTastingBowl).toBe(false);
+        expect(cfg.hasStrainer).toBe(false);
+        expect(cfg.targetTeaIds).toEqual([]);
+        expect(cfg.hasMysteryLayer).toBe(false);
+      }
       expect(cfg.sinkingIngredient !== undefined && cfg.hasStrainer).toBe(false);
       expect(cfg.sinkingIngredient !== undefined && cfg.hasSinkGuestCup).toBe(false);
       expect(cfg.sinkingIngredient !== undefined && cfg.hasTastingBowl).toBe(false);
