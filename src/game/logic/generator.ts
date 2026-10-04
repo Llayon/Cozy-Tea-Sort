@@ -155,6 +155,14 @@ import {
   instantiateHoneyTemplate,
 } from './honeyTemplates';
 import {
+  LEMON_HONEY_DEPTH_ACCEPT,
+  LEMON_HONEY_TARGET_TEAS,
+  LEMON_HONEY_TEMPLATE_ATTEMPTS,
+  LEMON_HONEY_TEMPLATE_BANK,
+  LemonHoneyTemplateKind,
+  instantiateLemonHoneyTemplate,
+} from './lemonHoneyTemplates';
+import {
   depthDistance,
   RhythmPhase,
   depthAccepted,
@@ -333,11 +341,20 @@ export function requestedSinkingIngredient(req: GenerateRequest): SinkingIngredi
 }
 
 /**
+ * A G8 request is recognized when BOTH are requested: floating 'lemon'
+ * AND sinking 'honey' (existing fields — interaction is composition of
+ * existing mechanics, not a new mechanic identity field, §65).
+ */
+export function isLemonHoneyInteractionRequest(req: GenerateRequest): boolean {
+  return requestedFloatingIngredient(req) === 'lemon' && requestedSinkingIngredient(req) === 'honey';
+}
+
+/**
  * Fail-fast request validation for sinking honey (programming errors,
  * not generation luck). Gauntlet 7 supports: honey (+ optional Mystery,
- * + optional single teapot). Rejected loudly: lemon, strainer, sink,
- * tasting, targets, multi-teapot, missing buckwheat in the active
- * palette.
+ * + optional single teapot). Rejected loudly: lemon (except the exact
+ * Gauntlet 8 interaction below), strainer, sink, tasting, targets,
+ * multi-teapot, missing buckwheat in the active palette.
  */
 export function validateSinkingIngredientRequest(req: GenerateRequest): void {
   const honey = requestedSinkingIngredient(req);
@@ -353,7 +370,33 @@ export function validateSinkingIngredientRequest(req: GenerateRequest): void {
     );
   }
   if (requestedFloatingIngredient(req) !== undefined) {
-    throw new Error(`validateSinkingIngredientRequest: ${honey} + lemon is out of scope for Gauntlet 7`);
+    // Gauntlet 8 interaction carve-out (§67): ONLY lemon + the exact G8
+    // topology (4c/6v/2e, no Mystery, no teapot, no third special).
+    if (!isLemonHoneyInteractionRequest(req)) {
+      throw new Error(
+        `validateSinkingIngredientRequest: ${honey} + ${requestedFloatingIngredient(req)} is out of scope`,
+      );
+    }
+    if (requestedHasStrainer(req)) {
+      throw new Error(`validateSinkingIngredientRequest: lemon+honey + strainer is out of scope for Gauntlet 8`);
+    }
+    if (requestedSinkOnlyCount(req) > 0) {
+      throw new Error(`validateSinkingIngredientRequest: lemon+honey + sink-only is out of scope for Gauntlet 8`);
+    }
+    if (requestedTastingCupCount(req) > 0) {
+      throw new Error(
+        `validateSinkingIngredientRequest: lemon+honey + tasting bowl is out of scope for Gauntlet 8`,
+      );
+    }
+    if (requestedTargetTeas(req).length > 0) {
+      throw new Error(`validateSinkingIngredientRequest: lemon+honey + targets is out of scope for Gauntlet 8`);
+    }
+    if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+      throw new Error(
+        'validateSinkingIngredientRequest: lemon+honey interaction requires 4 colors, 6 vessels, 2 empties, no Mystery, no teapot',
+      );
+    }
+    return;
   }
   if (requestedHasStrainer(req)) {
     throw new Error(`validateSinkingIngredientRequest: ${honey} + strainer is out of scope for Gauntlet 7`);
@@ -690,6 +733,136 @@ export function analyzeHoneyParticipation(
     slots = [...res.state.sinkingIngredients];
   }
   return { stays, moves, firstMoveDepth };
+}
+
+/**
+ * Multi-ingredient interaction trace (Gauntlet 8 §38, ANALYSIS ONLY —
+ * never gameplay state). Replays a solution and counts, at deterministic
+ * action boundaries, cohost states (one vessel holding BOTH lemon and
+ * honey), SPLIT events (cohost source pours: lemon moves, honey stays
+ * because tea remains) and JOINT MOVE events (cohost source empties:
+ * lemon AND honey relocate together), plus final goal/win verdicts.
+ */
+export interface IngredientInteractionTrace {
+  lemonMoves: number;
+  honeyStays: number;
+  honeyMoves: number;
+  cohostStates: number;
+  splitEvents: number;
+  jointMoveEvents: number;
+  firstCohostDepth: number | null;
+  firstSplitDepth: number | null;
+  firstJointMoveDepth: number | null;
+  finalLemonOk: boolean;
+  finalHoneyOk: boolean;
+  /** Final lemon host index (-1 when absent). */
+  finalLemonHost: number;
+  /** Final honey host index (-1 when absent). */
+  finalHoneyHost: number;
+  win: boolean;
+}
+
+function isCohostBoard(
+  floating: readonly (FloatingIngredientSlot | null)[],
+  sinking: readonly (SinkingIngredientSlot | null)[],
+): boolean {
+  for (let i = 0; i < floating.length; i++) {
+    if (floating[i] === 'lemon' && sinking[i] === 'honey') return true;
+  }
+  return false;
+}
+
+export function analyzeIngredientInteraction(
+  startCups: TeaId[][],
+  startFloating: readonly FloatingIngredientSlot[],
+  startSinking: readonly SinkingIngredientSlot[],
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): IngredientInteractionTrace {
+  const empty: IngredientInteractionTrace = {
+    lemonMoves: 0,
+    honeyStays: 0,
+    honeyMoves: 0,
+    cohostStates: 0,
+    splitEvents: 0,
+    jointMoveEvents: 0,
+    firstCohostDepth: null,
+    firstSplitDepth: null,
+    firstJointMoveDepth: null,
+    finalLemonOk: false,
+    finalHoneyOk: false,
+    finalLemonHost: -1,
+    finalHoneyHost: -1,
+    win: false,
+  };
+  let cups = startCups.map((c) => [...c]);
+  let floating = normalizeFloatingIngredients(startFloating, startCups.length);
+  let sinking = normalizeSinkingIngredients(startSinking, startCups.length);
+  const noteCohost = (depth: number): void => {
+    if (!isCohostBoard(floating, sinking)) return;
+    empty.cohostStates++;
+    if (empty.firstCohostDepth === null) empty.firstCohostDepth = depth;
+  };
+  noteCohost(0);
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') {
+      const sync = applyPuzzleActionState(
+        { cups, floatingIngredients: floating, sinkingIngredients: sinking },
+        a,
+        cupConstraints,
+      );
+      if (!sync) return empty;
+      cups = sync.state.cups;
+      floating = [...sync.state.floatingIngredients];
+      sinking = [...sync.state.sinkingIngredients];
+      noteCohost(i + 1);
+      continue;
+    }
+    const from = (a as { from: number }).from;
+    const cohostBefore = floating[from] === 'lemon' && sinking[from] === 'honey';
+    const res = applyPourState(
+      { cups, floatingIngredients: floating, sinkingIngredients: sinking },
+      from,
+      (a as { to: number }).to,
+      cupConstraints,
+    );
+    if (!res) return empty;
+    const lemonMoved = res.floatingIngredientMoved === 'lemon';
+    const honeyMoved = res.sinkingIngredientMoved === 'honey';
+    if (lemonMoved) empty.lemonMoves++;
+    if (sinking[from] === 'honey') {
+      if (honeyMoved) {
+        empty.honeyMoves++;
+        if (cohostBefore && lemonMoved) {
+          empty.jointMoveEvents++;
+          if (empty.firstJointMoveDepth === null) empty.firstJointMoveDepth = i;
+        }
+      } else if (res.state.cups[from]?.length !== 0) {
+        empty.honeyStays++;
+        if (cohostBefore && lemonMoved) {
+          empty.splitEvents++;
+          if (empty.firstSplitDepth === null) empty.firstSplitDepth = i;
+        }
+      }
+    }
+    cups = res.state.cups;
+    floating = [...res.state.floatingIngredients];
+    sinking = [...res.state.sinkingIngredients];
+    noteCohost(i + 1);
+  }
+  const lemonHost = floating.findIndex((s) => s === 'lemon');
+  const honeyHost = sinking.findIndex((s) => s === 'honey');
+  empty.finalLemonHost = lemonHost;
+  empty.finalHoneyHost = honeyHost;
+  empty.finalLemonOk =
+    lemonHost >= 0 &&
+    floatingIngredientHostSatisfied('lemon', cups[lemonHost] as TeaId[], cupConstraints[lemonHost]);
+  empty.finalHoneyOk =
+    honeyHost >= 0 &&
+    sinkingIngredientHostSatisfied('honey', cups[honeyHost] as TeaId[], cupConstraints[honeyHost]);
+  empty.win = isPuzzleWonState({ cups, floatingIngredients: floating, sinkingIngredients: sinking }, cupConstraints);
+  return empty;
 }
 
 /**
@@ -1171,7 +1344,14 @@ function finalizeCandidate(
     if ((hiddenCounts[host] ?? 0) !== 0) return null; // CL
     // CO: unsupported honey combinations absent (also enforced loudly at
     // request validation; re-checked here so no path slips through).
-    if (presentIds.length > 0) return null;
+    // Gauntlet 8 interaction (lemon + exact G8 topology) allows exactly
+    // one lemon; everything else still rejects.
+    const isInteraction = isLemonHoneyInteractionRequest(req);
+    if (presentIds.length > 0 && !isInteraction) return null;
+    if (isInteraction) {
+      if (presentIds.length !== 1 || presentIds[0] !== 'lemon') return null; // CX
+      if (slots.findIndex((s) => s === 'lemon') === host) return null; // CZ
+    }
     if (strainerState.present) return null;
     if (countSinkOnly(normalized) > 0) return null;
     if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
@@ -1204,9 +1384,12 @@ function finalizeCandidate(
     return level;
   }
   if (wantHoney !== undefined) {
-    // CP–CV: honey production gate (stay + move participation standard).
-    // Unlike the strainer rescued-necessity gate, honey is an additional
-    // GOAL — no without-honey unsolvability proof is required.
+    const isInteraction = isLemonHoneyInteractionRequest(req);
+    // CP–CV/DI–DR: honey production gate. Honey-alone requires stay + move
+    // participation (CS–CV). Unlike the strainer rescued-necessity gate,
+    // honey is an additional GOAL — no without-honey unsolvability proof is
+    // required. Interaction requests require TRUE differential L2
+    // participation instead (DJ–DR).
     if (stats) stats.solverCalls++;
     const honeySolved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -1216,19 +1399,41 @@ function finalizeCandidate(
     });
     if (!honeySolved.solvable || honeySolved.truncated) return null; // CP, CQ
     if (honeySolved.minMoves === undefined) return null;
-    if (!honeyDepthAccepted(honeySolved.minMoves, req)) return null; // CR
+    if (isInteraction) {
+      if (
+        honeySolved.minMoves < LEMON_HONEY_DEPTH_ACCEPT.min ||
+        honeySolved.minMoves > LEMON_HONEY_DEPTH_ACCEPT.max
+      ) {
+        return null; // DI
+      }
+    } else if (!honeyDepthAccepted(honeySolved.minMoves, req)) {
+      return null; // CR
+    }
     const honeySolution = (honeySolved.solution ?? []) as SolverAction[];
-    const honeyPart = analyzeHoneyParticipation(cups, sinkSlots, honeySolution, normalized);
-    if (honeyPart.stays < 1 || honeyPart.moves < 1) return null; // CS, CT
-    const honeyFinal = applySolutionState(
-      { cups, floatingIngredients: slots, sinkingIngredients: sinkSlots },
-      honeySolution,
-      normalized,
-    );
-    if (!honeyFinal) return null;
-    const honeyFinalHost = honeyFinal.sinkingIngredients.findIndex((s) => s === wantHoney);
-    if (!sinkingIngredientHostSatisfied(wantHoney, honeyFinal.cups[honeyFinalHost] as TeaId[], normalized[honeyFinalHost])) return null; // CU
-    if (!isPuzzleWonState(honeyFinal, normalized)) return null; // CV
+    if (isInteraction) {
+      const trace = analyzeIngredientInteraction(cups, slots, sinkSlots, honeySolution, normalized);
+      if (trace.lemonMoves < 1) return null; // DJ
+      if (trace.honeyStays < 1) return null; // DK
+      if (trace.honeyMoves < 1) return null; // DL
+      if (trace.cohostStates < 1) return null; // DM
+      if (trace.splitEvents < 1) return null; // DN
+      if (!trace.finalLemonOk) return null; // DO
+      if (!trace.finalHoneyOk) return null; // DP
+      if (trace.finalLemonHost === trace.finalHoneyHost) return null; // DQ
+      if (!trace.win) return null; // DR
+    } else {
+      const honeyPart = analyzeHoneyParticipation(cups, sinkSlots, honeySolution, normalized);
+      if (honeyPart.stays < 1 || honeyPart.moves < 1) return null; // CS, CT
+      const honeyFinal = applySolutionState(
+        { cups, floatingIngredients: slots, sinkingIngredients: sinkSlots },
+        honeySolution,
+        normalized,
+      );
+      if (!honeyFinal) return null;
+      const honeyFinalHost = honeyFinal.sinkingIngredients.findIndex((s) => s === wantHoney);
+      if (!sinkingIngredientHostSatisfied(wantHoney, honeyFinal.cups[honeyFinalHost] as TeaId[], normalized[honeyFinalHost])) return null; // CU
+      if (!isPuzzleWonState(honeyFinal, normalized)) return null; // CV
+    }
     const level: GeneratedLevel = {
       cups,
       hiddenCounts,
@@ -1813,6 +2018,55 @@ function honeyRotationEntry(
   return { cups, constraints, honeyHost: host };
 }
 
+/**
+ * Pinned strong L2 interaction fallback (depth 11, clear split at 5/11,
+ * joint move present): instantiated with the identity c2/c3 order so the
+ * recorded depth holds exactly. Passes through `finalizeCandidate` —
+ * never trusted blindly.
+ */
+const LEMON_HONEY_FALLBACK_TEMPLATE_ID = 'lemon-honey-11-9326';
+
+function primaryLemonHoneyFallback(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[]; lemonHost: number; honeyHost: number } | null {
+  if (!isLemonHoneyInteractionRequest(req)) return null;
+  const kind = lemonHoneyTemplateKindFor(req);
+  if (!kind) return null;
+  const tpl = LEMON_HONEY_TEMPLATE_BANK[kind].find((t) => t.id === LEMON_HONEY_FALLBACK_TEMPLATE_ID);
+  if (!tpl) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  if (!palette.includes(LEMON_HONEY_TARGET_TEAS.honey) || !palette.includes(LEMON_HONEY_TARGET_TEAS.lemon)) {
+    return null;
+  }
+  const others = palette.filter(
+    (t) => t !== LEMON_HONEY_TARGET_TEAS.honey && t !== LEMON_HONEY_TARGET_TEAS.lemon,
+  );
+  if (others.length < 2) return null;
+  const inst = instantiateLemonHoneyTemplate(tpl, palette, [others[0] as TeaId, others[1] as TeaId]);
+  const constraints = defaultCupConstraints(inst.cups.length);
+  return { cups: inst.cups, constraints, lemonHost: inst.lemonHost, honeyHost: inst.honeyHost };
+}
+
+/**
+ * Generic interaction rotation shape: rotation cups with lemon on the
+ * first and honey on the second eligible mixed-full vessel. Deterministic
+ * backup behind the pinned topology.
+ */
+function lemonHoneyRotationEntry(
+  req: GenerateRequest,
+): { cups: TeaId[][]; constraints: CupConstraint[]; lemonHost: number; honeyHost: number } | null {
+  if (!isLemonHoneyInteractionRequest(req)) return null;
+  const cups = rotationCups({ ...req, sourceOnlyCount: 0 });
+  const constraints = constraintsForShape(cups.length, 0);
+  const eligible: number[] = [];
+  cups.forEach((cup, idx) => {
+    if (cup.length === STANDARD_CUP_CAPACITY && isMixedFullCup(cup)) eligible.push(idx);
+  });
+  if (eligible.length < 2) return null;
+  return { cups, constraints, lemonHost: eligible[0] as number, honeyHost: eligible[1] as number };
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -1837,8 +2091,13 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantHoney !== undefined ? `:${wantHoney}` : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null }> = [];
-  // Dedicated honey shapes go first for honey requests (1 solve on hit).
-  if (wantHoney !== undefined) {
+  // Dedicated interaction shapes go first for lemon+honey requests.
+  if (isLemonHoneyInteractionRequest(req)) {
+    const dedicatedInteraction = primaryLemonHoneyFallback(req);
+    if (dedicatedInteraction) shapeEntries.push(dedicatedInteraction);
+    const interactionRot = lemonHoneyRotationEntry(req);
+    if (interactionRot) shapeEntries.push(interactionRot);
+  } else if (wantHoney !== undefined) {
     const dedicatedHoney = primaryHoneyFallback(req);
     if (dedicatedHoney) shapeEntries.push(dedicatedHoney);
     const honeyRot = honeyRotationEntry(req);
@@ -2247,6 +2506,9 @@ export function lemonTemplateKindFor(req: GenerateRequest): LemonTemplateKind | 
   if (requestedTargetTeas(req).length > 0) return null;
   if (requestedSinkOnlyCount(req) > 0) return null;
   if (requestedTastingCupCount(req) > 0) return null;
+  // Gauntlet 8 interaction requests (lemon + honey) are served by the
+  // dedicated lemon-honey bank — never silently degrade to lemon-only.
+  if (requestedSinkingIngredient(req) !== undefined) return null;
   const teapot = requestedSourceOnlyCount(req);
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 0) {
     return 'lemon-challenge';
@@ -2553,6 +2815,78 @@ function generateFromTemplateBank(
   return null;
 }
 
+/**
+ * Match a request against the interaction bank (Gauntlet 8). Recognized
+ * ONLY for the exact production combination: lemon + honey, 4 colors, 6
+ * vessels, 2 empties, no Mystery, no teapot, no third special. Anything
+ * else keeps the existing paths (validation throws for bad combos).
+ */
+export function lemonHoneyTemplateKindFor(req: GenerateRequest): LemonHoneyTemplateKind | null {
+  if (!isLemonHoneyInteractionRequest(req)) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'lemon-honey-interaction';
+  }
+  return null;
+}
+
+/**
+ * Bounded interaction fast path (Gauntlet 8 §69–70): seeded template
+ * choice → c0=buckwheat, c1=sea_buckthorn, seeded c2/c3 swap (a full
+ * isomorphism on non-target teas, so the bank depth is preserved) →
+ * place both initial ingredients → single `finalizeCandidate` validation
+ * (L2 trace inside). At most LEMON_HONEY_TEMPLATE_ATTEMPTS validations,
+ * never a 150-deal scan.
+ */
+function generateFromLemonHoneyTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = lemonHoneyTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = LEMON_HONEY_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  const others = palette.filter(
+    (t) => t !== LEMON_HONEY_TARGET_TEAS.honey && t !== LEMON_HONEY_TARGET_TEAS.lemon,
+  );
+  for (let a = 0; a < LEMON_HONEY_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: swap the two non-target roles (or keep).
+    // A bijection fixing both target teas — depth preserved exactly.
+    const c2c3: [TeaId, TeaId] =
+      rng() < 0.5
+        ? [others[0] as TeaId, others[1] as TeaId]
+        : [others[1] as TeaId, others[0] as TeaId];
+    const inst = instantiateLemonHoneyTemplate(tpl, palette, c2c3);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    const floating: FloatingIngredientSlot[] = emptyFloatingIngredients(inst.cups.length);
+    floating[inst.lemonHost] = 'lemon';
+    const sinking: SinkingIngredientSlot[] = emptySinkingIngredients(inst.cups.length);
+    sinking[inst.honeyHost] = 'honey';
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#lemon-honey:${tpl.id}`,
+      constraints,
+      stats,
+      floating,
+      undefined,
+      sinking,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 export function generateLevel(
   req: GenerateRequest,
   seed: SeedInput,
@@ -2633,6 +2967,16 @@ export function generateLevel(
   // or the validated fallback ladder.
   if (honeyTemplateKindFor(req) !== null) {
     const fast = generateFromHoneyTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical lemon+honey interaction configs skip the random scan
+  // entirely (Gauntlet 8 §69–70): bounded LEMON_HONEY_TEMPLATE_ATTEMPTS
+  // validations, never a 150-deal scan. Interaction is composition of the
+  // existing lemon+honey fields — no new request identity.
+  if (lemonHoneyTemplateKindFor(req) !== null) {
+    const fast = generateFromLemonHoneyTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -3137,9 +3481,24 @@ export function validateLevelStructure(
         if ((level.hiddenCounts[host] ?? 0) !== 0) {
           reasons.push(`honey host ${host} must not be the Mystery cup (CL)`);
         }
+        if (isLemonHoneyInteractionRequest(req)) {
+          const lemonHost = slots.findIndex((s) => s === 'lemon');
+          if (lemonHost === host) {
+            reasons.push('lemon and honey initial hosts must differ (CZ)');
+          }
+        }
       }
-      if (presentIds.length > 0) {
+      if (presentIds.length > 0 && !isLemonHoneyInteractionRequest(req)) {
         reasons.push('honey + lemon is out of scope for Gauntlet 7 (CO)');
+      }
+      if (isLemonHoneyInteractionRequest(req)) {
+        if (presentIds.length !== 1 || presentIds[0] !== 'lemon') {
+          reasons.push(`interaction requires exactly one lemon (CX), got [${presentIds.join(',')}]`);
+        }
+        const lemonPalette = req.colors.slice(0, req.numColors);
+        if (!lemonPalette.includes('sea_buckthorn') || !lemonPalette.includes('buckwheat')) {
+          reasons.push('interaction palette must contain sea_buckthorn and buckwheat (DD/DE)');
+        }
       }
       if (normalizeStrainerState(level.strainer).present) {
         reasons.push('honey + strainer is out of scope for Gauntlet 7 (CO)');
