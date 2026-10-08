@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CupConstraint, FloatingIngredientSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeSinkingIngredients, normalizeStrainerState } from './game/types';
+import { CupConstraint, FloatingIngredientSlot, IceSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeIceSlots, normalizeSinkingIngredients, normalizeStrainerState } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { isWonState } from './game/logic/rules';
 import { TeaSortView } from './game/view/TeaSortView';
@@ -52,6 +52,7 @@ interface LevelBackupState {
   floatingIngredients: FloatingIngredientSlot[];
   strainer: StrainerState;
   sinkingIngredients: SinkingIngredientSlot[];
+  iceSlots: IceSlot[];
 }
 
 export default function App() {
@@ -117,7 +118,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [] });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [], iceSlots: [] });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -141,6 +142,7 @@ export default function App() {
         floatingIngredient: cfg.floatingIngredient,
         hasStrainer: cfg.hasStrainer,
         sinkingIngredient: cfg.sinkingIngredient,
+        frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -155,6 +157,7 @@ export default function App() {
       floatingIngredients: [...generated.floatingIngredients],
       strainer: normalizeStrainerState(generated.strainer),
       sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
+      iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
     };
 
     return new TeaSortLogic(
@@ -164,6 +167,7 @@ export default function App() {
       generated.floatingIngredients,
       normalizeStrainerState(generated.strainer),
       normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
+      normalizeIceSlots(generated.iceSlots, generated.cups.length),
     );
   };
 
@@ -229,6 +233,7 @@ export default function App() {
         floatingIngredient: cfg.floatingIngredient,
         hasStrainer: cfg.hasStrainer,
         sinkingIngredient: cfg.sinkingIngredient,
+        frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -243,6 +248,7 @@ export default function App() {
       floatingIngredients: [...generated.floatingIngredients],
       strainer: normalizeStrainerState(generated.strainer),
       sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
+      iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
     };
 
     const logic = new TeaSortLogic(
@@ -252,6 +258,7 @@ export default function App() {
       generated.floatingIngredients,
       normalizeStrainerState(generated.strainer),
       normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
+      normalizeIceSlots(generated.iceSlots, generated.cups.length),
     );
     logicRef.current = logic;
 
@@ -390,8 +397,9 @@ export default function App() {
     const restoredSlots = [...(backup.floatingIngredients ?? [])];
     const restoredStrainer = normalizeStrainerState(backup.strainer);
     const restoredSinking = normalizeSinkingIngredients(backup.sinkingIngredients, restoredCups.length);
+    const restoredIce = normalizeIceSlots(backup.iceSlots, restoredCups.length);
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -620,8 +628,20 @@ export default function App() {
         </div>
       )}
 
+      {/* Frozen-cup first-encounter onboarding (Level 66 only): compact,
+          never blocking. NOT shown on 70 (no tutorial repeat). */}
+      {currentConfig.hasFrozenCup && currentLevel === 66 && moves === 0 && !isWon && (
+        <div
+          id="frozen-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#16242E]/95 border-b border-[#3E5A6B] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#C9E2F0] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#8AC9E8] shrink-0" />
+          <span>Замёрзшая чашка пока не отдаёт чай. Долей в неё облепиховый — лёд растает.</span>
+        </div>
+      )}
+
       {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
-          compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
+           compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
       {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
         <div
           id="lemon-honey-tutorial-hint"
@@ -848,6 +868,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C85E] font-bold">🍋🍯</span>
                 <span>Если в сосуде встретились лимон и мёд, они всё равно двигаются по своим правилам: лимон уезжает с любым переливанием, а мёд остаётся на дне до полного опустошения сосуда.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#8AC9E8] font-bold">🧊</span>
+                <span>Из замёрзшей чашки нельзя переливать. Налей в неё облепиховый чай — лёд растает, и чашка станет обычной.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

@@ -59,9 +59,10 @@ interface MechanicPlan {
   lemon: boolean;
   strainer: boolean;
   honey: boolean;
+  frozen: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -194,20 +195,40 @@ const PINNED_ROLLOUT_57_64: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–64, then a deterministic
+ * Pinned rollout 65–72 (Gauntlet 9 — frozen cup «Замёрзшая чашка»):
+ * 65 warmup clean · 66 challenge FROZEN CUP (tutorial) · 67 peak
+ * LEMON+mystery (familiar G8 lemon half — the full lemon+honey interaction
+ * is challenge-only by G8 validation, and peak phase forces Mystery, so a
+ * literal peak interaction would be ungeneratable) · 68 relax clean ·
+ * 69 warmup clean · 70 challenge FROZEN CUP (no tutorial repeat) ·
+ * 71 peak HONEY+mystery (familiar combination) · 72 relax clean.
+ */
+const PINNED_ROLLOUT_65_72: Record<number, MechanicPlan> = {
+  65: { ...CLEAN },
+  66: { ...CLEAN, frozen: true },
+  67: { ...CLEAN, lemon: true },
+  68: { ...CLEAN },
+  69: { ...CLEAN },
+  70: { ...CLEAN, frozen: true },
+  71: { ...CLEAN, honey: true },
+  72: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–72, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
  * combos, never honey + lemon / strainer / sink / tasting / targets except
  * the dedicated lemon+honey interaction, never strainer + lemon / sink /
  * tasting / targets, never lemon + sink / lemon + tasting / lemon +
  * targets / sink + targets / tasting + sink / tasting + targets, never
- * three specials together).
+ * three specials together; frozen cup stays standalone, §112–113).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
     PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ??
     PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum] ??
     PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum] ??
-    PINNED_ROLLOUT_57_64[levelNum];
+    PINNED_ROLLOUT_57_64[levelNum] ?? PINNED_ROLLOUT_65_72[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
@@ -215,9 +236,10 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   if (cycleIndex === 1) {
     // challenge (no mystery): honey → teapot+honey → strainer →
     // teapot+strainer → lemon → teapot+lemon → tasting → teapot+tasting →
-    // sink → teapot+sink → targets → teapot+targets → lemon+honey.
-    // (Cases 0–11 preserve the pre-G8 mapping exactly; G8 appends case 12.)
-    switch (cycleNumber % 13) {
+    // sink → teapot+sink → targets → teapot+targets → lemon+honey →
+    // frozen cup.
+    // (Cases 0–12 preserve the pre-G9 mapping exactly; G9 appends case 13.)
+    switch (cycleNumber % 14) {
       case 0: return { ...CLEAN, honey: true };
       case 1: return { ...CLEAN, teapot: true, honey: true };
       case 2: return { ...CLEAN, strainer: true };
@@ -230,7 +252,8 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
       case 9: return { ...CLEAN, teapot: true, sink: true };
       case 10: return { ...CLEAN, targets: true };
       case 11: return { ...CLEAN, teapot: true, targets: true };
-      default: return { ...CLEAN, lemon: true, honey: true };
+      case 12: return { ...CLEAN, lemon: true, honey: true };
+      default: return { ...CLEAN, frozen: true };
     }
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
@@ -344,6 +367,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasSinkGuestCup = plan.sink;
   const hasTastingBowl = plan.tasting;
   const hasStrainer = plan.strainer;
+  const hasFrozenCup = plan.frozen;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -362,6 +386,12 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   // Honey levels require buckwheat in the active palette (validated loudly
   // at generation). Same deterministic slot-0 injection as lemon.
   const sinkingIngredient = plan.honey ? ('honey' as const) : undefined;
+  // Frozen-cup levels require sea_buckthorn in the active palette (the
+  // stable melt tea, validated loudly at generation). Same deterministic
+  // slot-0 injection — reshuffles keep the same palette.
+  if (plan.frozen && !colors.includes('sea_buckthorn')) {
+    colors = ['sea_buckthorn', ...colors.slice(1)];
+  }
   if (plan.lemon && plan.honey) {
     // Interaction levels need BOTH target teas: sequential single-slot
     // injection would evict the first, so inject both deterministically
@@ -381,6 +411,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if (plan.frozen) {
+    phaseSubtitle = 'Замёрзшая чашка • 6 сосудов';
   } else if (plan.honey && plan.teapot) {
     phaseSubtitle = 'Чайник с мёдом • 6 сосудов';
   } else if (plan.honey) {
@@ -448,6 +480,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasSinkGuestCup,
     hasTastingBowl,
     hasStrainer,
+    hasFrozenCup,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

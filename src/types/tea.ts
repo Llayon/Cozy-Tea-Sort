@@ -62,6 +62,8 @@ export interface LevelConfig {
   hasTastingBowl: boolean;
   /** True when this level includes the catch-one movable strainer (Gauntlet 6, tight topology). */
   hasStrainer: boolean;
+  /** True when this level includes the frozen cup / ice overlay (Gauntlet 9, authored 4,4,4,3,1,0 topology). */
+  hasFrozenCup: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

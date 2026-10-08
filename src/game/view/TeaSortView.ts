@@ -18,6 +18,7 @@ import {
   CupSkinId,
   FloatingIngredientId,
   FloatingIngredientSlot,
+  IceSlot,
   SinkingIngredientSlot,
   TEA_TYPES,
   TeaId,
@@ -416,6 +417,82 @@ export function drawHoneyDrop(g: Graphics, cx: number, cy: number, r = HONEY_DRO
   g.circle(cx - 1, cy - 1.1, 1.2).fill({ color: 0xffffff, alpha: 0.6 });
 }
 
+/** Frozen-cup ice slab half-width (fits inside the 64-wide vessel). */
+export const ICE_SLAB_HALF_W = 22;
+/** Frozen-cup ice slab height. */
+export const ICE_SLAB_H = 10;
+/** Extra melt-flourish duration after the tea lands (spec §101: ~250–400ms). */
+export const ICE_MELT_MS = 320;
+
+/**
+ * Ice surface center Y in container-local coords (Gauntlet 9 §98–99): the
+ * single anchor shared by the static slab and the melt flourish. The slab
+ * rides slightly embedded into the liquid surface (like the lemon slice),
+ * never balanced above the rim.
+ */
+export function iceCenterLocalY(
+  layerCount: number,
+  constraint: CupConstraint,
+  height = 142,
+): number {
+  return lemonSurfaceLocalY(layerCount, constraint, height) - 2;
+}
+
+/**
+ * Procedural frozen slab (Gauntlet 9 §98): small translucent pale-blue ice
+ * sheet floating at the tea surface + subtle frost rim + two crack facets.
+ * Cozy and readable, never neon: restrained cyan, soft white gloss, no
+ * snowflake, no emoji, no text. Shape (not color alone) carries the frozen
+ * state for limited color discrimination (§130).
+ */
+export function drawIceSlab(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  halfW = ICE_SLAB_HALF_W,
+  h = ICE_SLAB_H,
+  alpha = 1,
+): void {
+  // Translucent slab body.
+  g.roundRect(cx - halfW, cy - h / 2, halfW * 2, h, 4).fill({ color: 0xbfe0ea, alpha: 0.75 * alpha });
+  // Frost rim (top edge reads as ice even without color).
+  g.roundRect(cx - halfW, cy - h / 2, halfW * 2, 3.4, 2).fill({ color: 0xffffff, alpha: 0.8 * alpha });
+  g.roundRect(cx - halfW, cy - h / 2, halfW * 2, h, 4).stroke({ width: 1.4, color: 0x8ab8cc, alpha: 0.9 * alpha });
+  // Two crack facets (shape language, visible in monochrome).
+  g.beginPath();
+  g.moveTo(cx - halfW * 0.3, cy - h / 2 + 1);
+  g.lineTo(cx - halfW * 0.05, cy + h / 2 - 1);
+  g.stroke({ width: 1.1, color: 0xffffff, alpha: 0.85 * alpha });
+  g.beginPath();
+  g.moveTo(cx + halfW * 0.25, cy - h / 2 + 1);
+  g.lineTo(cx + halfW * 0.45, cy);
+  g.lineTo(cx + halfW * 0.2, cy + h / 2 - 1);
+  g.stroke({ width: 1, color: 0xe8f4f8, alpha: 0.8 * alpha });
+  // Gloss highlight.
+  g.ellipse(cx - halfW * 0.4, cy - h * 0.18, 5, 1.6).fill({ color: 0xffffff, alpha: 0.55 * alpha });
+}
+
+/** Attempting to source from a frozen cup (never selects, gentle hint). */
+export const FROZEN_SOURCE_HINT = 'Сначала растопи лёд облепиховым чаем.';
+/** Pouring non-hot tea toward a frozen cup. */
+export const FROZEN_NEEDS_HOT_HINT = 'Сюда можно долить только облепиховый — он растопит лёд.';
+
+/**
+ * Frozen-pour UX copy (pure, no Pixi): maps `pourRejectCodeState` ice gates
+ * to Russian hints. `ok` and non-ice codes yield empty string (the caller
+ * handles other rejections through their own copy).
+ */
+export function frozenPourHint(code: string): string {
+  switch (code) {
+    case 'source-frozen':
+      return FROZEN_SOURCE_HINT;
+    case 'target-frozen-needs-hot':
+      return FROZEN_NEEDS_HOT_HINT;
+    default:
+      return '';
+  }
+}
+
 /** Mini brass mesh basket radius for the attached-over-rim marker. */
 export const STRAINER_ATTACHED_R = 9;
 /** Stand basket radius (clearly a tool, never a cup). */
@@ -564,6 +641,14 @@ export class CupView {
    * view-owned honey index/boolean.
    */
   honeyGraphics: Graphics;
+  /**
+   * Frozen-cup ice layer (Gauntlet 9 §98–99): translucent slab riding the
+   * liquid surface. Above the liquid (like the lemon slice), below the
+   * target motif. Driven solely by `Cup.ice` — no view-owned ice index.
+   * No suppression flag: logic ice is already null post-melt, so the melt
+   * flourish (transit layer) can never coincide with this static.
+   */
+  iceGraphics: Graphics;
   glassOverlay: Graphics;
   glowGraphics: Graphics;
   /**
@@ -670,6 +755,28 @@ export class CupView {
     const pivot = this.cupBodyContainer.pivot;
     const localX = this.width / 2;
     const localY = lemonCenterLocalY(layerCount, this.constraint, this.height);
+    const r = rotatePoint2D(
+      localX - pivot.x,
+      localY - pivot.y,
+      this.cupBodyContainer.rotation,
+    );
+    return {
+      x: this.container.x + (this.width / 2 + r.x) * this.scale,
+      y: this.container.y + (pivot.y + this.currentLift + r.y) * this.scale,
+    };
+  }
+
+  /**
+   * Ice surface point in stage space (Gauntlet 9 §98/§107): the ACTUAL
+   * transformed ice anchor — local ice point rotated by the live body tilt
+   * around the body pivot, shifted by the live lift, scaled and placed at
+   * the container position (same convention as `surfaceStagePoint`, shake
+   * ignored). The static slab and the melt flourish share this point.
+   */
+  iceSurfaceStagePoint(layerCount: number): { x: number; y: number } {
+    const pivot = this.cupBodyContainer.pivot;
+    const localX = this.width / 2;
+    const localY = iceCenterLocalY(layerCount, this.constraint, this.height);
     const r = rotatePoint2D(
       localX - pivot.x,
       localY - pivot.y,
@@ -835,6 +942,9 @@ export class CupView {
 
     this.lemonGraphics = new Graphics();
     this.cupBodyContainer.addChild(this.lemonGraphics);
+
+    this.iceGraphics = new Graphics();
+    this.cupBodyContainer.addChild(this.iceGraphics);
 
     this.targetGraphics = new Graphics();
     this.cupBodyContainer.addChild(this.targetGraphics);
@@ -1369,11 +1479,34 @@ export class CupView {
     drawHoneyBlob(g, p.x, p.y);
   }
 
+  /**
+   * Frozen-cup ice slab (Gauntlet 9 §98–99): drawn from the authoritative
+   * `Cup.ice` at the actual liquid surface for the current (possibly
+   * fill-animating) layer count. Tea layers stay fully visible beneath the
+   * translucent slab; the slab + frost rim + cracks read as frozen by
+   * shape, not color alone.
+   */
+  renderIce(cup: Cup) {
+    const g = this.iceGraphics;
+    g.clear();
+    if (cup.ice == null || cup.ice !== 'ice') return;
+    // During a fill animation the logic is already post-move: ride the
+    // animated surface like the lemon slice instead of jumping.
+    let effCount = cup.layers.length;
+    if (this.fillingCount > 0 && this.fillingLayer) {
+      effCount = cup.layers.length - this.fillingCount + this.fillingCount * this.fillAmount;
+    }
+    const cx = this.width / 2;
+    const cy = iceCenterLocalY(effCount, cup.constraint, this.height);
+    drawIceSlab(g, cx, cy);
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
     this.renderTargetMotif(cup);
     this.renderLemon(cup);
     this.renderHoney(cup);
+    this.renderIce(cup);
     // Sink glow lives in glowGraphics (behind the liquid, like the
     // selection ring); re-apply it on every liquid redraw unless a
     // selection ring is active (setSelection owns the layer then).
@@ -1619,6 +1752,23 @@ export class TeaSortView {
     durMs: number;
   } | null = null;
 
+  /** Melt-flourish layer (Gauntlet 9 §101, existing ticker only). */
+  iceTransitGraphics = new Graphics();
+  /**
+   * Active ice-melt flourish (Gauntlet 9 §101–105): the static slab is
+   * already gone from logic (post-move ice null), so this transit layer
+   * draws the cracking/fading slab at the destination surface for
+   * ICE_MELT_MS under the EXISTING ticker (no second ticker). Reads ONLY
+   * the `iceMelted` transition metadata — never a view-owned ice index.
+   * Exactly one visual ice representation at any time (§105).
+   */
+  private iceMelt: {
+    x: number;
+    y: number;
+    startMs: number;
+    durMs: number;
+  } | null = null;
+
   /** In-flight honey drop layer (Gauntlet 7 §82, existing ticker only). */
   honeyTransitGraphics = new Graphics();
   /**
@@ -1798,6 +1948,11 @@ export class TeaSortView {
     // transit layer so a pour moving both never erases the other.
     this.honeyTransitGraphics.eventMode = 'none';
     this.rootContainer.addChild(this.honeyTransitGraphics);
+    // Ice-melt flourish (Gauntlet 9 §101–105): dedicated layer on the
+    // EXISTING ticker (no second ticker), above cups so the cracking slab
+    // reads, below particles so melt sparkles read over it.
+    this.iceTransitGraphics.eventMode = 'none';
+    this.rootContainer.addChild(this.iceTransitGraphics);
 
     this.setupInteractivity();
     this.setupCups();
@@ -2386,12 +2541,23 @@ export class TeaSortView {
       // Guest cup as SOURCE (Gauntlet 3 §40): never leave it selected as
       // if a legal source existed — subtle invalid feedback + hint, no
       // state mutation. Legality itself stays in rules.ts (`canActAsSource`
-      // reads the authoritative constraint; the view duplicates nothing).
+      // reads the authoritative constraint; this helper duplicates nothing).
       if (!canActAsSource(clickedCup.constraint)) {
         audioSynth.playInvalid();
         telegram.hapticError();
         clickedView.triggerShake();
         this.callbacks.onInvalidMove?.(GUEST_SINK_HINT);
+        return;
+      }
+
+      // Frozen cup as SOURCE (Gauntlet 9 §100): never leave it selected —
+      // subtle invalid feedback + melt hint, no state mutation. Legality
+      // itself stays in rules.ts (`source-frozen`); this duplicates nothing.
+      if (clickedCup.ice != null) {
+        audioSynth.playInvalid();
+        telegram.hapticError();
+        clickedView.triggerShake();
+        this.callbacks.onInvalidMove?.(FROZEN_SOURCE_HINT);
         return;
       }
 
@@ -2449,16 +2615,25 @@ export class TeaSortView {
           res.strained,
           res.caughtTea ?? null,
           res.sinkingIngredientMoved ?? null,
+          res.iceMelted ?? null,
         );
       }
     } else {
       // Strainer gate first (Gauntlet 6 §36): attached single-layer pours
       // reject with the needs-two copy, tool stays attached (no source
       // switch, no mutation). Malformed loaded+attached fails closed too.
+      // Frozen gate (Gauntlet 9 §100): ice rejections report their own copy
+      // with no source switch and no mutation either.
       try {
         const st = this.logic.toState();
         const code = pourRejectCodeState(
-          { cups: st.cups, floatingIngredients: st.floatingIngredients, strainer: st.strainer },
+          {
+            cups: st.cups,
+            floatingIngredients: st.floatingIngredients,
+            strainer: st.strainer,
+            sinkingIngredients: st.sinkingIngredients,
+            iceSlots: st.iceSlots,
+          },
           sourceIdx,
           clickedIdx,
           st.cupConstraints,
@@ -2472,8 +2647,27 @@ export class TeaSortView {
           this.callbacks.onInvalidMove?.(strainedPourHint(code));
           return;
         }
+        if (code === 'source-frozen' || code === 'target-frozen-needs-hot') {
+          this.lastInvalidTargetIndex = clickedIdx;
+          clickedView.triggerShake();
+          sourceView.triggerShake();
+          audioSynth.playInvalid();
+          telegram.hapticError();
+          this.callbacks.onInvalidMove?.(frozenPourHint(code));
+          return;
+        }
       } catch {
         // fall through to ordinary invalid handling
+      }
+      // A frozen cup can never become a source via second-tap switching —
+      // refuse like the guest cup (selection stays where it was).
+      if (clickedCup.ice != null) {
+        this.lastInvalidTargetIndex = null;
+        clickedView.triggerShake();
+        audioSynth.playInvalid();
+        telegram.hapticError();
+        this.callbacks.onInvalidMove?.(FROZEN_NEEDS_HOT_HINT);
+        return;
       }
       const decision = decideSecondTap(
         clickedCup.constraint,
@@ -2515,6 +2709,17 @@ export class TeaSortView {
     // refuses to select it as a source) — Undo is the way back.
     if (sourceCup.isSinkOnly) {
       return GUEST_SINK_HINT;
+    }
+    // Frozen cup can never pour out (defensive: selection UX already
+    // refuses to select it) — melt it with sea_buckthorn first.
+    if (sourceCup.ice != null) {
+      return FROZEN_SOURCE_HINT;
+    }
+    // Frozen destination only accepts the melt tea (defensive: the tap
+    // handler already maps the authoritative rejection; this keeps the
+    // fallback reason accurate too).
+    if (targetCup.ice != null) {
+      return FROZEN_NEEDS_HOT_HINT;
     }
     // Source-only teapot can never receive — no state mutation, no
     // move-count increment; the caller already plays invalid haptics/audio.
@@ -2671,6 +2876,52 @@ export class TeaSortView {
     }
   }
 
+  /**
+   * Begin the ice-melt flourish (Gauntlet 9 §101): the tea has landed and
+   * logic ice is already null, so draw the cracking slab fading in place
+   * at the destination surface for ICE_MELT_MS. Stage-space point captured
+   * at rest pose (the pour tilt has already returned by landing time).
+   */
+  private startIceMelt(x: number, y: number): void {
+    this.iceMelt = { x, y, startMs: performance.now(), durMs: ICE_MELT_MS };
+  }
+
+  private clearIceMelt(): void {
+    this.iceMelt = null;
+    try {
+      this.iceTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Ice surface point in stage space (rest pose — melt runs post-landing). */
+  private iceStagePoint(view: CupView, layerCount: number): { x: number; y: number } {
+    return view.iceSurfaceStagePoint(layerCount);
+  }
+
+  /** Draw the cracking/fading melt slab (existing ticker). */
+  private drawIceMelt(): void {
+    const t = this.iceMelt;
+    if (!t) return;
+    const progress = Math.min(1, Math.max(0, (performance.now() - t.startMs) / t.durMs));
+    // Slab shrinks slightly and fades out; a rising cool glint sells melt.
+    const shrink = 1 - progress * 0.25;
+    try {
+      this.iceTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+    drawIceSlab(
+      this.iceTransitGraphics,
+      t.x,
+      t.y - progress * 4,
+      ICE_SLAB_HALF_W * shrink,
+      ICE_SLAB_H * shrink,
+      1 - progress,
+    );
+  }
+
   /** Clear honey suppression on every cup (reset / undo / failure path). */
   private clearHoneySuppression(): void {
     for (const v of this.cupViews) {
@@ -2738,6 +2989,7 @@ export class TeaSortView {
     strained = false,
     caughtTea: TeaId | null = null,
     sinkingIngredientMoved: SinkingIngredientSlot = null,
+    iceMelted: IceSlot = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -2941,6 +3193,29 @@ export class TeaSortView {
         this.clearHoneyTransit();
         sourceView.suppressHoneyTransit = false;
         targetView.suppressHoneyTransit = false;
+        this.renderAllCups();
+      }
+    }
+
+    // Ice-melt flourish (Gauntlet 9 §101): the tea has landed and logic
+    // ice is already null, so the cracking slab fades in place at the
+    // destination surface (~320ms total extra). Part of THIS pour — same
+    // single ticker, same isAnimating lock, never a second onMoveComplete.
+    // Exactly one visual ice representation at any time (§105): the static
+    // slab is gone from logic, only this transit draws.
+    if (iceMelted === 'ice') {
+      try {
+        const toCup = this.logic.cups[toIdx];
+        const p = this.iceStagePoint(targetView, toCup?.layers.length ?? 0);
+        this.startIceMelt(p.x, p.y);
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        this.triggerRevealSparkles(p.x, p.y);
+        await this.wait(ICE_MELT_MS);
+      } catch {
+        // Failure path: refresh from logic state (ice already null there).
+      } finally {
+        this.clearIceMelt();
         this.renderAllCups();
       }
     }
@@ -3172,6 +3447,10 @@ export class TeaSortView {
     if (this.honeyTransit !== null || this.needsHoneyPass()) {
       this.drawHoneyTransit();
     }
+    // Ice-melt flourish rides the SAME single ticker (no second ticker).
+    if (this.iceMelt !== null) {
+      this.drawIceMelt();
+    }
     this.drawStrainerTransit();
     if (this.strainerStandShake > 0) {
       this.strainerStandShake = Math.max(0, this.strainerStandShake - delta);
@@ -3259,6 +3538,8 @@ export class TeaSortView {
     // Honey never strands either: clear the drop flight + suppression flags.
     this.clearHoneyTransit();
     this.clearHoneySuppression();
+    // Melt flourish never strands either (logic ice is authoritative).
+    this.clearIceMelt();
     this.setupCups();
     this.layoutCups();
     this.renderAllCups();
@@ -3286,6 +3567,9 @@ export class TeaSortView {
     this.clearLemonSuppression();
     this.clearHoneyTransit();
     this.clearHoneySuppression();
+    // Undo restores logic ice exactly; a stranded flourish would hide the
+    // restored static slab — clear it first (same audit as lemon/honey).
+    this.clearIceMelt();
     const move = this.logic.undo();
     if (move) {
       audioSynth.playUndo();
