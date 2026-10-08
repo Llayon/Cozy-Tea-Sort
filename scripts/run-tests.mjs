@@ -108,6 +108,17 @@ const batches = [
     ],
   },
   { name: 'interaction stress', files: ['tests/interaction-stress.test.ts'] },
+  { name: 'frozen-cup kernel (G9 Phase A)', files: ['tests/frozen-cup-kernel.test.ts'] },
+  {
+    name: 'frozen-cup templates + fast path + rollout + view',
+    files: [
+      'tests/frozen-cup-templates.test.ts',
+      'tests/frozen-cup-fastpath.test.ts',
+      'tests/frozen-cup-rollout.test.ts',
+      'tests/frozen-cup-view.test.ts',
+    ],
+  },
+  { name: 'frozen-cup stress', files: ['tests/frozen-cup-stress.test.ts'] },
 ];
 
 function runBatch(batch) {

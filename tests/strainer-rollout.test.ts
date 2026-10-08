@@ -65,22 +65,22 @@ describe('rollout 1–40 unchanged (Gauntlets 0–5 spot-check)', () => {
       if (lemon !== undefined) expect(cfg.colors).toContain('sea_buckthorn');
     }
     expect(mechanicPlanForLevel(6)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(10)).toEqual({
-      teapot: false, targets: true, sink: false, tasting: false, lemon: false, strainer: false, honey: false,
+      teapot: false, targets: true, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(18)).toEqual({
-      teapot: false, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false,
+      teapot: false, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(26)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false,
+      teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(34)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(38)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false,
     });
   });
 });
@@ -119,13 +119,13 @@ describe('rollout 41–48 (Gauntlet 6 catch-one strainer introduction)', () => {
       if (lemon !== undefined) expect(cfg.colors).toContain('sea_buckthorn');
     }
     expect(mechanicPlanForLevel(42)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(46)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false,
     });
     expect(mechanicPlanForLevel(47)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false,
     });
   });
 

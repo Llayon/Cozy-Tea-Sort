@@ -113,6 +113,7 @@ describe('rollout 1–56 unchanged (Gauntlets 0–7 spot-check, interaction-free
       lemon: false,
       strainer: false,
       honey: false,
+      frozen: false,
     };
     expect(mechanicPlanForLevel(6)).toEqual({ ...CLEAN, teapot: true });
     expect(mechanicPlanForLevel(10)).toEqual({ ...CLEAN, targets: true });
@@ -171,6 +172,7 @@ describe('rollout 57–64 (Gauntlet 8 lemon+honey interaction introduction)', ()
       lemon: false,
       strainer: false,
       honey: false,
+      frozen: false,
     };
     expect(mechanicPlanForLevel(57)).toEqual({ ...CLEAN });
     expect(mechanicPlanForLevel(58)).toEqual({ ...CLEAN, lemon: true, honey: true });
