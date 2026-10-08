@@ -21,6 +21,8 @@
 import {
   CupConstraint,
   FloatingIngredientSlot,
+  IceId,
+  IceSlot,
   PuzzleAction,
   SinkingIngredientSlot,
   StrainerState,
@@ -32,6 +34,7 @@ import {
   isTastingCupConstraint,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeIceSlots,
   normalizeSinkingIngredients,
   normalizeStrainerState,
 } from '../types';
@@ -62,6 +65,7 @@ export interface LevelInitialState {
   floatingIngredients?: readonly FloatingIngredientSlot[];
   sinkingIngredients?: readonly SinkingIngredientSlot[];
   strainer?: StrainerState;
+  iceSlots?: readonly IceSlot[];
 }
 
 export class Cup {
@@ -87,6 +91,12 @@ export class Cup {
    * array exactly like the floating slot (no second mutable truth).
    */
   sinkingIngredient: SinkingIngredientSlot = null;
+  /**
+   * Frozen-cup ice overlay (Gauntlet 9 — «Замёрзшая чашка»), or null.
+   * Mutable dynamic state owned by the cups array exactly like the
+   * ingredient slots (no second mutable truth, no Cup.hasIce duplicate).
+   */
+  ice: IceSlot = null;
 
   constructor(
     id: number,
@@ -95,6 +105,7 @@ export class Cup {
     constraint?: CupConstraint,
     floatingIngredient: FloatingIngredientSlot = null,
     sinkingIngredient: SinkingIngredientSlot = null,
+    ice: IceSlot = null,
   ) {
     this.id = id;
     this.layers = [...initialLayers];
@@ -102,6 +113,7 @@ export class Cup {
     if (constraint) this.constraint = cloneCupConstraint(constraint);
     this.floatingIngredient = floatingIngredient ?? null;
     this.sinkingIngredient = sinkingIngredient ?? null;
+    this.ice = ice ?? null;
   }
 
   clone(): Cup {
@@ -112,6 +124,7 @@ export class Cup {
       cloneCupConstraint(this.constraint),
       this.floatingIngredient,
       this.sinkingIngredient,
+      this.ice,
     );
     return c;
   }
@@ -204,13 +217,14 @@ export class Cup {
 
   canPourInto(target: Cup): boolean {
     // Delegate to the shared state-aware rule table via a lightweight
-    // board view. Slots travel alongside so ingredient collision is
-    // honored here too.
+    // board view. Slots travel alongside so ingredient collision (and ice
+    // legality) is honored here too.
     return canPourState(
       {
         cups: [this.layers, target.layers],
         floatingIngredients: [this.floatingIngredient, target.floatingIngredient],
         sinkingIngredients: [this.sinkingIngredient, target.sinkingIngredient],
+        iceSlots: [this.ice, target.ice],
       },
       0,
       1,
@@ -218,12 +232,13 @@ export class Cup {
     );
   }
 
-  pourInto(target: Cup): { transferred: number; layer: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot } | null {
+  pourInto(target: Cup): { transferred: number; layer: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId } | null {
     const res = applyPourState(
       {
         cups: [this.layers, target.layers],
         floatingIngredients: [this.floatingIngredient, target.floatingIngredient],
         sinkingIngredients: [this.sinkingIngredient, target.sinkingIngredient],
+        iceSlots: [this.ice, target.ice],
       },
       0,
       1,
@@ -236,11 +251,14 @@ export class Cup {
     target.floatingIngredient = res.state.floatingIngredients[1] ?? null;
     this.sinkingIngredient = res.state.sinkingIngredients[0] ?? null;
     target.sinkingIngredient = res.state.sinkingIngredients[1] ?? null;
+    this.ice = res.state.iceSlots[0] ?? null;
+    target.ice = res.state.iceSlots[1] ?? null;
     return {
       transferred: res.transferred,
       layer: res.layer,
       floatingIngredientMoved: res.floatingIngredientMoved ?? null,
       sinkingIngredientMoved: res.sinkingIngredientMoved ?? null,
+      iceMelted: res.iceMelted,
     };
   }
 }
@@ -258,6 +276,7 @@ export interface GameStateSnapshot {
   floatingIngredients: FloatingIngredientSlot[];
   sinkingIngredients: SinkingIngredientSlot[];
   strainer: StrainerState;
+  iceSlots: IceSlot[];
   action: PuzzleAction;
   move: MoveStep;
 }
@@ -275,9 +294,10 @@ export class TeaSortLogic {
     floatingIngredients?: readonly FloatingIngredientSlot[],
     strainer?: StrainerState,
     sinkingIngredients?: readonly SinkingIngredientSlot[],
+    iceSlots?: readonly IceSlot[],
   ) {
     if (initialCups.length > 0) {
-      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients);
+      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots);
     }
   }
 
@@ -288,10 +308,12 @@ export class TeaSortLogic {
     floatingIngredients?: readonly FloatingIngredientSlot[],
     strainer?: StrainerState,
     sinkingIngredients?: readonly SinkingIngredientSlot[],
+    iceSlots?: readonly IceSlot[],
   ) {
     const normalized = normalizeCupConstraints(cupConstraints, state.length);
     const slots = normalizeFloatingIngredients(floatingIngredients, state.length);
     const sinkSlots = normalizeSinkingIngredients(sinkingIngredients, state.length);
+    const ice = normalizeIceSlots(iceSlots, state.length);
     this.cups = state.map(
       (layers, idx) =>
         new Cup(
@@ -301,6 +323,7 @@ export class TeaSortLogic {
           normalized[idx] as CupConstraint,
           slots[idx] ?? null,
           sinkSlots[idx] ?? null,
+          ice[idx] ?? null,
         ),
     );
     this.strainer = normalizeStrainerState(strainer);
@@ -317,6 +340,7 @@ export class TeaSortLogic {
       init.floatingIngredients,
       init.strainer,
       init.sinkingIngredients,
+      init.iceSlots,
     );
   }
 
@@ -339,6 +363,11 @@ export class TeaSortLogic {
     return this.cups.map((c) => c.sinkingIngredient ?? null);
   }
 
+  /** Aligned ice slots, reconstructed from the cups. */
+  get iceSlots(): IceSlot[] {
+    return this.cups.map((c) => c.ice ?? null);
+  }
+
   /** Current board as plain arrays (defensive copies). */
   toState(): {
     cups: TeaId[][];
@@ -347,6 +376,7 @@ export class TeaSortLogic {
     floatingIngredients: FloatingIngredientSlot[];
     sinkingIngredients: SinkingIngredientSlot[];
     strainer: StrainerState;
+    iceSlots: IceSlot[];
   } {
     return {
       cups: this.cups.map((c) => [...c.layers]),
@@ -355,6 +385,7 @@ export class TeaSortLogic {
       floatingIngredients: this.floatingIngredients,
       sinkingIngredients: this.sinkingIngredients,
       strainer: cloneStrainerState(this.strainer),
+      iceSlots: this.iceSlots,
     };
   }
 
@@ -362,25 +393,28 @@ export class TeaSortLogic {
     return this.cups.map((c) => c.constraint);
   }
 
-  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState } {
+  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState; iceSlots: IceSlot[] } {
     return {
       cups: this.cups.map((c) => c.layers),
       floatingIngredients: this.floatingIngredients,
       sinkingIngredients: this.sinkingIngredients,
       strainer: cloneStrainerState(this.strainer),
+      iceSlots: this.iceSlots,
     };
   }
 
-  private applyBoardState(next: { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState }): void {
+  private applyBoardState(next: { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState; iceSlots: IceSlot[] }): void {
     next.cups.forEach((layers, idx) => {
       const cup = this.cups[idx];
       if (cup) cup.layers = [...layers];
     });
     const slots = normalizeFloatingIngredients(next.floatingIngredients, this.cups.length);
     const sinkSlots = normalizeSinkingIngredients(next.sinkingIngredients, this.cups.length);
+    const ice = normalizeIceSlots(next.iceSlots, this.cups.length);
     this.cups.forEach((cup, idx) => {
       cup.floatingIngredient = slots[idx] ?? null;
       cup.sinkingIngredient = sinkSlots[idx] ?? null;
+      cup.ice = ice[idx] ?? null;
     });
     this.strainer = normalizeStrainerState(next.strainer);
   }
@@ -394,7 +428,7 @@ export class TeaSortLogic {
   makeMove(
     fromIdx: number,
     toIdx: number,
-  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot } | null {
+  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
@@ -403,6 +437,7 @@ export class TeaSortLogic {
       floatingIngredients: this.floatingIngredients,
       sinkingIngredients: this.sinkingIngredients,
       strainer: cloneStrainerState(this.strainer),
+      iceSlots: this.iceSlots,
       action: { kind: 'pour', from: fromIdx, to: toIdx },
       move: {
         fromCupIndex: fromIdx,
@@ -427,6 +462,7 @@ export class TeaSortLogic {
       caughtTea: res.caughtTea,
       floatingIngredientMoved: res.floatingIngredientMoved ?? null,
       sinkingIngredientMoved: res.sinkingIngredientMoved ?? null,
+      iceMelted: res.iceMelted,
     };
   }
 
@@ -446,6 +482,7 @@ export class TeaSortLogic {
       floatingIngredients: this.floatingIngredients,
       sinkingIngredients: this.sinkingIngredients,
       strainer: cloneStrainerState(this.strainer),
+      iceSlots: this.iceSlots,
       action: { kind: 'place-strainer', to: toIdx },
       move: { fromCupIndex: -1, toCupIndex: toIdx, layer: this.cups[toIdx]?.topLayer as TeaId, count: 0 },
     };
@@ -473,6 +510,7 @@ export class TeaSortLogic {
       floatingIngredients: this.floatingIngredients,
       sinkingIngredients: this.sinkingIngredients,
       strainer: cloneStrainerState(this.strainer),
+      iceSlots: this.iceSlots,
       action: { kind: 'release-strainer', to: toIdx },
       move: { fromCupIndex: -1, toCupIndex: toIdx, layer: held, count: 1 },
     };
@@ -489,11 +527,13 @@ export class TeaSortLogic {
     const last = this.history.pop() as GameStateSnapshot;
     const slots = normalizeFloatingIngredients(last.floatingIngredients, this.cups.length);
     const sinkSlots = normalizeSinkingIngredients(last.sinkingIngredients, this.cups.length);
+    const ice = normalizeIceSlots(last.iceSlots, this.cups.length);
     this.cups.forEach((cup, idx) => {
       cup.layers = [...(last.cups[idx] ?? [])];
       cup.hiddenCount = last.hiddenCounts[idx] ?? 0;
       cup.floatingIngredient = slots[idx] ?? null;
       cup.sinkingIngredient = sinkSlots[idx] ?? null;
+      cup.ice = ice[idx] ?? null;
     });
     this.strainer = cloneStrainerState(last.strainer);
     if (last.action.kind === 'pour' || last.action.kind === 'release-strainer') {

@@ -61,6 +61,9 @@ import {
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientId,
   FloatingIngredientSlot,
+  ICE_MELT_TEA,
+  IceId,
+  IceSlot,
   PuzzleAction,
   PuzzleState,
   ReadonlyPuzzleState,
@@ -79,6 +82,7 @@ import {
   mustEndEmpty,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
+  normalizeIceSlots,
   normalizeSinkingIngredients,
   normalizeStrainerState,
 } from '../types';
@@ -92,10 +96,12 @@ export type PourRejectCode =
   | 'out-of-range'
   | 'source-empty'
   | 'source-sink-only'
+  | 'source-frozen'
   | 'target-full'
   | 'target-source-only'
   | 'target-floating-occupied'
   | 'target-sinking-occupied'
+  | 'target-frozen-needs-hot'
   | 'complete-to-empty'
   | 'color-mismatch'
   | 'strainer-needs-two-layers'
@@ -317,7 +323,16 @@ export function unstrainedPourCountState(
   constraints?: readonly CupConstraint[],
 ): number {
   const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints);
-  if (tea !== 'ok') return 0;
+  if (tea !== 'ok') {
+    // Melt exemption mirrors pourRejectCodeState (§52): the transfer count
+    // for a genuine melt pour is computed normally below.
+    if (
+      tea !== 'complete-to-empty' ||
+      !completeToEmptyMeltExempt(state, fromIdx, toIdx, constraints)
+    ) {
+      return 0;
+    }
+  }
   const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
   if (slots[fromIdx] != null && slots[toIdx] != null) return 0;
   const source = state.cups[fromIdx] as TeaId[];
@@ -332,11 +347,44 @@ export function unstrainedPourCountState(
 }
 
 /**
+ * Frozen-cup melt exemption (Gauntlet 9 §19/§52): the legacy
+ * complete-homogeneous → empty rejection assumes an ordinary symmetric
+ * relocation, but a hot-tea pour into a FROZEN empty vessel melts ice —
+ * a semantic state change that is never a mere permutation. Returns true
+ * exactly when the tea core rejects `complete-to-empty` yet the pour
+ * would be a genuine melt (frozen destination, hot tea on top, capacity
+ * already verified by the core before it reached the prune).
+ */
+function completeToEmptyMeltExempt(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  if (fromIdx < 0 || fromIdx >= state.cups.length) return false;
+  if (toIdx < 0 || toIdx >= state.cups.length) return false;
+  const ice = normalizeIceSlots(state.iceSlots, state.cups.length);
+  if (ice[toIdx] == null) return false;
+  if (topLayerOf(state.cups[fromIdx] as TeaId[]) !== ICE_MELT_TEA) return false;
+  return (
+    teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints) === 'complete-to-empty'
+  );
+}
+
+/**
  * State-aware legality (single truth): tea rules first, then
  * floating-ingredient collision, then catch-one strainer gating. The lemon
  * never alters color/capacity legality — but a source ingredient meeting
  * an already-occupied target slot is rejected fail-closed
  * (`target-floating-occupied`) rather than overwriting.
+ *
+ * Frozen cups (Gauntlet 9 — «Замёрзшая чашка»): a frozen source can never
+ * pour (`source-frozen`); a frozen destination accepts ONLY the designated
+ * hot tea (`target-frozen-needs-hot`). Hot tea bypasses no ordinary rule —
+ * a melt is an ordinary legal transfer plus an ice-state transition.
+ * Priority notes: `source-sink-only` still outranks `source-frozen` (a
+ * frozen guest cup reports its source-incapability first, §30);
+ * `target-full` still outranks melting (ice creates no space, §18).
  *
  * Catch-one gating (preferred §I semantics — every actual strainer use is
  * meaningful): when the EMPTY tool is attached to the pour source, the
@@ -353,7 +401,34 @@ export function pourRejectCodeState(
   constraints?: readonly CupConstraint[],
 ): PourRejectCode {
   const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints);
-  if (tea !== 'ok') return tea;
+  const n = state.cups.length;
+  const ice = normalizeIceSlots(state.iceSlots, n);
+  const fromIn = fromIdx >= 0 && fromIdx < n;
+  const toIn = toIdx >= 0 && toIdx < n;
+  // A frozen vessel can never source (§14) — this outranks every tea-level
+  // reason except addressing/role identity (same-cup, out-of-range, and
+  // source-sink-only per §30: a frozen guest cup still reports its
+  // source-incapability first).
+  if (fromIn && ice[fromIdx] != null && tea !== 'same-cup' && tea !== 'out-of-range' && tea !== 'source-sink-only') {
+    return 'source-frozen';
+  }
+  // Vessel capacity and destination roles win over melting: ice creates no
+  // space (§18), and a teapot never receives (§16).
+  if (tea === 'target-full' || tea === 'target-source-only') return tea;
+  // A frozen destination accepts ONLY hot tea (§15, §20) — this outranks
+  // color/prune detail, but never the capacity/role rejections above.
+  if (toIn && fromIn && ice[toIdx] != null && topLayerOf(state.cups[fromIdx] as TeaId[]) !== ICE_MELT_TEA) {
+    return 'target-frozen-needs-hot';
+  }
+  if (tea !== 'ok') {
+    // Melt pours are never mere permutations (§52): a hot full-homogeneous
+    // source into a frozen empty vessel proceeds to the checks below.
+    if (tea === 'complete-to-empty' && completeToEmptyMeltExempt(state, fromIdx, toIdx, constraints)) {
+      // fall through to floating/honey/strainer validation
+    } else {
+      return tea;
+    }
+  }
   const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
   const srcIng = slots[fromIdx];
   const dstIng = slots[toIdx];
@@ -492,6 +567,15 @@ export function isConstructiveMoveState(
   // Strained catches change the partition AND external hold — never the
   // symmetry-only full-group relocation the legacy prune targets.
   if (isStrainedCatchSource(state, fromIdx)) return true;
+  // Melt pours always change semantic state (ice overlay removed) — never
+  // a mere vessel permutation, even full-homogeneous hot tea into an
+  // empty frozen cup of the same signature group (§41).
+  if (toIdx >= 0 && toIdx < state.cups.length) {
+    const ice = normalizeIceSlots(state.iceSlots, state.cups.length);
+    if (ice[toIdx] != null && topLayerOf(state.cups[fromIdx] as TeaId[]) === ICE_MELT_TEA) {
+      return true;
+    }
+  }
   // Honey audit (§30): a move that relocates honey is constructive UNLESS
   // the COMPLETE canonical state is invariant (e.g. AAAA+honey into an
   // empty identical normal cup merely swaps the whole decorated vessel
@@ -579,12 +663,14 @@ export interface PourStateResult {
   floatingIngredientMoved?: FloatingIngredientId;
   /** Sinking ingredient that moved with the emptying outflow, if any. */
   sinkingIngredientMoved?: SinkingIngredientId;
+  /** Ice cleared by this pour, when a melt occurred (animation metadata only). */
+  iceMelted?: IceId;
 }
 
 /**
  * Atomic pure state transition (single truth): tea movement plus the
- * floating ride, the sinking rule and the catch-one tool update in ONE
- * operation.
+ * floating ride, the sinking rule, the catch-one tool update and the
+ * frozen-cup melt in ONE operation.
  *
  * - Ordinary: source loses m, destination gains m.
  * - Strained (empty tool attached to source, m >= 2): source loses ALL m,
@@ -593,9 +679,12 @@ export interface PourStateResult {
  * - Honey: the source's sinking ingredient moves to the destination IFF
  *   this successful pour completely empties the source; outflows that
  *   leave tea behind (and all inflow) leave honey untouched.
+ * - Ice (Gauntlet 9): a successful hot-tea (sea_buckthorn) inflow into a
+ *   frozen destination melts the ice atomically with the tea transfer.
+ *   Tea is conserved (nothing consumed/produced); the melt is one-way.
  * - Illegal pours (including would-be single-layer pours while attached,
- *   `strainer-needs-two-layers`, and `target-sinking-occupied`) return
- *   null with NO mutation.
+ *   `strainer-needs-two-layers`, `target-sinking-occupied`, `source-frozen`
+ *   and `target-frozen-needs-hot`) return null with NO mutation.
  */
 export function applyPourState(
   state: ReadonlyPuzzleState,
@@ -612,6 +701,7 @@ export function applyPourState(
   const nextSlots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
   const nextSink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
   const nextStrainer = normalizeStrainerState(state.strainer);
+  const nextIce = normalizeIceSlots(state.iceSlots, state.cups.length);
   const source = nextCups[fromIdx] as TeaId[];
   const target = nextCups[toIdx] as TeaId[];
   const layer = topLayerOf(source) as TeaId;
@@ -640,8 +730,17 @@ export function applyPourState(
     nextSink[fromIdx] = null;
     sinkingIngredientMoved = honey;
   }
+  // Melt (Gauntlet 9 §27–28): hot-tea inflow into a frozen destination
+  // clears ice in the SAME atomic transition. Legality above already
+  // guarantees the inflow is hot tea; the layer check stays as a
+  // fail-closed belt (ice never clears without hot tea actually entering).
+  let iceMelted: IceId | undefined;
+  if (nextIce[toIdx] != null && layer === ICE_MELT_TEA) {
+    nextIce[toIdx] = null;
+    iceMelted = 'ice';
+  }
   return {
-    state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer },
+    state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce },
     transferred: m,
     received,
     layer,
@@ -649,6 +748,7 @@ export function applyPourState(
     caughtTea,
     floatingIngredientMoved,
     sinkingIngredientMoved,
+    iceMelted,
   };
 }
 
@@ -712,6 +812,7 @@ export function applyPlaceStrainerState(
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
     sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length),
     strainer: { present: true, attachedCupIndex: toIdx, heldTea: null },
+    iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
   };
 }
 
@@ -762,6 +863,7 @@ export function applyReleaseStrainerState(
       floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
       sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length),
       strainer: { present: true, attachedCupIndex: null, heldTea: null },
+      iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
     },
     layer: held,
   };
@@ -854,6 +956,7 @@ export interface ApplyPuzzleActionResult {
   caughtTea?: TeaId;
   floatingIngredientMoved?: FloatingIngredientId;
   sinkingIngredientMoved?: SinkingIngredientId;
+  iceMelted?: IceId;
 }
 
 export function applyPuzzleActionState(
@@ -882,6 +985,7 @@ export function applyPuzzleActionState(
     caughtTea: res.caughtTea,
     floatingIngredientMoved: res.floatingIngredientMoved,
     sinkingIngredientMoved: res.sinkingIngredientMoved,
+    iceMelted: res.iceMelted,
   };
 }
 
@@ -1034,7 +1138,8 @@ export function sinkingIngredientGoalsSatisfied(
  * Canonical puzzle win: tea sorted AND every floating ingredient on its
  * correct completed tea AND the strainer holding nothing (a caught layer
  * outside the vessels means tea counts are incomplete) AND every sinking
- * ingredient under its correct completed tea. An attached-but-empty tool
+ * ingredient under its correct completed tea AND no active ice (a frozen
+ * vessel is never a finished vessel, §38–39). An attached-but-empty tool
  * may be anywhere at victory.
  */
 export function isPuzzleWonState(
@@ -1046,6 +1151,8 @@ export function isPuzzleWonState(
   if (!sinkingIngredientGoalsSatisfied(state, constraints)) return false;
   const s = normalizeStrainerState(state.strainer);
   if (s.present && s.heldTea !== null) return false;
+  const ice = normalizeIceSlots(state.iceSlots, state.cups.length);
+  if (ice.some((slot) => slot !== null)) return false;
   return true;
 }
 
@@ -1151,7 +1258,9 @@ export function canonicalKey(
  *   markers fail-closed (production validation rejects them).
  *
  * Honey-free boards take this path verbatim (G6 byte-identity); honey
- * boards use `canonicalPuzzleKeyHoney` below.
+ * boards use the grouped honey path in `canonicalPuzzleKey`, and any board
+ * carrying ice uses `groupedIceKey` (G9) — both keep ice-free keys
+ * byte-identical.
  */
 export function canonicalPuzzleKeyNoHoney(
   state: ReadonlyPuzzleState,
@@ -1253,13 +1362,86 @@ function groupedHoneyKey(
     .join('||');
 }
 
+/**
+ * Ice-aware canonical key (Gauntlet 9 §31): the ice marker joins the CUP
+ * CONTENT encoding (`…#sink:<m>#ice:<i>`), travelling WITH the tea as one
+ * unit inside the same vessel-signature group — swapping interchangeable
+ * vessels (contents + ice together) stays canonical, while frozen vs
+ * unfrozen placements key differently. `#ice:ice` segments never appear in
+ * pre-G9 keys, so frozen states can never collide with unfrozen ones.
+ * Ice-free boards take the legacy paths verbatim (byte-identical G8 keys,
+ * §32); honey-only boards keep the exact honey path below.
+ */
+function groupedIceKey(
+  state: ReadonlyPuzzleState,
+  slots: FloatingIngredientSlot[],
+  sinkSlots: SinkingIngredientSlot[],
+  iceArr: IceSlot[],
+  hasLemon: boolean,
+  toolMarkerAt: (idx: number) => string | null,
+  constraints?: readonly CupConstraint[],
+): string {
+  const normalized = normalizeCupConstraints(constraints, state.cups.length);
+  const groups = new Map<string, string[]>();
+  state.cups.forEach((cup, idx) => {
+    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const lemonMarker = slots[idx] ?? '_';
+    const sinkMarker = sinkSlots[idx] ?? '_';
+    const iceMarker = iceArr[idx] ?? '_';
+    let enc = hasLemon ? `${cup.join(',')}#${lemonMarker}` : cup.join(',');
+    const tool = toolMarkerAt(idx);
+    if (tool !== null) enc += `#${tool}`;
+    enc += `#sink:${sinkMarker}#ice:${iceMarker}`;
+    const arr = groups.get(sig);
+    if (arr) arr.push(enc);
+    else groups.set(sig, [enc]);
+  });
+  const orderedSigs = [...groups.keys()].sort();
+  return orderedSigs
+    .map((sig) => {
+      const arr = groups.get(sig) as string[];
+      arr.sort();
+      return `${sig}:${arr.join('|')}`;
+    })
+    .join('||');
+}
+
 export function canonicalPuzzleKey(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
 ): string {
   const sinkSlots = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
-  if (!sinkSlots.some((s) => s != null)) {
+  const iceArr = normalizeIceSlots(state.iceSlots, state.cups.length);
+  if (!sinkSlots.some((s) => s != null) && !iceArr.some((s) => s != null)) {
     return canonicalPuzzleKeyNoHoney(state, constraints);
+  }
+  if (iceArr.some((s) => s != null)) {
+    const strainer = normalizeStrainerState(state.strainer);
+    const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+    const hasLemon = slots.some((s) => s != null);
+    const noTool = (_idx: number): string | null => null;
+    if (!strainer.present) {
+      return groupedIceKey(state, slots, sinkSlots, iceArr, hasLemon, noTool, constraints);
+    }
+    if (strainer.heldTea !== null) {
+      const base = groupedIceKey(state, slots, sinkSlots, iceArr, hasLemon, noTool, constraints);
+      const host =
+        strainer.attachedCupIndex === null ? 'STAND' : `CUP:${strainer.attachedCupIndex}`;
+      return `${base}||STR:${host}:HOLD:${strainer.heldTea}`;
+    }
+    if (strainer.attachedCupIndex === null) {
+      const base = groupedIceKey(state, slots, sinkSlots, iceArr, hasLemon, noTool, constraints);
+      return `${base}||STR:STAND:EMPTY`;
+    }
+    return groupedIceKey(
+      state,
+      slots,
+      sinkSlots,
+      iceArr,
+      hasLemon,
+      (idx) => (strainer.attachedCupIndex === idx ? 'STR' : '_'),
+      constraints,
+    );
   }
   const strainer = normalizeStrainerState(state.strainer);
   const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);

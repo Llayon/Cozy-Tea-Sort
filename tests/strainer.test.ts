@@ -363,6 +363,7 @@ describe('H. win requires an empty hold', () => {
         floatingIngredients: noIng(3),
         sinkingIngredients: [null, null, null],
         strainer: { present: true, attachedCupIndex: host, heldTea: null },
+        iceSlots: [null, null, null],
       };
       expect(isPuzzleWonState(st)).toBe(true);
     }

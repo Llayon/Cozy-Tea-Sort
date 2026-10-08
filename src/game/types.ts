@@ -252,6 +252,27 @@ export const SINKING_INGREDIENT_TYPES = {
 export type SinkingIngredientSlot = SinkingIngredientId | null;
 
 /**
+ * Frozen-cup ice (Gauntlet 9 — «Замёрзшая чашка»): a state overlay on a
+ * vessel, NOT tea. Ice never counts toward tea color totals, never consumes
+ * vessel capacity, never transforms/consumes/produces tea. Exactly one
+ * vessel may carry it in production (`frozenCupCount` 0/1). It blocks its
+ * host from sourcing until a legal sea_buckthorn inflow melts it (one-way;
+ * undo restores it exactly).
+ */
+export type IceId = 'ice';
+
+/** Per-vessel ice slot: `'ice'` while frozen, or null. The ONE authoritative ice location. */
+export type IceSlot = IceId | null;
+
+/**
+ * Stable hot-tea identity (Gauntlet 9 §4): sea_buckthorn melts ice.
+ * Permanent player-learned rule — never randomized between levels. An
+ * existing TeaId (no lemon coexistence in G9 production, so no competing
+ * lemon-target semantics).
+ */
+export const ICE_MELT_TEA: TeaId = 'sea_buckthorn';
+
+/**
  * Full dynamic puzzle state: tea layers plus independent floating-object
  * positions, sinking-object positions, plus the movable strainer tool.
  * Immutable level data (CupConstraint[], ingredient TYPE metadata, Mystery
@@ -263,20 +284,22 @@ export interface PuzzleState {
   floatingIngredients: FloatingIngredientSlot[];
   sinkingIngredients: SinkingIngredientSlot[];
   strainer: StrainerState;
+  iceSlots: IceSlot[];
 }
 
 /**
  * Read-only view of puzzle state accepted by every state-aware rule,
  * solver and generator helper (callers may hold mutable or readonly
  * arrays; legacy tea-only arrays are never accepted here — normalize
- * first). `strainer`/`sinkingIngredients` optional for legacy callers
- * (absent = no tool / no honey).
+ * first). `strainer`/`sinkingIngredients`/`iceSlots` optional for legacy
+ * callers (absent = no tool / no honey / no ice).
  */
 export interface ReadonlyPuzzleState {
   cups: readonly TeaId[][];
   floatingIngredients: readonly FloatingIngredientSlot[] | undefined;
   sinkingIngredients?: readonly SinkingIngredientSlot[] | undefined;
   strainer?: ReadonlyStrainerState | undefined;
+  iceSlots?: readonly IceSlot[] | undefined;
 }
 
 /** All-null slots for a vessel count (ordinary old levels). */
@@ -355,6 +378,35 @@ export function normalizeSinkingIngredients(
   return out;
 }
 
+/** All-null ice slots for a vessel count (ordinary old levels). */
+export function emptyIceSlots(count: number): IceSlot[] {
+  return Array.from({ length: count }, () => null);
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers without ice
+ * synthesize all-null slots. Wrong-length arrays are padded/truncated
+ * defensively (production validation rejects them).
+ */
+export function normalizeIceSlots(
+  slots: readonly IceSlot[] | undefined,
+  count: number,
+): IceSlot[] {
+  if (!slots) return emptyIceSlots(count);
+  const out: IceSlot[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(slots[i] ?? null);
+  }
+  return out;
+}
+
+/** Total frozen vessels in a state (production max 1). */
+export function countIceSlots(state: {
+  iceSlots: readonly IceSlot[] | undefined;
+}): number {
+  return (state.iceSlots ?? []).filter((s) => s !== null).length;
+}
+
 /** Defensive deep copy of a puzzle state (no shared arrays). */
 export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
   const cups = (state.cups as TeaId[][]).map((c) => [...c]);
@@ -363,6 +415,7 @@ export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, cups.length),
     sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, cups.length),
     strainer: normalizeStrainerState(state.strainer),
+    iceSlots: normalizeIceSlots(state.iceSlots, cups.length),
   };
 }
 
