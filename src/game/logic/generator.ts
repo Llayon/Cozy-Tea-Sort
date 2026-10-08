@@ -74,6 +74,7 @@ import {
   CupConstraint,
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientSlot,
+  ICE_MELT_TEA,
   SINKING_INGREDIENT_TYPES,
   STANDARD_CUP_CAPACITY,
   StrainerState,
@@ -86,6 +87,7 @@ import {
   cupCapacity,
   defaultCupConstraints,
   emptyFloatingIngredients,
+  emptyIceSlots,
   emptySinkingIngredients,
   emptyStrainerState,
   floatingIngredientIndex,
@@ -93,11 +95,13 @@ import {
   isTastingCupConstraint,
   mustEndEmpty,
   normalizeFloatingIngredients,
+  normalizeIceSlots,
   normalizeSinkingIngredients,
   normalizeStrainerState,
   sinkingIngredientIndex,
   standStrainerState,
   type FloatingIngredientId,
+  type IceSlot,
   type SinkingIngredientId,
   type SinkingIngredientSlot,
   type SolverAction,
@@ -162,6 +166,14 @@ import {
   LemonHoneyTemplateKind,
   instantiateLemonHoneyTemplate,
 } from './lemonHoneyTemplates';
+import {
+  FROZEN_CUP_DEPTH_ACCEPT,
+  FROZEN_CUP_TARGET_TEA,
+  FROZEN_CUP_TEMPLATE_ATTEMPTS,
+  FROZEN_CUP_TEMPLATE_BANK,
+  FrozenCupTemplateKind,
+  instantiateFrozenCupTemplate,
+} from './frozenCupTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -229,6 +241,14 @@ export interface GenerateRequest {
    * exists yet on purpose).
    */
   sinkingIngredient?: SinkingIngredientId;
+  /**
+   * Number of frozen-cup (ice overlay) vessels requested (Gauntlet 9 —
+   * «Замёрзшая чашка»). 0 = standard level. Gauntlet 9 uses exactly 1:
+   * one standard normal 3/4 mixed vessel (sea_buckthorn on top) carrying
+   * the ice overlay, inside the authored 4,4,4,3,1,0 topology. Production
+   * supports max 1; every sibling special is rejected loudly.
+   */
+  frozenCupCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -255,6 +275,12 @@ export interface GeneratedLevel {
    * runtime never guesses whether the field exists.
    */
   sinkingIngredients?: SinkingIngredientSlot[];
+  /**
+   * Dynamic ice-overlay slots, aligned with `cups` indices (Gauntlet 9).
+   * ALWAYS returned in production (all-null for pre-ice levels) so
+   * runtime never guesses whether the field exists.
+   */
+  iceSlots?: IceSlot[];
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -340,6 +366,13 @@ export function requestedSinkingIngredient(req: GenerateRequest): SinkingIngredi
   return req.sinkingIngredient ?? undefined;
 }
 
+/** Requested frozen-cup count, normalized (default 0, clamped to >= 0). */
+export function requestedFrozenCupCount(req: GenerateRequest): number {
+  const v = req.frozenCupCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
 /**
  * A G8 request is recognized when BOTH are requested: floating 'lemon'
  * AND sinking 'honey' (existing fields — interaction is composition of
@@ -414,6 +447,56 @@ export function validateSinkingIngredientRequest(req: GenerateRequest): void {
     throw new Error(
       `validateSinkingIngredientRequest: sourceOnlyCount ${requestedSourceOnlyCount(req)} unsupported (production max 1)`,
     );
+  }
+}
+
+/**
+ * Fail-fast request validation for frozen cups (programming errors, not
+ * generation luck). Gauntlet 9 supports exactly the standalone
+ * interaction: one ice overlay inside the authored 4c/6v 4,4,4,3,1,0
+ * topology (numColors 4, nominal emptyCups 2 → 6 vessels), sea_buckthorn
+ * in the active palette, no Mystery/teapot/targets/sink/tasting/
+ * lemon/honey/strainer. Production max 1; anything more is rejected
+ * loudly (ER/ES).
+ */
+export function validateFrozenCupRequest(req: GenerateRequest): void {
+  const frozen = requestedFrozenCupCount(req);
+  if (frozen === 0) return;
+  if (frozen > 1) {
+    throw new Error(`validateFrozenCupRequest: frozenCupCount ${frozen} unsupported (production max 1)`);
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (!palette.includes(FROZEN_CUP_TARGET_TEA)) {
+    throw new Error(
+      `validateFrozenCupRequest: melt tea ${FROZEN_CUP_TARGET_TEA} not in active palette`,
+    );
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateFrozenCupRequest: frozen cup requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+    );
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateFrozenCupRequest: frozen cup + targets is out of scope for Gauntlet 9');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateFrozenCupRequest: frozen cup + sink-only is out of scope for Gauntlet 9');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateFrozenCupRequest: frozen cup + tasting bowl is out of scope for Gauntlet 9');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateFrozenCupRequest: frozen cup + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 9`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateFrozenCupRequest: frozen cup + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 9`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateFrozenCupRequest: frozen cup + strainer is out of scope for Gauntlet 9');
   }
 }
 
@@ -733,6 +816,80 @@ export function analyzeHoneyParticipation(
     slots = [...res.state.sinkingIngredients];
   }
   return { stays, moves, firstMoveDepth };
+}
+
+export interface IceParticipation {
+  melts: number;
+  sourceUses: number;
+  deepUnlocks: number;
+  firstMeltDepth: number | null;
+  firstSourceUseDepth: number | null;
+  firstDeepUnlockDepth: number | null;
+  finalIceCleared: boolean;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal WITH-ice solution and count MELT events (a successful
+ * hot-tea inflow clearing the overlay), SOURCE_USE events (a later pour
+ * from the formerly frozen vessel) and DEEP_UNLOCK events (that vessel
+ * later dropping below its initial 3 tea layers — proving originally
+ * trapped content moved), plus final ice/win verdicts. Production
+ * templates require melt >= 1 AND source-use >= 1 AND cleared ice AND win
+ * (FI–FL); deep unlock is preferred quality (bank is 18/18 L3).
+ */
+export function analyzeIceParticipation(
+  startCups: TeaId[][],
+  startIce: readonly IceSlot[],
+  frozenHost: number,
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): IceParticipation {
+  const out: IceParticipation = {
+    melts: 0,
+    sourceUses: 0,
+    deepUnlocks: 0,
+    firstMeltDepth: null,
+    firstSourceUseDepth: null,
+    firstDeepUnlockDepth: null,
+    finalIceCleared: false,
+    win: false,
+  };
+  let cups = startCups.map((c) => [...c]);
+  let ice = normalizeIceSlots(startIce, startCups.length);
+  let melted = false;
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') continue;
+    const res = applyPourState(
+      { cups, floatingIngredients: emptyFloatingIngredients(cups.length), iceSlots: [...ice] },
+      (a as { from: number }).from,
+      (a as { to: number }).to,
+      cupConstraints,
+    );
+    if (!res) return out;
+    cups = res.state.cups;
+    ice = [...res.state.iceSlots];
+    if (res.iceMelted === 'ice') {
+      out.melts++;
+      if (out.firstMeltDepth === null) out.firstMeltDepth = i;
+      melted = true;
+    }
+    if (melted && (a as { from: number }).from === frozenHost) {
+      out.sourceUses++;
+      if (out.firstSourceUseDepth === null) out.firstSourceUseDepth = i;
+    }
+    if (melted && (cups[frozenHost] as TeaId[]).length < 3) {
+      out.deepUnlocks++;
+      if (out.firstDeepUnlockDepth === null) out.firstDeepUnlockDepth = i;
+    }
+  }
+  out.finalIceCleared = ice.every((s) => s === null);
+  out.win = isPuzzleWonState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length), iceSlots: [...ice] },
+    cupConstraints,
+  );
+  return out;
 }
 
 /**
@@ -1139,6 +1296,7 @@ function finalizeCandidate(
   floatingIngredients?: readonly FloatingIngredientSlot[],
   strainer?: StrainerState,
   sinkingIngredients?: readonly SinkingIngredientSlot[],
+  iceSlots?: readonly IceSlot[],
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -1357,9 +1515,43 @@ function finalizeCandidate(
     if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
     if (countTastingCups(normalized) > 0) return null;
   }
+  // ER–FE: frozen-cup initial-state invariant (Gauntlet 9 standalone ice).
+  const wantFrozen = requestedFrozenCupCount(req);
+  const ice: IceSlot[] = normalizeIceSlots(iceSlots, cups.length);
+  if (ice.length !== cups.length) return null; // ET
+  const icePresent = ice.filter((s): s is 'ice' => s != null);
+  if (wantFrozen === 0) {
+    if (icePresent.length !== 0) return null;
+  } else {
+    if (icePresent.length !== 1 || icePresent[0] !== 'ice') return null; // EU
+    const host = ice.findIndex((s) => s === 'ice');
+    const hostCup = cups[host] as TeaId[];
+    const hostC = normalized[host] as CupConstraint;
+    if (!hostCup || hostCup.length !== 3) return null; // EX
+    if (hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) return null; // EV
+    if (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(hostC)) return null; // EV/EW
+    if (isTastingCupConstraint(hostC)) return null; // EV
+    const first = hostCup[0] as TeaId;
+    if (!hostCup.some((t) => t !== first)) return null; // EY: mixed
+    if (hostCup[hostCup.length - 1] !== FROZEN_CUP_TARGET_TEA) return null; // EZ: SB on top
+    if (hostCup.filter((t) => t === FROZEN_CUP_TARGET_TEA).length !== 1) return null; // FA
+    // FB: exact authored layer-count multiset 4,4,4,3,1,0.
+    const counts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(counts) !== JSON.stringify([0, 1, 3, 4, 4, 4])) return null;
+    // FD: exactly one truly empty cup.
+    if (cups.filter((c) => c.length === 0).length !== 1) return null;
+    if ((hiddenCounts[host] ?? 0) !== 0) return null; // never hide the frozen host
+    // FE: no sibling special mechanic (also enforced loudly at validation).
+    if (presentIds.length > 0) return null;
+    if (sinkPresent.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
-  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState }, normalized)) return null; // D (lemon/honey/strainer-aware)
-  if (!wantStrainer && wantHoney === undefined) {
+  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice }, normalized)) return null; // D (lemon/honey/strainer/ice-aware)
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -1376,6 +1568,7 @@ function finalizeCandidate(
       floatingIngredients: slots,
       sinkingIngredients: sinkSlots,
       strainer: strainerState,
+      iceSlots: ice,
       seed,
       minMoves: solved.minMoves,
       visitedStates: solved.visitedStates,
@@ -1441,9 +1634,52 @@ function finalizeCandidate(
       floatingIngredients: slots,
       sinkingIngredients: sinkSlots,
       strainer: strainerState,
+      iceSlots: ice,
       seed,
       minMoves: honeySolved.minMoves,
       visitedStates: honeySolved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null;
+    return level;
+  }
+  // FF–FL: frozen-cup production gate (Gauntlet 9). Ice is a legality
+  // gate, not a rescue tool — no without-ice unsolvability proof is
+  // required (§72). The optimal replay must MELT the frozen cup, later
+  // SOURCE from it, clear the ice and win (L2).
+  if (wantFrozen > 0) {
+    if (stats) stats.solverCalls++;
+    const iceSolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      iceSlots: ice,
+    });
+    if (!iceSolved.solvable || iceSolved.truncated) return null; // FF, FG
+    if (iceSolved.minMoves === undefined) return null;
+    if (
+      iceSolved.minMoves < FROZEN_CUP_DEPTH_ACCEPT.min ||
+      iceSolved.minMoves > FROZEN_CUP_DEPTH_ACCEPT.max
+    ) {
+      return null; // FH
+    }
+    const frozenHost = ice.findIndex((s) => s === 'ice');
+    const iceSolution = (iceSolved.solution ?? []) as SolverAction[];
+    const part = analyzeIceParticipation(cups, ice, frozenHost, iceSolution, normalized);
+    if (part.melts < 1) return null; // FI
+    if (part.sourceUses < 1) return null; // FJ
+    if (!part.finalIceCleared) return null; // FK
+    if (!part.win) return null; // FL
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      iceSlots: ice,
+      seed,
+      minMoves: iceSolved.minMoves,
+      visitedStates: iceSolved.visitedStates,
     };
     if (!validateLevelStructure(level, req).ok) return null;
     return level;
@@ -1502,6 +1738,7 @@ function finalizeCandidate(
     floatingIngredients: slots,
     sinkingIngredients: sinkSlots,
     strainer: strainerState,
+    iceSlots: ice,
     seed,
     minMoves: solved.minMoves,
     visitedStates: solved.visitedStates,
@@ -2067,6 +2304,34 @@ function lemonHoneyRotationEntry(
   return { cups, constraints, lemonHost: eligible[0] as number, honeyHost: eligible[1] as number };
 }
 
+/**
+ * Pinned strong frozen-cup fallback topology (depth 11, delayed melt):
+ * instantiated with the identity role mapping (c0 → sea_buckthorn,
+ * c1/c2/c3 in palette order — a full isomorphism), so the recorded depth
+ * holds exactly. Passes through `finalizeCandidate` — never trusted
+ * blindly. Backup pins cover the (near-impossible) miss.
+ */
+const FROZEN_CUP_FALLBACK_TEMPLATE_ID = 'frozen-cup-11-2165';
+const FROZEN_CUP_FALLBACK_BACKUP_IDS = ['frozen-cup-10-1215', 'frozen-cup-12-4714'];
+
+function frozenCupFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[]; frozenHost: number }> {
+  if (frozenCupTemplateKindFor(req) === null) return [];
+  const kind = frozenCupTemplateKindFor(req) as FrozenCupTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return [];
+  if (!palette.includes(FROZEN_CUP_TARGET_TEA)) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; frozenHost: number }> = [];
+  for (const id of [FROZEN_CUP_FALLBACK_TEMPLATE_ID, ...FROZEN_CUP_FALLBACK_BACKUP_IDS]) {
+    const tpl = FROZEN_CUP_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateFrozenCupTemplate(tpl, palette);
+    out.push({ cups: inst.cups, constraints: defaultCupConstraints(inst.cups.length), frozenHost: inst.frozenHost });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -2074,6 +2339,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateFloatingIngredientRequest(req);
   validateStrainerRequest(req);
   validateSinkingIngredientRequest(req);
+  validateFrozenCupRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -2082,15 +2348,22 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantIngredient = requestedFloatingIngredient(req);
   const wantStrainer = requestedHasStrainer(req);
   const wantHoney = requestedSinkingIngredient(req);
+  const wantFrozen = requestedFrozenCupCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
     `${wantSink > 0 ? ':sink' : ''}${wantTasting > 0 ? ':tasting' : ''}` +
     `${wantIngredient !== undefined ? `:${wantIngredient}` : ''}` +
     `${wantStrainer ? ':strainer' : ''}` +
-    `${wantHoney !== undefined ? `:${wantHoney}` : ''}`;
+    `${wantHoney !== undefined ? `:${wantHoney}` : ''}` +
+    `${wantFrozen > 0 ? ':frozen-cup' : ''}`;
 
-  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null }> = [];
+  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null }> = [];
+  // Dedicated frozen-cup shapes go first for frozen requests (identity
+  // role mapping — recorded depths hold exactly).
+  if (wantFrozen > 0) {
+    shapeEntries.push(...frozenCupFallbackEntries(req));
+  }
   // Dedicated interaction shapes go first for lemon+honey requests.
   if (isLemonHoneyInteractionRequest(req)) {
     const dedicatedInteraction = primaryLemonHoneyFallback(req);
@@ -2156,6 +2429,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       constraints: CupConstraint[];
       lemonHost?: number | null;
       honeyHost?: number | null;
+      frozenHost?: number | null;
     };
     const cups = entry.cups;
     let constraints = entry.constraints;
@@ -2168,6 +2442,11 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     const shapeSinkSlots: SinkingIngredientSlot[] = emptySinkingIngredients(cups.length);
     if (wantHoney !== undefined && entry.honeyHost !== undefined && entry.honeyHost !== null) {
       shapeSinkSlots[entry.honeyHost] = wantHoney;
+    }
+    // Ice slots for this shape (all-null when no frozen cup requested).
+    const shapeIceSlots: IceSlot[] = emptyIceSlots(cups.length);
+    if (wantFrozen > 0 && entry.frozenHost !== undefined && entry.frozenHost !== null) {
+      shapeIceSlots[entry.frozenHost] = 'ice';
     }
     // Named serving roles are assigned deterministically (first eligible
     // cup per tea); failure rejects this shape, never forces a bad role.
@@ -2221,6 +2500,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       shapeSlots,
       wantStrainer ? standStrainerState() : undefined,
       shapeSinkSlots,
+      shapeIceSlots,
     );
     if (level) {
       if (stats) stats.usedFallback = true;
@@ -2887,6 +3167,78 @@ function generateFromLemonHoneyTemplateBank(
   return null;
 }
 
+/**
+ * Match a request against the frozen-cup bank (Gauntlet 9). Recognized
+ * ONLY for the exact production combination: frozenCupCount 1, 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling
+ * special. Anything else keeps the existing paths (validation throws for
+ * bad combos).
+ */
+export function frozenCupTemplateKindFor(req: GenerateRequest): FrozenCupTemplateKind | null {
+  if (requestedFrozenCupCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'frozen-cup';
+  }
+  return null;
+}
+
+/**
+ * Bounded frozen-cup fast path (Gauntlet 9 §88): seeded template choice →
+ * c0 fixed to sea_buckthorn, seeded permutation of the remaining roles (a
+ * full isomorphism on non-melt teas, so the bank depth is preserved) →
+ * ice placed on the template frozen host → single `finalizeCandidate`
+ * validation (L2 trace inside). At most FROZEN_CUP_TEMPLATE_ATTEMPTS
+ * validations, never a 150-deal scan. Returns null when no template
+ * validates (caller uses the fallback ladder).
+ */
+function generateFromFrozenCupTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = frozenCupTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = FROZEN_CUP_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (!palette.includes(FROZEN_CUP_TARGET_TEA)) return null;
+  const others = palette.filter((t) => t !== FROZEN_CUP_TARGET_TEA);
+  for (let a = 0; a < FROZEN_CUP_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: full permutation of the non-melt roles.
+    // A bijection fixing sea_buckthorn — depth preserved exactly.
+    const otherOrder = [...others];
+    shuffleInPlace(rng, otherOrder);
+    const inst = instantiateFrozenCupTemplate(tpl, palette, otherOrder);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    const ice: IceSlot[] = emptyIceSlots(inst.cups.length);
+    ice[inst.frozenHost] = 'ice';
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#frozen-cup:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      ice,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 export function generateLevel(
   req: GenerateRequest,
   seed: SeedInput,
@@ -2898,6 +3250,7 @@ export function generateLevel(
   validateFloatingIngredientRequest(req);
   validateStrainerRequest(req);
   validateSinkingIngredientRequest(req);
+  validateFrozenCupRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -2977,6 +3330,16 @@ export function generateLevel(
   // existing lemon+honey fields — no new request identity.
   if (lemonHoneyTemplateKindFor(req) !== null) {
     const fast = generateFromLemonHoneyTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical frozen-cup configs skip the random scan entirely (Gauntlet 9
+  // §88): bounded FROZEN_CUP_TEMPLATE_ATTEMPTS validations, never a
+  // 150-deal scan. maxRetries: 0 still yields a valid level through the
+  // fast path or the validated fallback ladder.
+  if (frozenCupTemplateKindFor(req) !== null) {
+    const fast = generateFromFrozenCupTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -3097,8 +3460,16 @@ export function generateLevel(
  * AS. exactly one lemon when requested; AT. host non-empty; AU. host full
  * standard; AV. host mixed; AW. host plain standard normal; AX. host
  * untargeted; AY. host not teapot/sink/tasting; AZ. host != Mystery host;
- * BA. initial lemon not already satisfied; BB. no unsupported lemon combos.
- * Solver items G–J and BC–BE are enforced by finalizeCandidate, not here.
+ * BA. initial lemon not already satisfied; BB. no unsupported lemon combos;
+ * ER. frozenCupCount recognized (request validation); ES. production max
+ * exactly 1; ET. iceSlots length == cups length; EU. exactly one ice when
+ * requested; EV. ice host standard normal; EW. ice host capacity 4; EX. ice
+ * host starts length 3; EY. ice host mixed; EZ. ice host top ==
+ * sea_buckthorn; FA. ice host holds exactly one sea_buckthorn; FB. initial
+ * layer-count multiset == 4,4,4,3,1,0; FC. total tea units per TeaId remain
+ * exactly 4 (covered by C); FD. exactly one truly empty cup; FE. no
+ * third/sibling special mechanic. Solver items G–J, BC–BE and FF–FL are
+ * enforced by finalizeCandidate, not here.
  */
 export function validateLevelStructure(
   level: GeneratedLevel,
@@ -3248,21 +3619,24 @@ export function validateLevelStructure(
   for (const t of actualTargets) {
     if (!palette.includes(t)) reasons.push(`targetTeaId ${t} not in palette (P)`);
   }
-  // D: not already solved (lemon/honey-aware: tea-sorted with an
-  // ingredient on the wrong tea is NOT a solved start).
+  // D: not already solved (lemon/honey/ice-aware: tea-sorted with an
+  // ingredient on the wrong tea — or with active ice — is NOT a solved start).
   const sinkSlotsForD: SinkingIngredientSlot[] = normalizeSinkingIngredients(
     level.sinkingIngredients,
     level.cups.length,
   );
   const sinkPresentForD = sinkSlotsForD.filter((s) => s != null);
+  const iceSlotsForD: IceSlot[] = normalizeIceSlots(level.iceSlots, level.cups.length);
+  const icePresentForD = iceSlotsForD.filter((s) => s != null);
   const startWon =
-    presentIds.length > 0 || sinkPresentForD.length > 0
+    presentIds.length > 0 || sinkPresentForD.length > 0 || icePresentForD.length > 0
       ? isPuzzleWonState(
           {
             cups: level.cups,
             floatingIngredients: slots,
             sinkingIngredients: sinkSlotsForD,
             strainer: level.strainer,
+            iceSlots: iceSlotsForD,
           },
           constraints.length > 0 ? constraints : undefined,
         )
@@ -3512,6 +3886,77 @@ export function validateLevelStructure(
       if (constraints.some((c) => c && isTastingCupConstraint(c))) {
         reasons.push('honey + tasting is out of scope for Gauntlet 7 (CO)');
       }
+    }
+  }
+  // ER–FE: frozen-cup structural invariant (solver items FF–FL live in
+  // finalizeCandidate, not here).
+  const wantFrozen = requestedFrozenCupCount(req);
+  const iceSlots: IceSlot[] = normalizeIceSlots(level.iceSlots, level.cups.length);
+  if (iceSlots.length !== level.cups.length) {
+    reasons.push(`iceSlots length mismatch (ET): got ${iceSlots.length}`);
+  }
+  const icePresentIds = iceSlots.filter((s): s is 'ice' => s != null);
+  if (wantFrozen === 0) {
+    if (icePresentIds.length !== 0) {
+      reasons.push(`unexpected ice without request: ${icePresentIds.join(',')}`);
+    }
+  } else {
+    if (icePresentIds.length !== 1 || icePresentIds[0] !== 'ice') {
+      reasons.push(`expected exactly one ice (EU), got [${icePresentIds.join(',')}]`);
+    } else {
+      const host = iceSlots.findIndex((s) => s === 'ice');
+      const hostCup = level.cups[host] as TeaId[];
+      const hostC = constraints[host] as CupConstraint | undefined;
+      if (!hostCup || hostCup.length !== 3) reasons.push(`frozen host ${host} must hold exactly 3 layers (EX)`);
+      if (!hostC || hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) {
+        reasons.push(`frozen host ${host} must be untargeted plain normal (EV)`);
+      }
+      if (hostC && (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(hostC))) {
+        reasons.push(`frozen host ${host} must be a standard vessel (EV/EW)`);
+      }
+      if (hostC && (hostC.mode !== 'normal' || isTastingCupConstraint(hostC))) {
+        reasons.push(`frozen host ${host} must not be teapot/sink/tasting (EV)`);
+      }
+      if (hostCup && hostCup.length > 0) {
+        const first = hostCup[0] as TeaId;
+        if (!hostCup.some((t) => t !== first)) reasons.push(`frozen host ${host} must start mixed (EY)`);
+        if (hostCup[hostCup.length - 1] !== FROZEN_CUP_TARGET_TEA) {
+          reasons.push(`frozen host ${host} top must be ${FROZEN_CUP_TARGET_TEA} (EZ)`);
+        }
+        if (hostCup.filter((t) => t === FROZEN_CUP_TARGET_TEA).length !== 1) {
+          reasons.push(`frozen host ${host} must contain exactly one ${FROZEN_CUP_TARGET_TEA} (FA)`);
+        }
+      }
+      if ((level.hiddenCounts[host] ?? 0) !== 0) {
+        reasons.push(`frozen host ${host} must not hide mystery`);
+      }
+    }
+    const lens = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(lens) !== JSON.stringify([0, 1, 3, 4, 4, 4])) {
+      reasons.push(`frozen-cup levels must start 4,4,4,3,1,0 (FB), got [${lens.join(',')}]`);
+    }
+    if (level.cups.filter((c) => c.length === 0).length !== 1) {
+      reasons.push('frozen-cup levels must keep exactly one truly empty cup (FD)');
+    }
+    if (presentIds.length > 0) reasons.push('frozen cup + lemon is out of scope for Gauntlet 9 (FE)');
+    if (sinkPresentForD.length > 0) reasons.push('frozen cup + honey is out of scope for Gauntlet 9 (FE)');
+    if (normalizeStrainerState(level.strainer).present) {
+      reasons.push('frozen cup + strainer is out of scope for Gauntlet 9 (FE)');
+    }
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('frozen cup + sink is out of scope for Gauntlet 9 (FE)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('frozen cup + targets is out of scope for Gauntlet 9 (FE)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('frozen cup + tasting is out of scope for Gauntlet 9 (FE)');
+    }
+    if (requestedSourceOnlyCount(req) > 0) {
+      reasons.push('frozen cup + teapot is out of scope for Gauntlet 9 (FE)');
+    }
+    if (req.hasMysteryLayer) {
+      reasons.push('frozen cup + Mystery is out of scope for Gauntlet 9 (FE)');
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.
