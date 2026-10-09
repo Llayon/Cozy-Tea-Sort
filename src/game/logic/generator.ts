@@ -86,6 +86,7 @@ import {
   cloneCupConstraint,
   countFloatingIngredients,
   countSinkingIngredients,
+  countTeaBuds,
   cupCapacity,
   defaultCupConstraints,
   emptyCapacityObstacles,
@@ -93,6 +94,7 @@ import {
   emptyIceSlots,
   emptySinkingIngredients,
   emptyStrainerState,
+  emptyTeaBudSlots,
   floatingIngredientIndex,
   isReleaseStrainerAction,
   isTastingCupConstraint,
@@ -103,13 +105,16 @@ import {
   normalizeIceSlots,
   normalizeSinkingIngredients,
   normalizeStrainerState,
+  normalizeTeaBudSlots,
   sinkingIngredientIndex,
   standStrainerState,
+  teaBudIndex,
   type FloatingIngredientId,
   type IceSlot,
   type SinkingIngredientId,
   type SinkingIngredientSlot,
   type SolverAction,
+  type TeaBudSlot,
 } from '../types';
 import {
   applyPourState,
@@ -193,6 +198,13 @@ import {
   CinnamonTemplateKind,
   instantiateCinnamonTemplate,
 } from './cinnamonTemplates';
+import {
+  TEA_BLOOM_DEPTH_ACCEPT,
+  TEA_BLOOM_TEMPLATE_ATTEMPTS,
+  TEA_BLOOM_TEMPLATE_BANK,
+  TeaBloomTemplateKind,
+  instantiateTeaBloomTemplate,
+} from './teaBloomTemplates';
 import {
   depthDistance,
   RhythmPhase,
@@ -286,6 +298,16 @@ export interface GenerateRequest {
    * Production supports max 1; every sibling special is rejected loudly.
    */
   cinnamonCupCount?: number;
+  /**
+   * Number of tea-bud (route objective) vessels requested (Gauntlet 12 —
+   * «Чайный бутон»). 0 = standard level. G12 uses exactly 1: one standard
+   * normal cap4 vessel starting FULL + MIXED (4 layers, >=2 TeaIds) with a
+   * dormant bud at its physical bottom, inside the authored 4,4,4,4,0,0
+   * topology. Completely emptying it blooms the bud (slot clears); after
+   * that the vessel is ordinary. Production supports max 1; every sibling
+   * special is rejected loudly.
+   */
+  teaBudCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -325,6 +347,12 @@ export interface GeneratedLevel {
    * exists. No duplicate cinnamon index anywhere.
    */
   capacityObstacles?: CapacityObstacleSlot[];
+  /**
+   * Dynamic tea-bud slots, aligned with `cups` indices (Gauntlet 12).
+   * ALWAYS returned in production (all-null for pre-bud levels) so
+   * runtime never guesses whether the field exists. No index duplication.
+   */
+  teaBudSlots?: TeaBudSlot[];
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -427,6 +455,13 @@ export function requestedThermosCupCount(req: GenerateRequest): number {
 /** Requested cinnamon-stick count, normalized (default 0, clamped to >= 0). */
 export function requestedCinnamonCupCount(req: GenerateRequest): number {
   const v = req.cinnamonCupCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested tea-bud count, normalized (default 0, clamped to >= 0). */
+export function requestedTeaBudCount(req: GenerateRequest): number {
+  const v = req.teaBudCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -562,6 +597,9 @@ export function validateFrozenCupRequest(req: GenerateRequest): void {
   if (requestedCinnamonCupCount(req) > 0) {
     throw new Error('validateFrozenCupRequest: frozen cup + cinnamon is out of scope for Gauntlet 9');
   }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateFrozenCupRequest: frozen cup + tea bud is out of scope for Gauntlet 9');
+  }
 }
 
 /**
@@ -610,6 +648,9 @@ export function validateThermosRequest(req: GenerateRequest): void {
   }
   if (requestedCinnamonCupCount(req) > 0) {
     throw new Error('validateThermosRequest: thermos + cinnamon is out of scope for Gauntlet 10');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateThermosRequest: thermos + tea bud is out of scope for Gauntlet 10');
   }
 }
 
@@ -660,6 +701,62 @@ export function validateCinnamonRequest(req: GenerateRequest): void {
   }
   if (requestedThermosCupCount(req) > 0) {
     throw new Error('validateCinnamonRequest: cinnamon + thermos is out of scope for Gauntlet 11');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateCinnamonRequest: cinnamon + tea bud is out of scope for Gauntlet 11');
+  }
+}
+
+/**
+ * Fail-fast request validation for tea buds (programming errors, not
+ * generation luck). Gauntlet 12 supports exactly the standalone
+ * interaction: one dormant bud on a standard normal cap4 vessel holding a
+ * FULL MIXED 4-layer stack, inside the authored 4c/6v 4,4,4,4,0,0
+ * topology (numColors 4, nominal emptyCups 2 → 6 vessels), no
+ * Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen/thermos/
+ * cinnamon. Production max 1; anything more is rejected loudly (HB/HC).
+ */
+export function validateTeaBudRequest(req: GenerateRequest): void {
+  const buds = requestedTeaBudCount(req);
+  if (buds === 0) return;
+  if (buds > 1) {
+    throw new Error(`validateTeaBudRequest: teaBudCount ${buds} unsupported (production max 1)`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateTeaBudRequest: tea bud requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+    );
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateTeaBudRequest: tea bud + targets is out of scope for Gauntlet 12');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateTeaBudRequest: tea bud + sink-only is out of scope for Gauntlet 12');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateTeaBudRequest: tea bud + tasting bowl is out of scope for Gauntlet 12');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateTeaBudRequest: tea bud + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 12`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateTeaBudRequest: tea bud + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 12`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateTeaBudRequest: tea bud + strainer is out of scope for Gauntlet 12');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateTeaBudRequest: tea bud + frozen cup is out of scope for Gauntlet 12');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateTeaBudRequest: tea bud + thermos is out of scope for Gauntlet 12');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateTeaBudRequest: tea bud + cinnamon is out of scope for Gauntlet 12');
   }
 }
 
@@ -1219,6 +1316,93 @@ export function analyzeCinnamonParticipation(
   return out;
 }
 
+export interface TeaBloomParticipation {
+  blooms: number;
+  postBloomReceives: number;
+  postBloomSourceUses: number;
+  firstBloomDepth: number | null;
+  firstReuseDepth: number | null;
+  firstPostBloomSourceDepth: number | null;
+  maxPostBloomOccupancy: number;
+  finalRepurpose: boolean;
+  finalBudCleared: boolean;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal tea-bloom solution and count BLOOM events (a successful
+ * outflow emptying the dormant host, clearing tea_bud), MEANINGFUL_REUSE
+ * (later host occupancy >=2), POST_BLOOM_DRAIN (later source uses after
+ * reuse = WORKSPACE_CYCLE) and FINAL_REPURPOSE (host ends 4 homogeneous),
+ * plus final cleared/win verdicts. Production templates require bloom >= 1
+ * AND meaningful reuse >= 1 AND cleared bud AND win (HQ–HT); L3A/L3B is
+ * offline curation truth. Analysis only — never PuzzleState.
+ */
+export function analyzeTeaBloomParticipation(
+  startCups: TeaId[][],
+  startBuds: readonly TeaBudSlot[],
+  budHost: number,
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): TeaBloomParticipation {
+  const out: TeaBloomParticipation = {
+    blooms: 0,
+    postBloomReceives: 0,
+    postBloomSourceUses: 0,
+    firstBloomDepth: null,
+    firstReuseDepth: null,
+    firstPostBloomSourceDepth: null,
+    maxPostBloomOccupancy: 0,
+    finalRepurpose: false,
+    finalBudCleared: false,
+    win: false,
+  };
+  let cups = startCups.map((c) => [...c]);
+  let buds = normalizeTeaBudSlots(startBuds, startCups.length);
+  let bloomed = false;
+  let reuseSeen = false;
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') continue;
+    const from = (a as { from: number }).from;
+    const to = (a as { to: number }).to;
+    const res = applyPourState(
+      { cups, floatingIngredients: emptyFloatingIngredients(cups.length), teaBudSlots: [...buds] },
+      from,
+      to,
+      cupConstraints,
+    );
+    if (!res) return out;
+    cups = res.state.cups;
+    buds = [...res.state.teaBudSlots];
+    if (!bloomed && res.teaBudBloomed === 'tea_bud') {
+      bloomed = true;
+      out.blooms++;
+      out.firstBloomDepth = i;
+    }
+    if (bloomed) {
+      if (to === budHost) out.postBloomReceives++;
+      if (from === budHost) out.postBloomSourceUses++;
+      out.maxPostBloomOccupancy = Math.max(out.maxPostBloomOccupancy, (cups[budHost] as TeaId[]).length);
+      if (!reuseSeen && (cups[budHost] as TeaId[]).length >= 2) {
+        reuseSeen = true;
+        out.firstReuseDepth = i;
+      }
+      if (reuseSeen && out.firstReuseDepth !== null && from === budHost && i > out.firstReuseDepth && out.firstPostBloomSourceDepth === null) {
+        out.firstPostBloomSourceDepth = i;
+      }
+    }
+  }
+  const hostFinal = cups[budHost] as TeaId[];
+  out.finalRepurpose = hostFinal.length === 4 && hostFinal.every((t) => t === hostFinal[0]);
+  out.finalBudCleared = buds.every((s) => s === null);
+  out.win = isPuzzleWonState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length), teaBudSlots: [...buds] },
+    cupConstraints,
+  );
+  return out;
+}
+
 /**
  * Multi-ingredient interaction trace (Gauntlet 8 §38, ANALYSIS ONLY —
  * never gameplay state). Replays a solution and counts, at deterministic
@@ -1625,6 +1809,7 @@ function finalizeCandidate(
   sinkingIngredients?: readonly SinkingIngredientSlot[],
   iceSlots?: readonly IceSlot[],
   capacityObstacles?: readonly CapacityObstacleSlot[],
+  teaBudSlots?: readonly TeaBudSlot[],
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -1958,9 +2143,55 @@ function finalizeCandidate(
     if (icePresent.length > 0) return null;
     if (countThermosCups(normalized) > 0) return null;
   }
+  // HB–HT: tea-bud initial-state invariant (Gauntlet 12 standalone route objective).
+  const wantBud = requestedTeaBudCount(req);
+  const buds: TeaBudSlot[] = normalizeTeaBudSlots(teaBudSlots, cups.length);
+  if (buds.filter((s) => s !== null).length !== wantBud) return null; // HD/HE (HB recognized at validation)
+  if (wantBud > 1) return null; // HC: production max one
+  if (wantBud > 0) {
+    if (buds.filter((s) => s === 'tea_bud').length !== 1) return null; // HE
+    const host = buds.findIndex((s) => s === 'tea_bud');
+    const hostCup = cups[host] as TeaId[];
+    const hostC = normalized[host] as CupConstraint;
+    if (hostC.mode !== 'normal') return null; // HF
+    if (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY) return null; // HG: base cap 4
+    if (hostC.targetTeaId !== undefined) return null; // HF: no target
+    if (mustEndEmpty(hostC)) return null; // HF: standard normal only
+    if (hostCup.length !== 4) return null; // HH: starts full length 4
+    const first = hostCup[0] as TeaId;
+    if (!hostCup.some((t) => t !== first)) return null; // HI: starts mixed
+    // HJ: global topology 4,4,4,4,0,0.
+    const counts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(counts) !== JSON.stringify([0, 0, 4, 4, 4, 4])) return null;
+    // HK: exactly 4 units each TeaId.
+    const unitCount = new Map<TeaId, number>();
+    for (const cup of cups) for (const t of cup as TeaId[]) unitCount.set(t, (unitCount.get(t) ?? 0) + 1);
+    for (const [, n] of unitCount) if (n !== TEA_UNITS_PER_COLOR) return null;
+    // HL: exactly two ordinary empties.
+    const empties = cups.filter((c) => c.length === 0);
+    if (empties.length !== 2) return null;
+    for (let i = 0; i < cups.length; i++) {
+      if ((cups[i] as TeaId[]).length === 0) {
+        const ec = normalized[i] as CupConstraint;
+        if (ec.mode !== 'normal' || ec.targetTeaId !== undefined) return null;
+        if (cupCapacity(ec) !== STANDARD_CUP_CAPACITY || mustEndEmpty(ec)) return null;
+      }
+    }
+    if ((hiddenCounts[host] ?? 0) !== 0) return null; // never hide bud host
+    // HM: no second special.
+    if (presentIds.length > 0) return null;
+    if (sinkPresent.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+    if (icePresent.length > 0) return null;
+    if (countThermosCups(normalized) > 0) return null;
+    if (obstacles.some((s) => s !== null)) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
-  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0) {
+  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles, teaBudSlots: buds }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon/bud-aware)
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -2171,9 +2402,55 @@ function finalizeCandidate(
       strainer: strainerState,
       iceSlots: ice,
       capacityObstacles: obstacles,
+      teaBudSlots: buds,
       seed,
       minMoves: cinnamonSolved.minMoves,
       visitedStates: cinnamonSolved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null;
+    return level;
+  }
+  // HB–HT: tea-bud production gate (Gauntlet 12). The bud is a route
+  // objective, not rescue — no plain-control comparison at runtime (§106:
+  // L3 is offline curation truth). The optimal replay must BLOOM the host,
+  // later reach >=2 there (MEANINGFUL_REUSE), clear the bud and win (L2).
+  // Happy path is exactly 1 solve (§106).
+  if (wantBud > 0) {
+    if (stats) stats.solverCalls++;
+    const budSolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      teaBudSlots: buds,
+    });
+    if (!budSolved.solvable || budSolved.truncated) return null; // HN, HO
+    if (budSolved.minMoves === undefined) return null;
+    if (
+      budSolved.minMoves < TEA_BLOOM_DEPTH_ACCEPT.min ||
+      budSolved.minMoves > TEA_BLOOM_DEPTH_ACCEPT.max
+    ) {
+      return null; // HP
+    }
+    const budHost = buds.findIndex((s) => s === 'tea_bud');
+    const budSolution = (budSolved.solution ?? []) as SolverAction[];
+    const bpart = analyzeTeaBloomParticipation(cups, buds, budHost, budSolution, normalized);
+    if (bpart.blooms < 1) return null; // HQ
+    if (bpart.firstReuseDepth === null) return null; // HR
+    if (!bpart.finalBudCleared) return null; // HS
+    if (!bpart.win) return null; // HT
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      iceSlots: ice,
+      capacityObstacles: obstacles,
+      teaBudSlots: buds,
+      seed,
+      minMoves: budSolved.minMoves,
+      visitedStates: budSolved.visitedStates,
     };
     if (!validateLevelStructure(level, req).ok) return null;
     return level;
@@ -2882,6 +3159,33 @@ function cinnamonFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong L2 tea-bloom fallback topology (depth 12, delayed reuse
+ * gap 5, L3A workspace cycle, route-influenced): instantiated with the
+ * identity role mapping (c0..c3 in palette order — a full isomorphism), so
+ * the recorded depth holds exactly. Passes through `finalizeCandidate` —
+ * never trusted blindly. Backup pins cover the (near-impossible) miss.
+ */
+const TEA_BLOOM_FALLBACK_TEMPLATE_ID = 'tea-bloom-12-503081';
+const TEA_BLOOM_FALLBACK_BACKUP_IDS = ['tea-bloom-12-502370', 'tea-bloom-11-502478'];
+
+function teaBloomFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[]; teaBudHost: number }> {
+  if (teaBloomTemplateKindFor(req) === null) return [];
+  const kind = teaBloomTemplateKindFor(req) as TeaBloomTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; teaBudHost: number }> = [];
+  for (const id of [TEA_BLOOM_FALLBACK_TEMPLATE_ID, ...TEA_BLOOM_FALLBACK_BACKUP_IDS]) {
+    const tpl = TEA_BLOOM_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateTeaBloomTemplate(tpl, palette, [...palette]);
+    out.push({ cups: inst.cups, constraints: defaultCupConstraints(inst.cups.length), teaBudHost: inst.teaBudHost });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -2892,6 +3196,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateFrozenCupRequest(req);
   validateThermosRequest(req);
   validateCinnamonRequest(req);
+  validateTeaBudRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -2903,6 +3208,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantFrozen = requestedFrozenCupCount(req);
   const wantThermos = requestedThermosCupCount(req);
   const wantCinnamon = requestedCinnamonCupCount(req);
+  const wantBud = requestedTeaBudCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
@@ -2912,9 +3218,15 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantHoney !== undefined ? `:${wantHoney}` : ''}` +
     `${wantFrozen > 0 ? ':frozen-cup' : ''}` +
     `${wantThermos > 0 ? ':thermos' : ''}` +
-    `${wantCinnamon > 0 ? ':cinnamon' : ''}`;
+    `${wantCinnamon > 0 ? ':cinnamon' : ''}` +
+    `${wantBud > 0 ? ':tea-bloom' : ''}`;
 
-  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null }> = [];
+  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
+  // Dedicated tea-bloom shapes go first for bud requests (identity role
+  // mapping — recorded depths hold exactly).
+  if (wantBud > 0) {
+    shapeEntries.push(...teaBloomFallbackEntries(req));
+  }
   // Dedicated cinnamon shapes go first for cinnamon requests (identity
   // role mapping — recorded depths hold exactly).
   if (wantCinnamon > 0) {
@@ -2996,7 +3308,9 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       lemonHost?: number | null;
       honeyHost?: number | null;
       frozenHost?: number | null;
+      thermosHost?: number | null;
       cinnamonHost?: number | null;
+      teaBudHost?: number | null;
     };
     const cups = entry.cups;
     let constraints = entry.constraints;
@@ -3019,6 +3333,11 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     const shapeObstacleSlots: CapacityObstacleSlot[] = emptyCapacityObstacles(cups.length);
     if (wantCinnamon > 0 && entry.cinnamonHost !== undefined && entry.cinnamonHost !== null) {
       shapeObstacleSlots[entry.cinnamonHost] = 'cinnamon';
+    }
+    // Tea-bud slots for this shape (all-null when no bud requested).
+    const shapeBudSlots: TeaBudSlot[] = emptyTeaBudSlots(cups.length);
+    if (wantBud > 0 && entry.teaBudHost !== undefined && entry.teaBudHost !== null) {
+      shapeBudSlots[entry.teaBudHost] = 'tea_bud';
     }
     // Named serving roles are assigned deterministically (first eligible
     // cup per tea); failure rejects this shape, never forces a bad role.
@@ -3074,6 +3393,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       shapeSinkSlots,
       shapeIceSlots,
       shapeObstacleSlots,
+      shapeBudSlots,
     );
     if (level) {
       if (stats) stats.usedFallback = true;
@@ -3756,6 +4076,7 @@ export function cinnamonTemplateKindFor(req: GenerateRequest): CinnamonTemplateK
   if (requestedHasStrainer(req)) return null;
   if (requestedFrozenCupCount(req) > 0) return null;
   if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedTeaBudCount(req) > 0) return null;
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
     return 'cinnamon';
   }
@@ -3813,6 +4134,80 @@ function generateFromCinnamonTemplateBank(
 }
 
 /**
+ * Match a request against the tea-bloom bank (Gauntlet 12). Recognized
+ * ONLY for the exact production combination: teaBudCount 1, 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * Anything else keeps the existing paths (validation throws for bad combos).
+ */
+export function teaBloomTemplateKindFor(req: GenerateRequest): TeaBloomTemplateKind | null {
+  if (requestedTeaBudCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'tea-bloom';
+  }
+  return null;
+}
+
+/**
+ * Bounded tea-bloom fast path (Gauntlet 12 §104/§107): seeded template
+ * choice → seeded full permutation of c0..c3 roles (a full isomorphism, so
+ * the bank depth is preserved) → one dormant bud on the template host →
+ * single `finalizeCandidate` validation (L2 trace inside). At most
+ * TEA_BLOOM_TEMPLATE_ATTEMPTS validations, never a 150-deal scan. Returns
+ * null when no template validates (caller uses the fallback ladder).
+ */
+function generateFromTeaBloomTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = teaBloomTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = TEA_BLOOM_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < TEA_BLOOM_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: full permutation of all four roles.
+    // A bijection — depth preserved exactly, bud profile isomorphic.
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateTeaBloomTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    const buds: TeaBudSlot[] = emptyTeaBudSlots(inst.cups.length);
+    buds[inst.teaBudHost] = 'tea_bud';
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#tea-bloom:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      buds,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Match a request against the thermos bank (Gauntlet 10). Recognized
  * ONLY for the exact production combination: thermosCupCount 1, 4 colors,
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
@@ -3827,6 +4222,8 @@ export function thermosTemplateKindFor(req: GenerateRequest): ThermosTemplateKin
   if (requestedSinkingIngredient(req) !== undefined) return null;
   if (requestedHasStrainer(req)) return null;
   if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedTeaBudCount(req) > 0) return null;
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
     return 'thermos';
   }
@@ -3897,6 +4294,8 @@ export function frozenCupTemplateKindFor(req: GenerateRequest): FrozenCupTemplat
   if (requestedSinkingIngredient(req) !== undefined) return null;
   if (requestedHasStrainer(req)) return null;
   if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedTeaBudCount(req) > 0) return null;
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
     return 'frozen-cup';
   }
@@ -3966,6 +4365,9 @@ export function generateLevel(
   validateStrainerRequest(req);
   validateSinkingIngredientRequest(req);
   validateFrozenCupRequest(req);
+  validateThermosRequest(req);
+  validateCinnamonRequest(req);
+  validateTeaBudRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -4075,6 +4477,16 @@ export function generateLevel(
   // fast path or the validated fallback ladder.
   if (cinnamonTemplateKindFor(req) !== null) {
     const fast = generateFromCinnamonTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical tea-bloom configs skip the random scan entirely (Gauntlet 12
+  // §104): bounded TEA_BLOOM_TEMPLATE_ATTEMPTS validations, never a
+  // 150-deal scan. maxRetries: 0 still yields a valid level through the
+  // fast path or the validated fallback ladder.
+  if (teaBloomTemplateKindFor(req) !== null) {
+    const fast = generateFromTeaBloomTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -4828,7 +5240,84 @@ export function validateLevelStructure(
       reasons.push('unexpected capacity obstacle without request (GI)');
     }
   }
+  // HB–HT: tea-bud structural invariant (solver L2 items HN–HT live in
+  // finalizeCandidate, not here).
+  const wantBud = requestedTeaBudCount(req);
+  const budSlots = normalizeTeaBudSlots(level.teaBudSlots, level.cups.length);
+  const gotBud = budSlots.filter((s) => s !== null).length;
+  if (gotBud !== wantBud) {
+    reasons.push(`expected ${wantBud} tea buds, got ${gotBud} (HD/HE)`);
+  }
+  if (wantBud > 1) {
+    reasons.push(`tea-bud production max one (HC), got ${wantBud}`);
+  }
+  if (wantBud > 0) {
+    if (budSlots.filter((s) => s === 'tea_bud').length !== 1) {
+      reasons.push(`expected exactly one tea_bud (HE), got [${budSlots.join(',')}]`);
+    } else {
+      const host = budSlots.findIndex((s) => s === 'tea_bud');
+      const hostCup = level.cups[host] as TeaId[];
+      const hostC = constraints[host] as CupConstraint | undefined;
+      if (!hostC || hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) {
+        reasons.push(`tea-bud host ${host} must be untargeted plain normal (HF)`);
+      }
+      if (hostC && cupCapacity(hostC) !== STANDARD_CUP_CAPACITY) {
+        reasons.push(`tea-bud host ${host} must keep base capacity 4 (HG)`);
+      }
+      if (hostC && mustEndEmpty(hostC)) {
+        reasons.push(`tea-bud host ${host} must be a standard vessel (HF)`);
+      }
+      if (!hostCup || hostCup.length !== 4) reasons.push(`tea-bud host ${host} must hold exactly 4 layers (HH)`);
+      if (hostCup && hostCup.length > 0) {
+        const first = hostCup[0] as TeaId;
+        if (!hostCup.some((t) => t !== first)) reasons.push(`tea-bud host ${host} must start mixed (HI)`);
+      }
+      if ((level.hiddenCounts[host] ?? 0) !== 0) {
+        reasons.push(`tea-bud host ${host} must not hide mystery`);
+      }
+    }
+    const lens = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(lens) !== JSON.stringify([0, 0, 4, 4, 4, 4])) {
+      reasons.push(`tea-bud levels must start 4,4,4,4,0,0 (HJ), got [${lens.join(',')}]`);
+    }
+    if (level.cups.filter((c) => c.length === 0).length !== 2) {
+      reasons.push('tea-bud levels must keep exactly two ordinary empties (HL)');
+    }
+    if (presentIds.length > 0) reasons.push('tea bud + lemon is out of scope for Gauntlet 12 (HM)');
+    if (sinkPresentForD.length > 0) reasons.push('tea bud + honey is out of scope for Gauntlet 12 (HM)');
+    if (normalizeStrainerState(level.strainer).present) {
+      reasons.push('tea bud + strainer is out of scope for Gauntlet 12 (HM)');
+    }
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('tea bud + sink is out of scope for Gauntlet 12 (HM)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('tea bud + targets is out of scope for Gauntlet 12 (HM)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('tea bud + tasting is out of scope for Gauntlet 12 (HM)');
+    }
+    if (icePresentForD.length > 0) reasons.push('tea bud + frozen cup is out of scope for Gauntlet 12 (HM)');
+    if (constraints.some((c) => isThermosCupConstraint(c))) {
+      reasons.push('tea bud + thermos is out of scope for Gauntlet 12 (HM)');
+    }
+    if (obstacleSlots.some((s) => s !== null)) {
+      reasons.push('tea bud + cinnamon is out of scope for Gauntlet 12 (HM)');
+    }
+    if (requestedSourceOnlyCount(req) > 0) {
+      reasons.push('tea bud + teapot is out of scope for Gauntlet 12 (HM)');
+    }
+    if (req.hasMysteryLayer) {
+      reasons.push('tea bud + Mystery is out of scope for Gauntlet 12 (HM)');
+    }
+  } else {
+    if (budSlots.some((s) => s !== null)) {
+      reasons.push('unexpected tea bud without request (HB)');
+    }
+  }
   // Homogeneity helper stays referenced for future mixed-block checks.
   void isHomogeneous;
+  void countTeaBuds;
+  void teaBudIndex;
   return { ok: reasons.length === 0, reasons };
 }
