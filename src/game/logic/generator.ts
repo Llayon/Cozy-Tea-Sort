@@ -80,6 +80,7 @@ import {
   StrainerState,
   TASTING_BOWL_CAPACITY,
   TEA_UNITS_PER_COLOR,
+  THERMOS_CAPACITY,
   TeaId,
   cloneCupConstraint,
   countFloatingIngredients,
@@ -93,6 +94,7 @@ import {
   floatingIngredientIndex,
   isReleaseStrainerAction,
   isTastingCupConstraint,
+  isThermosCupConstraint,
   mustEndEmpty,
   normalizeFloatingIngredients,
   normalizeIceSlots,
@@ -175,6 +177,13 @@ import {
   instantiateFrozenCupTemplate,
 } from './frozenCupTemplates';
 import {
+  THERMOS_DEPTH_ACCEPT,
+  THERMOS_TEMPLATE_ATTEMPTS,
+  THERMOS_TEMPLATE_BANK,
+  ThermosTemplateKind,
+  instantiateThermosTemplate,
+} from './thermosTemplates';
+import {
   depthDistance,
   RhythmPhase,
   depthAccepted,
@@ -249,6 +258,15 @@ export interface GenerateRequest {
    * supports max 1; every sibling special is rejected loudly.
    */
   frozenCupCount?: number;
+  /**
+   * Number of high-thermos (capacity-5, must-end-empty) vessels requested
+   * (Gauntlet 10 — «Высокий термос»). 0 = standard level. G10 uses exactly
+   * 1: one normal cap5/mustEndEmpty vessel starting PARTIALLY FILLED + MIXED
+   * (T3 profile: length 3, top tea exactly once inside), inside the authored
+   * 4,4,3,2,0 + thermos-3 topology (global 4,4,3,3,2,0). Production supports
+   * max 1; every sibling special is rejected loudly. No thermos+tasting.
+   */
+  thermosCupCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -369,6 +387,13 @@ export function requestedSinkingIngredient(req: GenerateRequest): SinkingIngredi
 /** Requested frozen-cup count, normalized (default 0, clamped to >= 0). */
 export function requestedFrozenCupCount(req: GenerateRequest): number {
   const v = req.frozenCupCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested high-thermos count, normalized (default 0, clamped to >= 0). */
+export function requestedThermosCupCount(req: GenerateRequest): number {
+  const v = (req as GenerateRequest).thermosCupCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -498,6 +523,55 @@ export function validateFrozenCupRequest(req: GenerateRequest): void {
   if (requestedHasStrainer(req)) {
     throw new Error('validateFrozenCupRequest: frozen cup + strainer is out of scope for Gauntlet 9');
   }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateFrozenCupRequest: frozen cup + thermos is out of scope for Gauntlet 9');
+  }
+}
+
+/**
+ * Fail-fast request validation for high thermos (programming errors, not
+ * generation luck). Gauntlet 10 supports exactly the standalone
+ * interaction: one cap5/mustEndEmpty vessel inside the authored 4c/6v
+ * 4,4,3,3,2,0 topology (numColors 4, nominal emptyCups 2 → 6 vessels),
+ * no Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen.
+ * Production max 1; anything more is rejected loudly (FM/FN).
+ */
+export function validateThermosRequest(req: GenerateRequest): void {
+  const thermos = requestedThermosCupCount(req);
+  if (thermos === 0) return;
+  if (thermos > 1) {
+    throw new Error(`validateThermosRequest: thermosCupCount ${thermos} unsupported (production max 1)`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateThermosRequest: thermos requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+    );
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateThermosRequest: thermos + targets is out of scope for Gauntlet 10');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateThermosRequest: thermos + sink-only is out of scope for Gauntlet 10');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateThermosRequest: thermos + tasting bowl is out of scope for Gauntlet 10');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateThermosRequest: thermos + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 10`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateThermosRequest: thermos + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 10`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateThermosRequest: thermos + strainer is out of scope for Gauntlet 10');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateThermosRequest: thermos + frozen cup is out of scope for Gauntlet 10');
+  }
 }
 
 /**
@@ -596,6 +670,11 @@ export function countSinkOnly(constraints: readonly CupConstraint[]): number {
 /** Count tasting-bowl vessels in a constraints array. */
 export function countTastingCups(constraints: readonly CupConstraint[]): number {
   return constraints.filter(isTastingCupConstraint).length;
+}
+
+/** Count high-thermos vessels in a constraints array (Gauntlet 10). */
+export function countThermosCups(constraints: readonly CupConstraint[]): number {
+  return constraints.filter(isThermosCupConstraint).length;
 }
 
 /**
@@ -887,6 +966,69 @@ export function analyzeIceParticipation(
   out.finalIceCleared = ice.every((s) => s === null);
   out.win = isPuzzleWonState(
     { cups, floatingIngredients: emptyFloatingIngredients(cups.length), iceSlots: [...ice] },
+    cupConstraints,
+  );
+  return out;
+}
+
+export interface ThermosParticipation {
+  fifthSlotUses: number;
+  drainsAfterFifth: number;
+  firstFifthSlotDepth: number | null;
+  firstDrainAfterFifthDepth: number | null;
+  finalThermosEmpty: boolean;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal thermos solution and count FIFTH_SLOT_USE events (a
+ * successful POUR causing thermos 4→5) and THERMOS_DRAIN events (a later
+ * POUR sourcing from the thermos back below 5), plus final empty/win.
+ * Production templates require fifth >= 1 AND drain >= 1 AND final empty
+ * AND win (GE–GG). Analysis only — never PuzzleState.
+ */
+export function analyzeThermosParticipation(
+  startCups: TeaId[][],
+  thermosHost: number,
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): ThermosParticipation {
+  const out: ThermosParticipation = {
+    fifthSlotUses: 0,
+    drainsAfterFifth: 0,
+    firstFifthSlotDepth: null,
+    firstDrainAfterFifthDepth: null,
+    finalThermosEmpty: false,
+    win: false,
+  };
+  let cups = startCups.map((c) => [...c]);
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') continue;
+    const from = (a as { from: number }).from;
+    const to = (a as { to: number }).to;
+    const before = (cups[thermosHost] as TeaId[]).length;
+    const res = applyPourState(
+      { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+      from,
+      to,
+      cupConstraints,
+    );
+    if (!res) return out;
+    cups = res.state.cups;
+    const after = (cups[thermosHost] as TeaId[]).length;
+    if (to === thermosHost && before === 4 && after === 5) {
+      out.fifthSlotUses++;
+      if (out.firstFifthSlotDepth === null) out.firstFifthSlotDepth = i;
+    }
+    if (out.firstFifthSlotDepth !== null && i > (out.firstFifthSlotDepth as number) && from === thermosHost && after < 5) {
+      out.drainsAfterFifth++;
+      if (out.firstDrainAfterFifthDepth === null) out.firstDrainAfterFifthDepth = i;
+    }
+  }
+  out.finalThermosEmpty = (cups[thermosHost] as TeaId[]).length === 0;
+  out.win = isPuzzleWonState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
     cupConstraints,
   );
   return out;
@@ -1549,9 +1691,50 @@ function finalizeCandidate(
     if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
     if (countTastingCups(normalized) > 0) return null;
   }
+  // FM–GA: thermos initial-state invariant (Gauntlet 10 standalone cap5).
+  const wantThermos = requestedThermosCupCount(req);
+  if (countThermosCups(normalized) !== wantThermos) return null; // FO (FM recognized at validation)
+  if (wantThermos > 1) return null; // FN: production max one
+  if (wantThermos > 0) {
+    const host = normalized.findIndex((c) => isThermosCupConstraint(c));
+    const hostCup = cups[host] as TeaId[];
+    const hostC = normalized[host] as CupConstraint;
+    if (hostC.mode !== 'normal') return null; // FP
+    if (cupCapacity(hostC) !== THERMOS_CAPACITY) return null; // FQ
+    if (!mustEndEmpty(hostC)) return null; // FR
+    if (hostC.targetTeaId !== undefined) return null; // FS
+    // FT: thermos is neither source-only nor sink-only (mode normal checked above).
+    if (hostCup.length !== 3) return null; // FU: selected T3 starting length
+    const first = hostCup[0] as TeaId;
+    if (!hostCup.some((t) => t !== first)) return null; // FV: starts mixed
+    const top = hostCup[hostCup.length - 1] as TeaId;
+    if (hostCup.filter((t) => t === top).length !== 1) return null; // FW: top role once
+    // FX: global layer multiset 4,4,3,3,2,0.
+    const counts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(counts) !== JSON.stringify([0, 2, 3, 3, 4, 4])) return null;
+    // FY: exactly 4 units per color (checked in validateLevelStructure; re-checked defensively).
+    const unitCount = new Map<TeaId, number>();
+    for (const cup of cups) for (const t of cup as TeaId[]) unitCount.set(t, (unitCount.get(t) ?? 0) + 1);
+    for (const [, n] of unitCount) if (n !== TEA_UNITS_PER_COLOR) return null;
+    // FZ: exactly one true empty normal vessel.
+    if (cups.filter((c) => c.length === 0).length !== 1) return null;
+    const emptyIdx = cups.findIndex((c) => c.length === 0);
+    const emptyC = normalized[emptyIdx] as CupConstraint;
+    if (emptyC.mode !== 'normal' || emptyC.targetTeaId !== undefined) return null;
+    if (cupCapacity(emptyC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(emptyC)) return null;
+    if ((hiddenCounts[host] ?? 0) !== 0) return null; // never hide thermos
+    // GA: no other special.
+    if (presentIds.length > 0) return null;
+    if (sinkPresent.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+    if (icePresent.length > 0) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
   if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice }, normalized)) return null; // D (lemon/honey/strainer/ice-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0) {
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -1680,6 +1863,47 @@ function finalizeCandidate(
       seed,
       minMoves: iceSolved.minMoves,
       visitedStates: iceSolved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null;
+    return level;
+  }
+  // GB–GG: thermos production gate (Gauntlet 10). Capacity-5 is workspace,
+  // not rescue — no cap4 comparison at runtime (§74: L3 is offline curation
+  // truth). The optimal replay must REACH 5/5, later DRAIN, empty fully
+  // and win (L2). Happy path is exactly 1 solve (§75).
+  if (wantThermos > 0) {
+    if (stats) stats.solverCalls++;
+    const thermosSolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+    });
+    if (!thermosSolved.solvable || thermosSolved.truncated) return null; // GB, GC
+    if (thermosSolved.minMoves === undefined) return null;
+    if (
+      thermosSolved.minMoves < THERMOS_DEPTH_ACCEPT.min ||
+      thermosSolved.minMoves > THERMOS_DEPTH_ACCEPT.max
+    ) {
+      return null; // GD
+    }
+    const thermosHost = normalized.findIndex((c) => isThermosCupConstraint(c));
+    const thermosSolution = (thermosSolved.solution ?? []) as SolverAction[];
+    const tpart = analyzeThermosParticipation(cups, thermosHost, thermosSolution, normalized);
+    if (tpart.fifthSlotUses < 1) return null; // GE
+    if (tpart.drainsAfterFifth < 1) return null; // GF
+    if (!tpart.finalThermosEmpty) return null; // GG
+    if (!tpart.win) return null; // GH
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      iceSlots: ice,
+      seed,
+      minMoves: thermosSolved.minMoves,
+      visitedStates: thermosSolved.visitedStates,
     };
     if (!validateLevelStructure(level, req).ok) return null;
     return level;
@@ -2332,6 +2556,35 @@ function frozenCupFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong L2 thermos fallback topology (depth 11, L3, delayed drain):
+ * instantiated with the identity role mapping (c0..c3 in palette order — a
+ * full isomorphism), so the recorded depth holds exactly. Passes through
+ * `finalizeCandidate` — never trusted blindly. Backup pins cover the
+ * (near-impossible) miss.
+ */
+const THERMOS_FALLBACK_TEMPLATE_ID = 'thermos-11-100124';
+const THERMOS_FALLBACK_BACKUP_IDS = ['thermos-11-101057', 'thermos-10-100171'];
+
+function thermosFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[]; thermosHost: number }> {
+  if (thermosTemplateKindFor(req) === null) return [];
+  const kind = thermosTemplateKindFor(req) as ThermosTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; thermosHost: number }> = [];
+  for (const id of [THERMOS_FALLBACK_TEMPLATE_ID, ...THERMOS_FALLBACK_BACKUP_IDS]) {
+    const tpl = THERMOS_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateThermosTemplate(tpl, palette, [...palette]);
+    const constraints = defaultCupConstraints(inst.cups.length);
+    constraints[inst.thermosSlot] = { mode: 'normal', capacity: THERMOS_CAPACITY, mustEndEmpty: true };
+    out.push({ cups: inst.cups, constraints, thermosHost: inst.thermosSlot });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -2340,6 +2593,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateStrainerRequest(req);
   validateSinkingIngredientRequest(req);
   validateFrozenCupRequest(req);
+  validateThermosRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -2349,6 +2603,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantStrainer = requestedHasStrainer(req);
   const wantHoney = requestedSinkingIngredient(req);
   const wantFrozen = requestedFrozenCupCount(req);
+  const wantThermos = requestedThermosCupCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
@@ -2356,9 +2611,15 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantIngredient !== undefined ? `:${wantIngredient}` : ''}` +
     `${wantStrainer ? ':strainer' : ''}` +
     `${wantHoney !== undefined ? `:${wantHoney}` : ''}` +
-    `${wantFrozen > 0 ? ':frozen-cup' : ''}`;
+    `${wantFrozen > 0 ? ':frozen-cup' : ''}` +
+    `${wantThermos > 0 ? ':thermos' : ''}`;
 
-  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null }> = [];
+  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null }> = [];
+  // Dedicated thermos shapes go first for thermos requests (identity role
+  // mapping — recorded depths hold exactly).
+  if (wantThermos > 0) {
+    shapeEntries.push(...thermosFallbackEntries(req));
+  }
   // Dedicated frozen-cup shapes go first for frozen requests (identity
   // role mapping — recorded depths hold exactly).
   if (wantFrozen > 0) {
@@ -3168,6 +3429,75 @@ function generateFromLemonHoneyTemplateBank(
 }
 
 /**
+ * Match a request against the thermos bank (Gauntlet 10). Recognized
+ * ONLY for the exact production combination: thermosCupCount 1, 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * Anything else keeps the existing paths (validation throws for bad combos).
+ */
+export function thermosTemplateKindFor(req: GenerateRequest): ThermosTemplateKind | null {
+  if (requestedThermosCupCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'thermos';
+  }
+  return null;
+}
+
+/**
+ * Bounded thermos fast path (Gauntlet 10 §72): seeded template choice →
+ * seeded full permutation of c0..c3 roles (a full isomorphism, so the bank
+ * depth is preserved) → thermos constraint on the template host → single
+ * `finalizeCandidate` validation (L2 trace inside). At most
+ * THERMOS_TEMPLATE_ATTEMPTS validations, never a 150-deal scan. Returns
+ * null when no template validates (caller uses the fallback ladder).
+ */
+function generateFromThermosTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = thermosTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = THERMOS_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < THERMOS_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: full permutation of all four roles.
+    // A bijection — depth preserved exactly, thermos profile isomorphic.
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateThermosTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    constraints[inst.thermosSlot] = { mode: 'normal', capacity: THERMOS_CAPACITY, mustEndEmpty: true };
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#thermos:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Match a request against the frozen-cup bank (Gauntlet 9). Recognized
  * ONLY for the exact production combination: frozenCupCount 1, 4 colors,
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling
@@ -3182,6 +3512,7 @@ export function frozenCupTemplateKindFor(req: GenerateRequest): FrozenCupTemplat
   if (requestedFloatingIngredient(req) !== undefined) return null;
   if (requestedSinkingIngredient(req) !== undefined) return null;
   if (requestedHasStrainer(req)) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
     return 'frozen-cup';
   }
@@ -3340,6 +3671,16 @@ export function generateLevel(
   // fast path or the validated fallback ladder.
   if (frozenCupTemplateKindFor(req) !== null) {
     const fast = generateFromFrozenCupTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical thermos configs skip the random scan entirely (Gauntlet 10
+  // §72): bounded THERMOS_TEMPLATE_ATTEMPTS validations, never a 150-deal
+  // scan. maxRetries: 0 still yields a valid level through the fast path
+  // or the validated fallback ladder.
+  if (thermosTemplateKindFor(req) !== null) {
+    const fast = generateFromThermosTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -3957,6 +4298,71 @@ export function validateLevelStructure(
     }
     if (req.hasMysteryLayer) {
       reasons.push('frozen cup + Mystery is out of scope for Gauntlet 9 (FE)');
+    }
+  }
+  // FM–GH: thermos structural invariant (solver L2 items GB–GG live in
+  // finalizeCandidate, not here).
+  const wantThermos = requestedThermosCupCount(req);
+  const gotThermos = constraints.filter(isThermosCupConstraint).length;
+  if (gotThermos !== wantThermos) {
+    reasons.push(`expected ${wantThermos} thermos vessels, got ${gotThermos} (FO)`);
+  }
+  if (wantThermos > 1) {
+    reasons.push(`thermos production max one (FN), got ${wantThermos}`);
+  }
+  if (wantThermos > 0) {
+    const host = constraints.findIndex((c) => isThermosCupConstraint(c));
+    const hostCup = level.cups[host] as TeaId[];
+    const hostC = constraints[host] as CupConstraint | undefined;
+    if (!hostC || hostC.mode !== 'normal') reasons.push(`thermos host ${host} must be normal (FP)`);
+    if (hostC && cupCapacity(hostC) !== THERMOS_CAPACITY) {
+      reasons.push(`thermos host ${host} must have capacity 5 (FQ)`);
+    }
+    if (hostC && !mustEndEmpty(hostC)) reasons.push(`thermos host ${host} must end empty (FR)`);
+    if (hostC?.targetTeaId !== undefined) reasons.push(`thermos host ${host} must not carry a target (FS)`);
+    if (!hostCup || hostCup.length !== 3) reasons.push(`thermos host ${host} must hold exactly 3 layers T3 (FU)`);
+    if (hostCup && hostCup.length > 0) {
+      const first = hostCup[0] as TeaId;
+      if (!hostCup.some((t) => t !== first)) reasons.push(`thermos host ${host} must start mixed (FV)`);
+      const top = hostCup[hostCup.length - 1] as TeaId;
+      if (hostCup.filter((t) => t === top).length !== 1) {
+        reasons.push(`thermos host ${host} top must appear exactly once (FW)`);
+      }
+    }
+    const lens = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(lens) !== JSON.stringify([0, 2, 3, 3, 4, 4])) {
+      reasons.push(`thermos levels must start 4,4,3,3,2,0 (FX), got [${lens.join(',')}]`);
+    }
+    if (level.cups.filter((c) => c.length === 0).length !== 1) {
+      reasons.push('thermos levels must keep exactly one truly empty normal (FZ)');
+    }
+    if ((level.hiddenCounts[host] ?? 0) !== 0) {
+      reasons.push(`thermos host ${host} must not hide mystery`);
+    }
+    if (presentIds.length > 0) reasons.push('thermos + lemon is out of scope for Gauntlet 10 (GA)');
+    if (sinkPresentForD.length > 0) reasons.push('thermos + honey is out of scope for Gauntlet 10 (GA)');
+    if (normalizeStrainerState(level.strainer).present) {
+      reasons.push('thermos + strainer is out of scope for Gauntlet 10 (GA)');
+    }
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('thermos + sink is out of scope for Gauntlet 10 (GA)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('thermos + targets is out of scope for Gauntlet 10 (GA)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('thermos + tasting is out of scope for Gauntlet 10 (GA)');
+    }
+    if (icePresentForD.length > 0) reasons.push('thermos + frozen cup is out of scope for Gauntlet 10 (GA)');
+    if (requestedSourceOnlyCount(req) > 0) {
+      reasons.push('thermos + teapot is out of scope for Gauntlet 10 (GA)');
+    }
+    if (req.hasMysteryLayer) {
+      reasons.push('thermos + Mystery is out of scope for Gauntlet 10 (GA)');
+    }
+  } else {
+    if (constraints.some((c) => isThermosCupConstraint(c))) {
+      reasons.push('unexpected thermos without request (FM)');
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.

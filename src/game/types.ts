@@ -472,6 +472,9 @@ export const MAX_CUP_CAPACITY = STANDARD_CUP_CAPACITY;
 /** Tasting-bowl (дегустационная пиала) physical capacity. */
 export const TASTING_BOWL_CAPACITY = 2;
 
+/** High thermos (высокий термос) physical capacity (Gauntlet 10). */
+export const THERMOS_CAPACITY = 5;
+
 /**
  * Per-vessel constraint (puzzle/domain data, never UI data).
  *
@@ -488,10 +491,11 @@ export const TASTING_BOWL_CAPACITY = 2;
  *     source-only or sink-only vessel MUST NOT carry a target (rejected in
  *     production generation — flow restriction and destination identity
  *     stay separate).
- * - `capacity` controls PHYSICAL SPACE (Gauntlet 4):
+ * - `capacity` controls PHYSICAL SPACE (Gauntlet 4, extended Gauntlet 10):
  *   - absent        : standard capacity (`STANDARD_CUP_CAPACITY`).
  *   - present       : this vessel holds at most that many layers. The
- *     production tasting bowl uses `TASTING_BOWL_CAPACITY` (2).
+ *     production tasting bowl uses `TASTING_BOWL_CAPACITY` (2);
+ *     the high thermos uses `THERMOS_CAPACITY` (5).
  * - `mustEndEmpty` controls COMPLETION REQUIREMENT (Gauntlet 4):
  *   - absent/false  : normal end-state semantics for the mode.
  *   - true          : this vessel MUST be empty in the solved state
@@ -547,6 +551,13 @@ export const TASTING_BOWL_CONSTRAINT: CupConstraint = Object.freeze({
   mustEndEmpty: true,
 }) as CupConstraint;
 
+/** Canonical high-thermos (высокий термос) constraint (frozen, Gauntlet 10). */
+export const THERMOS_CONSTRAINT: CupConstraint = Object.freeze({
+  mode: 'normal',
+  capacity: THERMOS_CAPACITY,
+  mustEndEmpty: true,
+}) as CupConstraint;
+
 /**
  * Effective vessel capacity: explicit `capacity`, else standard.
  * Non-positive / non-finite values fall back to standard (production
@@ -568,12 +579,29 @@ export function mustEndEmpty(c: CupConstraint | undefined): boolean {
  * Production tasting-bowl identification (pure domain helper): normal
  * flow, capacity 2, must end empty, no named target. The View uses this
  * for the visual form — no parallel `isTastingCup` booleans anywhere.
+ * Pinned: capacity 5 + mustEndEmpty is THERMOS, never tasting (§62).
  */
 export function isTastingCupConstraint(c: CupConstraint | undefined): boolean {
   if (!c) return false;
   return (
     c.mode === 'normal' &&
     cupCapacity(c) === TASTING_BOWL_CAPACITY &&
+    mustEndEmpty(c) &&
+    c.targetTeaId === undefined
+  );
+}
+
+/**
+ * Production thermos identification (pure domain helper, Gauntlet 10):
+ * normal flow, capacity 5, must end empty, no named target. Derives from
+ * authoritative constraint fields — no dynamic thermos state anywhere.
+ * Constraint-derived identity: normal + cap5 + mustEndEmpty + no target.
+ */
+export function isThermosCupConstraint(c: CupConstraint | undefined): boolean {
+  if (!c) return false;
+  return (
+    c.mode === 'normal' &&
+    cupCapacity(c) === THERMOS_CAPACITY &&
     mustEndEmpty(c) &&
     c.targetTeaId === undefined
   );

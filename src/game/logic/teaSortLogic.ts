@@ -32,6 +32,7 @@ import {
   cupCapacity,
   emptyStrainerState,
   isTastingCupConstraint,
+  isThermosCupConstraint,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
   normalizeIceSlots,
@@ -209,6 +210,11 @@ export class Cup {
   /** Production tasting-bowl identification (delegates to the domain helper). */
   get isTastingBowl(): boolean {
     return isTastingCupConstraint(this.constraint);
+  }
+
+  /** Production thermos identification (delegates to the domain helper, no dynamic state). */
+  get isThermos(): boolean {
+    return isThermosCupConstraint(this.constraint);
   }
 
   get isHomogeneous(): boolean {
