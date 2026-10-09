@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CupConstraint, FloatingIngredientSlot, IceSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeIceSlots, normalizeSinkingIngredients, normalizeStrainerState } from './game/types';
+import { CapacityObstacleSlot, CupConstraint, FloatingIngredientSlot, IceSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeCapacityObstacles, normalizeIceSlots, normalizeSinkingIngredients, normalizeStrainerState } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { isWonState } from './game/logic/rules';
 import { TeaSortView } from './game/view/TeaSortView';
@@ -53,6 +53,7 @@ interface LevelBackupState {
   strainer: StrainerState;
   sinkingIngredients: SinkingIngredientSlot[];
   iceSlots: IceSlot[];
+  capacityObstacles: CapacityObstacleSlot[];
 }
 
 export default function App() {
@@ -118,7 +119,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [], iceSlots: [] });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [], iceSlots: [], capacityObstacles: [] });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -144,6 +145,7 @@ export default function App() {
         sinkingIngredient: cfg.sinkingIngredient,
         frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
         thermosCupCount: cfg.hasThermos ? 1 : 0,
+        cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -159,6 +161,7 @@ export default function App() {
       strainer: normalizeStrainerState(generated.strainer),
       sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
+      capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
     };
 
     return new TeaSortLogic(
@@ -169,6 +172,7 @@ export default function App() {
       normalizeStrainerState(generated.strainer),
       normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       normalizeIceSlots(generated.iceSlots, generated.cups.length),
+      normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
     );
   };
 
@@ -236,6 +240,7 @@ export default function App() {
         sinkingIngredient: cfg.sinkingIngredient,
         frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
         thermosCupCount: cfg.hasThermos ? 1 : 0,
+        cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -251,6 +256,7 @@ export default function App() {
       strainer: normalizeStrainerState(generated.strainer),
       sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
+      capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
     };
 
     const logic = new TeaSortLogic(
@@ -261,6 +267,7 @@ export default function App() {
       normalizeStrainerState(generated.strainer),
       normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       normalizeIceSlots(generated.iceSlots, generated.cups.length),
+      normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
     );
     logicRef.current = logic;
 
@@ -400,8 +407,9 @@ export default function App() {
     const restoredStrainer = normalizeStrainerState(backup.strainer);
     const restoredSinking = normalizeSinkingIngredients(backup.sinkingIngredients, restoredCups.length);
     const restoredIce = normalizeIceSlots(backup.iceSlots, restoredCups.length);
+    const restoredObstacles = normalizeCapacityObstacles(backup.capacityObstacles, restoredCups.length);
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -643,7 +651,7 @@ export default function App() {
       )}
 
       {/* Thermos first-encounter onboarding (Level 74 only): compact,
-          never blocking. NOT shown on 78 (no tutorial repeat). */}
+           never blocking. NOT shown on 78 (no tutorial repeat). */}
       {currentConfig.hasThermos && currentLevel === 74 && moves === 0 && !isWon && (
         <div
           id="thermos-tutorial-hint"
@@ -651,6 +659,18 @@ export default function App() {
         >
           <Coffee className="w-3.5 h-3.5 text-[#E8C878] shrink-0" />
           <span>В высокий термос помещается 5 слоёв. Это удобный временный запас, но к концу термос нужно опустошить.</span>
+        </div>
+      )}
+
+      {/* Cinnamon first-encounter onboarding (Level 82 only): compact,
+           never blocking. NOT shown on 86 (no tutorial repeat). */}
+      {currentConfig.hasCinnamon && currentLevel === 82 && moves === 0 && !isWon && (
+        <div
+          id="cinnamon-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2E1C12]/95 border-b border-[#7A4A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F2C9A0] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8A05E] shrink-0" />
+          <span>Палочка корицы оставляет место только для 2 слоёв. Полностью опустоши чашку — палочка уберётся, и снова поместится 4.</span>
         </div>
       )}
 
@@ -890,6 +910,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🧉</span>
                 <span>Высокий термос вмещает 5 слоёв и переливает чай как обычная чашка. Но в конце уровня термос должен остаться пустым.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8A05E] font-bold">🪵</span>
+                <span>Пока в чашке палочка корицы, в неё помещается только 2 слоя. Полностью опустоши чашку — палочка уберётся, и чашка снова будет вмещать 4.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

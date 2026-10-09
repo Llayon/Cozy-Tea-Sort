@@ -14,11 +14,14 @@
 
 import { Application, Container, Graphics, Rectangle } from 'pixi.js';
 import {
+  CINNAMON_EFFECTIVE_CAPACITY,
+  CapacityObstacleSlot,
   CupConstraint,
   CupSkinId,
   FloatingIngredientId,
   FloatingIngredientSlot,
   IceSlot,
+  STANDARD_CUP_CAPACITY,
   SinkingIngredientSlot,
   TEA_TYPES,
   THERMOS_CAPACITY,
@@ -537,6 +540,197 @@ export function frozenPourHint(code: string): string {
   }
 }
 
+/** Cinnamon stick width (fits inside the 64-wide standard vessel). */
+export const CINNAMON_STICK_W = 11;
+/** Cinnamon stick length (upper interior + protrusion above the rim). */
+export const CINNAMON_STICK_H = 78;
+/** Resting lean of the stick (radians, ~10deg cozy tilt). */
+export const CINNAMON_STICK_TILT = 0.18;
+/** How far the top end protrudes above the rim (px, container-local). */
+export const CINNAMON_PROTRUSION = 18;
+/** Removal-flourish duration after the tea lands (spec: ~250-400ms). */
+export const CINNAMON_REMOVAL_MS = 320;
+/** Blocked upper slots while the stick is present (base 4 - effective 2). */
+export const CINNAMON_BLOCKED_SLOTS = STANDARD_CUP_CAPACITY - CINNAMON_EFFECTIVE_CAPACITY;
+
+/**
+ * Stick geometry in container-local coords (Gauntlet 11, pure and
+ * headless-testable): the single anchor shared by the static stick and
+ * the removal flourish. The stick is centered slightly off-axis with a
+ * small resting tilt, its top protruding above the rim and its bottom
+ * resting in the upper interior above the 2-layer tea surface — it
+ * occupies the blocked upper slots, never the tea column.
+ */
+export interface CinnamonGeometry {
+  /** Stick center X (container-local). */
+  x: number;
+  /** Stick center Y (container-local). */
+  y: number;
+  /** Stick width. */
+  w: number;
+  /** Stick length. */
+  h: number;
+  /** Resting tilt (radians). */
+  tilt: number;
+}
+
+export function cinnamonGeometry(width = 64, height = 142): CinnamonGeometry {
+  const rimY = 4;
+  const topY = rimY - CINNAMON_PROTRUSION;
+  const h = CINNAMON_STICK_H;
+  const w = CINNAMON_STICK_W;
+  void height;
+  return {
+    x: width / 2 + 6,
+    y: topY + h / 2,
+    w,
+    h,
+    tilt: CINNAMON_STICK_TILT,
+  };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getCinnamonGeometry = cinnamonGeometry;
+export const cinnamonStickGeometry = cinnamonGeometry;
+
+/**
+ * Removal plan (pure, Gauntlet 11): whether the unlock pour must run the
+ * lift/tilt-out flourish. The ONLY signal is the rules metadata
+ * `capacityObstacleRemoved` — never a view-owned wasCinnamon flag.
+ * - `'cinnamon'` → animate once for CINNAMON_REMOVAL_MS.
+ * - null/undefined → no flourish, the static stick stays (partial outflow).
+ */
+export interface CinnamonRemovalPlan {
+  shouldAnimate: boolean;
+  durMs: number;
+}
+
+export function cinnamonRemovalPlan(
+  capacityObstacleRemoved: CapacityObstacleSlot,
+): CinnamonRemovalPlan {
+  if (capacityObstacleRemoved === 'cinnamon') {
+    return { shouldAnimate: true, durMs: CINNAMON_REMOVAL_MS };
+  }
+  return { shouldAnimate: false, durMs: 0 };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getCinnamonRemovalPlan = cinnamonRemovalPlan;
+export const cinnamonTransitPlan = cinnamonRemovalPlan;
+
+/**
+ * Blocked-capacity overlay (pure, Gauntlet 11): the upper interior the
+ * stick occupies while present. Tea layers ALWAYS use the base-4 slot
+ * height (never stretched to cap-2) — this overlay only describes the
+ * subtle warm obstruction band + at most two faint slot cues above the
+ * tea, never fake tea layers, never gray liquid, never lock icons, never
+ * text. Empty (0 blocked) once the obstacle is gone — post-unlock the cup
+ * is indistinguishable from a standard normal vessel.
+ */
+export interface BlockedCapacityOverlay {
+  /** Blocked upper slots (2 while present, 0 when gone). */
+  blockedSlots: number;
+  /** Obstruction band top Y (container-local). */
+  bandY: number;
+  /** Obstruction band height. */
+  bandH: number;
+  /** At most two faint cue Y positions (slot dividers). */
+  cueYs: number[];
+}
+
+export function blockedCapacityOverlay(
+  obstacle: CapacityObstacleSlot,
+  height = 142,
+): BlockedCapacityOverlay {
+  if (obstacle == null) {
+    return { blockedSlots: 0, bandY: 0, bandH: 0, cueYs: [] };
+  }
+  const bottomY = height - 6;
+  const slotH = STANDARD_SLOT_H;
+  const blocked = CINNAMON_BLOCKED_SLOTS;
+  const bandH = blocked * slotH;
+  const bandY = bottomY - STANDARD_CUP_CAPACITY * slotH;
+  const cueYs: number[] = [bandY + slotH, bandY + bandH];
+  return { blockedSlots: blocked, bandY, bandH, cueYs };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getBlockedCapacityOverlay = blockedCapacityOverlay;
+export const blockedSlotOverlay = blockedCapacityOverlay;
+
+/**
+ * Cozy cinnamon stick (Gauntlet 11): warm brown rolled-bark silhouette
+ * with a subtle spiral curl at the protruding top end, two faint bark
+ * grain lines + soft highlight for slight texture. Restrained cozy
+ * illustration — readable by shape (lean + curl + obstruction band), not
+ * by brown color alone; no emoji, no text, no lock icon, no photorealism.
+ */
+export function drawCinnamonStick(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  w = CINNAMON_STICK_W,
+  h = CINNAMON_STICK_H,
+  tilt = CINNAMON_STICK_TILT,
+  alpha = 1,
+): void {
+  const halfW = w / 2;
+  const halfH = h / 2;
+  const dx = Math.sin(tilt) * halfH;
+  // Rolled-bark body (parallelogram following the lean).
+  const tlX = cx - halfW + dx;
+  const tlY = cy - halfH;
+  const trX = cx + halfW + dx;
+  const trY = cy - halfH;
+  const brX = cx + halfW - dx;
+  const brY = cy + halfH;
+  const blX = cx - halfW - dx;
+  const blY = cy + halfH;
+  g.beginPath();
+  g.moveTo(tlX, tlY);
+  g.lineTo(trX, trY);
+  g.lineTo(brX, brY);
+  g.lineTo(blX, blY);
+  g.closePath();
+  g.fill({ color: 0x8f5a2e, alpha: 0.96 * alpha });
+  g.beginPath();
+  g.moveTo(tlX, tlY);
+  g.lineTo(trX, trY);
+  g.lineTo(brX, brY);
+  g.lineTo(blX, blY);
+  g.closePath();
+  g.stroke({ width: 1.4, color: 0x6b3f1d, alpha: 0.9 * alpha });
+  // Bark grain: two faint longitudinal lines following the lean.
+  for (const off of [-halfW * 0.28, halfW * 0.3]) {
+    g.beginPath();
+    g.moveTo(cx + off + dx * 0.9, cy - halfH + 7);
+    g.lineTo(cx + off - dx * 0.9, cy + halfH - 6);
+    g.stroke({ width: 1, color: 0x6b3f1d, alpha: 0.55 * alpha });
+  }
+  // Soft highlight along the left edge (slight texture, keeps tea readable).
+  g.beginPath();
+  g.moveTo(cx - halfW * 0.72 + dx * 0.9, cy - halfH + 8);
+  g.lineTo(cx - halfW * 0.72 - dx * 0.9, cy + halfH - 8);
+  g.stroke({ width: 2, color: 0xd9a86c, alpha: 0.5 * alpha });
+  // Spiral curl at the protruding top end (rolled bark read by shape):
+  // outer curl ring + darker opening + tiny highlight.
+  const curlCX = cx + dx;
+  const curlCY = cy - halfH + 2;
+  g.ellipse(curlCX, curlCY, halfW * 0.95, 3.4).fill({ color: 0xa06a35, alpha: 0.98 * alpha });
+  g.ellipse(curlCX, curlCY, halfW * 0.95, 3.4).stroke({
+    width: 1.2,
+    color: 0x6b3f1d,
+    alpha: 0.9 * alpha,
+  });
+  g.ellipse(curlCX, curlCY, halfW * 0.48, 1.8).fill({ color: 0x4a2a12, alpha: 0.9 * alpha });
+  g.ellipse(curlCX - 1.4, curlCY - 0.8, 1.4, 0.8).fill({ color: 0xffe0b3, alpha: 0.6 * alpha });
+  // Rounded bottom end (rests above the tea, never submerged marker).
+  g.ellipse(cx - dx, cy + halfH - 1, halfW * 0.9, 2.6).fill({
+    color: 0x7a4a24,
+    alpha: 0.9 * alpha,
+  });
+}
+
 /** Mini brass mesh basket radius for the attached-over-rim marker. */
 export const STRAINER_ATTACHED_R = 9;
 /** Stand basket radius (clearly a tool, never a cup). */
@@ -693,6 +887,17 @@ export class CupView {
    * flourish (transit layer) can never coincide with this static.
    */
   iceGraphics: Graphics;
+  /**
+   * Cinnamon-stick layer (Gauntlet 11): cozy rolled-bark stick occupying
+   * the upper interior with its top protruding above the rim, plus the
+   * subtle warm obstruction band + at most two faint blocked-slot cues.
+   * Above the liquid (like lemon/ice), below the target motif. Driven
+   * solely by `Cup.capacityObstacle` — no view-owned wasCinnamon flag,
+   * no dynamic capacity. No suppression flag: logic obstacle is already
+   * null post-unlock, so the removal flourish (transit layer) can never
+   * coincide with this static. Never intercepts pointer (eventMode none).
+   */
+  cinnamonGraphics: Graphics;
   glassOverlay: Graphics;
   glowGraphics: Graphics;
   /**
@@ -793,6 +998,12 @@ export class CupView {
    * interior by its effective capacity (exactly 5 readable slots via
    * `thermosSlotH`, never 4 compressed slots). Standard/tasting geometry
    * is unchanged.
+   *
+   * Cinnamon (Gauntlet 11) deliberately does NOT alter this: the stick
+   * vessel keeps the STANDARD cup body/geometry and tea layers ALWAYS use
+   * the base-4 slot height (never stretch 2 layers to cap-2). The
+   * effective cap-2 is a legality rule in rules.ts (`effectiveCupCapacity`);
+   * the view only adds the stick + obstruction band above the tea.
    */
   slotHeightFor(c: CupConstraint): number {
     if (isTastingCupConstraint(c)) {
@@ -843,6 +1054,40 @@ export class CupView {
     const r = rotatePoint2D(
       localX - pivot.x,
       localY - pivot.y,
+      this.cupBodyContainer.rotation,
+    );
+    return {
+      x: this.container.x + (this.width / 2 + r.x) * this.scale,
+      y: this.container.y + (pivot.y + this.currentLift + r.y) * this.scale,
+    };
+  }
+
+  /**
+   * Cinnamon stick center in container-local coords (Gauntlet 11): the ONE
+   * shared anchor used by BOTH static rendering and the removal flourish.
+   * Delegates to the pure `cinnamonGeometry` helper — never a second
+   * offset truth. Fixed anchor (like honey, unlike lemon): partial
+   * outflows keep the stick exactly here with no flicker.
+   */
+  cinnamonLocalPoint(): { x: number; y: number } {
+    const geo = cinnamonGeometry(this.width, this.height);
+    return { x: geo.x, y: geo.y };
+  }
+
+  /**
+   * Cinnamon stick center in stage space (Gauntlet 11): the ACTUAL
+   * transformed stick anchor — local stick point rotated by the live body
+   * tilt around the body pivot, shifted by live lift, scaled and placed at
+   * the container position (same convention as `surfaceStagePoint`/lemon
+   * transit, shake ignored). A tilted pouring source therefore launches
+   * the removal flourish from where its stick really is, never rest pose.
+   */
+  cinnamonStagePoint(): { x: number; y: number } {
+    const pivot = this.cupBodyContainer.pivot;
+    const local = this.cinnamonLocalPoint();
+    const r = rotatePoint2D(
+      local.x - pivot.x,
+      local.y - pivot.y,
       this.cupBodyContainer.rotation,
     );
     return {
@@ -1013,10 +1258,20 @@ export class CupView {
     this.cupBodyContainer.addChild(this.glassOverlay);
 
     this.lemonGraphics = new Graphics();
+    this.lemonGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.lemonGraphics);
 
     this.iceGraphics = new Graphics();
+    this.iceGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.iceGraphics);
+
+    // Cinnamon stick + obstruction band (Gauntlet 11): above the liquid so
+    // the stick reads over the empty upper interior, below the target
+    // motif. Standard hitbox unchanged; this layer never intercepts
+    // pointer (eventMode none, same as the strainer marker).
+    this.cinnamonGraphics = new Graphics();
+    this.cinnamonGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.cinnamonGraphics);
 
     this.targetGraphics = new Graphics();
     this.cupBodyContainer.addChild(this.targetGraphics);
@@ -1654,12 +1909,54 @@ export class CupView {
     drawIceSlab(g, cx, cy);
   }
 
+  /**
+   * Cinnamon stick (Gauntlet 11): drawn from the authoritative
+   * `Cup.capacityObstacle` at the ONE shared stick anchor
+   * (`cinnamonLocalPoint`, never a second offset truth). The stick keeps
+   * the STANDARD cup body/geometry; tea layers always use the base-4 slot
+   * height (see `slotHeightFor` — never stretched). The blocked upper
+   * interior reads via the stick silhouette occupying it + a subtle
+   * translucent warm obstruction band + at most two faint slot cues —
+   * never fake tea layers, never gray liquid, never Mystery-? cover,
+   * never lock icons, never text. The stick stays fixed during partial
+   * outflows (no flicker); post-unlock (obstacle null) this clears to an
+   * empty layer so the cup is indistinguishable from standard normal.
+   */
+  renderCinnamon(cup: Cup) {
+    const g = this.cinnamonGraphics;
+    g.clear();
+    const obstacle: CapacityObstacleSlot = cup.capacityObstacle;
+    if (obstacle == null || obstacle !== 'cinnamon') return;
+    // No-honey-style fast path is implicit: null clears to empty, so
+    // cinnamon-free levels render byte-identical to before.
+    const overlay = blockedCapacityOverlay(obstacle, this.height);
+    if (overlay.blockedSlots > 0) {
+      // Subtle translucent warm obstruction band over the blocked upper
+      // interior (warm tint, never gray, never opaque tea).
+      g.roundRect(3, overlay.bandY, this.width - 6, overlay.bandH, 4).fill({
+        color: 0xc98a4b,
+        alpha: 0.14,
+      });
+      // At most two faint blocked-slot cues (thin dividers, shape language
+      // for limited color discrimination — not color alone, no icons).
+      for (const cueY of overlay.cueYs.slice(0, 2)) {
+        g.rect(5, cueY - 0.75, this.width - 10, 1.5).fill({
+          color: 0xffe0b3,
+          alpha: 0.4,
+        });
+      }
+    }
+    const geo = cinnamonGeometry(this.width, this.height);
+    drawCinnamonStick(g, geo.x, geo.y, geo.w, geo.h, geo.tilt, 1);
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
     this.renderTargetMotif(cup);
     this.renderLemon(cup);
     this.renderHoney(cup);
     this.renderIce(cup);
+    this.renderCinnamon(cup);
     // Sink glow lives in glowGraphics (behind the liquid, like the
     // selection ring); re-apply it on every liquid redraw unless a
     // selection ring is active (setSelection owns the layer then).
@@ -1944,6 +2241,24 @@ export class TeaSortView {
     durMs: number;
   } | null = null;
 
+  /** Removal-flourish layer (Gauntlet 11, existing ticker only). */
+  cinnamonTransitGraphics = new Graphics();
+  /**
+   * Active cinnamon removal flourish (Gauntlet 11): the static stick is
+   * already gone from logic (post-move obstacle null), so this transit
+   * layer draws the lifting/tilting stick at the source for
+   * CINNAMON_REMOVAL_MS under the EXISTING ticker (no second ticker).
+   * Reads ONLY the `capacityObstacleRemoved` transition metadata — never
+   * a view-owned wasCinnamon flag, never dynamic capacity. Exactly one
+   * visual stick representation at any time (static suppression).
+   */
+  private cinnamonRemoval: {
+    x: number;
+    y: number;
+    startMs: number;
+    durMs: number;
+  } | null = null;
+
   /**
    * Active strainer transit (Gauntlet 6 §40-41): exactly one flying tool
    * or caught drop, drawn by the EXISTING ticker loop (no second ticker).
@@ -2106,6 +2421,12 @@ export class TeaSortView {
     // reads, below particles so melt sparkles read over it.
     this.iceTransitGraphics.eventMode = 'none';
     this.rootContainer.addChild(this.iceTransitGraphics);
+    // Cinnamon removal flourish (Gauntlet 11): dedicated layer on the
+    // EXISTING ticker (no second ticker), above cups so the lifting stick
+    // reads, below particles so warm sparkles read over it. Separate from
+    // the ice/honey/lemon layers so a joint visual never erases another.
+    this.cinnamonTransitGraphics.eventMode = 'none';
+    this.rootContainer.addChild(this.cinnamonTransitGraphics);
 
     this.setupInteractivity();
     this.setupCups();
@@ -2776,6 +3097,7 @@ export class TeaSortView {
           res.caughtTea ?? null,
           res.sinkingIngredientMoved ?? null,
           res.iceMelted ?? null,
+          res.capacityObstacleRemoved ?? null,
         );
       }
     } else {
@@ -3082,6 +3404,59 @@ export class TeaSortView {
     );
   }
 
+  /** Cinnamon stick point in stage space (tilted pour pose — like honey). */
+  private cinnamonStagePoint(view: CupView): { x: number; y: number } {
+    return view.cinnamonStagePoint();
+  }
+
+  /**
+   * Begin the cinnamon removal flourish (Gauntlet 11): the tea has landed
+   * and logic obstacle is already null, so draw the lifting/tilting stick
+   * rising out of the emptied source for CINNAMON_REMOVAL_MS. Stage-space
+   * point captured while the source is still hovered/tilted (actual pour
+   * pose, never rest pose) — the stick lifts out of where it really was.
+   */
+  private startCinnamonRemoval(x: number, y: number): void {
+    const plan = cinnamonRemovalPlan('cinnamon');
+    this.cinnamonRemoval = { x, y, startMs: performance.now(), durMs: plan.durMs };
+  }
+
+  private clearCinnamonRemoval(): void {
+    this.cinnamonRemoval = null;
+    try {
+      this.cinnamonTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Draw the lifting/tilting removal stick (existing ticker). */
+  private drawCinnamonRemoval(): void {
+    const t = this.cinnamonRemoval;
+    if (!t) return;
+    const progress = Math.min(1, Math.max(0, (performance.now() - t.startMs) / t.durMs));
+    // The stick rises out of the emptied cup while tilting further and
+    // fading — a warm lift, never a second pour, never a badge.
+    const liftY = t.y - progress * 30;
+    const driftX = t.x + progress * 12;
+    const tilt = CINNAMON_STICK_TILT + progress * 0.55;
+    const alpha = 1 - progress;
+    try {
+      this.cinnamonTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+    drawCinnamonStick(
+      this.cinnamonTransitGraphics,
+      driftX,
+      liftY,
+      CINNAMON_STICK_W,
+      CINNAMON_STICK_H,
+      tilt,
+      alpha,
+    );
+  }
+
   /** Clear honey suppression on every cup (reset / undo / failure path). */
   private clearHoneySuppression(): void {
     for (const v of this.cupViews) {
@@ -3150,6 +3525,7 @@ export class TeaSortView {
     caughtTea: TeaId | null = null,
     sinkingIngredientMoved: SinkingIngredientSlot = null,
     iceMelted: IceSlot = null,
+    capacityObstacleRemoved: CapacityObstacleSlot = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -3376,6 +3752,32 @@ export class TeaSortView {
         // Failure path: refresh from logic state (ice already null there).
       } finally {
         this.clearIceMelt();
+        this.renderAllCups();
+      }
+    }
+
+    // Cinnamon removal flourish (Gauntlet 11): the tea has landed and the
+    // source is completely empty with logic obstacle already null, so the
+    // stick lifts/tilts out of the emptied source (~320ms total extra).
+    // Part of THIS pour — same single ticker, same isAnimating lock, never
+    // a second onMoveComplete. Exactly one visual stick at any time: the
+    // static stick is gone from logic, only this transit draws (static
+    // suppression). Partial outflows (null) keep the static stick with no
+    // transit/flicker; post-unlock the cup renders as standard normal.
+    // Signal is rules metadata only (`capacityObstacleRemoved`), never a
+    // view-owned wasCinnamon flag.
+    if (cinnamonRemovalPlan(capacityObstacleRemoved).shouldAnimate) {
+      try {
+        const p = this.cinnamonStagePoint(sourceView);
+        this.startCinnamonRemoval(p.x, p.y);
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        this.triggerRevealSparkles(p.x, p.y);
+        await this.wait(CINNAMON_REMOVAL_MS);
+      } catch {
+        // Failure path: refresh from logic state (obstacle already null).
+      } finally {
+        this.clearCinnamonRemoval();
         this.renderAllCups();
       }
     }
@@ -3611,6 +4013,10 @@ export class TeaSortView {
     if (this.iceMelt !== null) {
       this.drawIceMelt();
     }
+    // Cinnamon removal flourish rides the SAME single ticker (no second ticker).
+    if (this.cinnamonRemoval !== null) {
+      this.drawCinnamonRemoval();
+    }
     this.drawStrainerTransit();
     if (this.strainerStandShake > 0) {
       this.strainerStandShake = Math.max(0, this.strainerStandShake - delta);
@@ -3700,6 +4106,8 @@ export class TeaSortView {
     this.clearHoneySuppression();
     // Melt flourish never strands either (logic ice is authoritative).
     this.clearIceMelt();
+    // Removal flourish never strands either (logic obstacle is authoritative).
+    this.clearCinnamonRemoval();
     this.setupCups();
     this.layoutCups();
     this.renderAllCups();
@@ -3730,6 +4138,9 @@ export class TeaSortView {
     // Undo restores logic ice exactly; a stranded flourish would hide the
     // restored static slab — clear it first (same audit as lemon/honey).
     this.clearIceMelt();
+    // Undo restores the logic obstacle exactly; a stranded removal flourish
+    // would double the restored static stick — clear it first (same audit).
+    this.clearCinnamonRemoval();
     const move = this.logic.undo();
     if (move) {
       audioSynth.playUndo();
