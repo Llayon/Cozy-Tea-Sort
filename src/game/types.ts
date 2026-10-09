@@ -273,6 +273,19 @@ export type IceSlot = IceId | null;
 export const ICE_MELT_TEA: TeaId = 'sea_buckthorn';
 
 /**
+ * Tea bud route objective (Gauntlet 12 — «Чайный бутон»): a dormant
+ * tied-tea bud at a vessel's physical bottom. It is NOT tea — never a
+ * TeaId, never capacity, never color legality, never a target. Exactly one
+ * vessel may carry it in production. It blooms (clears atomically) ONLY
+ * when a successful POUR outflow from its host leaves the source tea count
+ * at zero. After clearing the vessel is completely ordinary.
+ */
+export type TeaBudId = 'tea_bud';
+
+/** Per-vessel tea-bud slot: `'tea_bud'` while dormant, or null. The ONE authoritative bud location. */
+export type TeaBudSlot = TeaBudId | null;
+
+/**
  * Full dynamic puzzle state: tea layers plus independent floating-object
  * positions, sinking-object positions, plus the movable strainer tool.
  * Immutable level data (CupConstraint[], ingredient TYPE metadata, Mystery
@@ -286,6 +299,7 @@ export interface PuzzleState {
   strainer: StrainerState;
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
+  teaBudSlots: TeaBudSlot[];
 }
 
 /**
@@ -303,6 +317,7 @@ export interface ReadonlyPuzzleState {
   strainer?: ReadonlyStrainerState | undefined;
   iceSlots?: readonly IceSlot[] | undefined;
   capacityObstacles?: readonly CapacityObstacleSlot[] | undefined;
+  teaBudSlots?: readonly TeaBudSlot[] | undefined;
 }
 
 /** All-null slots for a vessel count (ordinary old levels). */
@@ -439,6 +454,40 @@ export function countCapacityObstacles(state: {
   return (state.capacityObstacles ?? []).filter((s) => s !== null).length;
 }
 
+/** All-null tea-bud slots for a vessel count (ordinary old levels). */
+export function emptyTeaBudSlots(count: number): TeaBudSlot[] {
+  return Array.from({ length: count }, () => null);
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers without buds
+ * synthesize all-null slots. Wrong-length arrays are padded/truncated
+ * defensively (production validation rejects them).
+ */
+export function normalizeTeaBudSlots(
+  slots: readonly TeaBudSlot[] | undefined,
+  count: number,
+): TeaBudSlot[] {
+  if (!slots) return emptyTeaBudSlots(count);
+  const out: TeaBudSlot[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(slots[i] ?? null);
+  }
+  return out;
+}
+
+/** Total dormant tea buds present in a state (production max 1). */
+export function countTeaBuds(state: {
+  teaBudSlots: readonly TeaBudSlot[] | undefined;
+}): number {
+  return (state.teaBudSlots ?? []).filter((s) => s !== null).length;
+}
+
+/** Vessel index hosting the dormant tea bud, or -1 when absent. */
+export function teaBudIndex(state: { teaBudSlots: readonly TeaBudSlot[] | undefined }): number {
+  return (state.teaBudSlots ?? []).findIndex((s) => s !== null);
+}
+
 /** Vessel index hosting a capacity obstacle id, or -1 when absent. */
 export function capacityObstacleIndex(
   state: { capacityObstacles: readonly CapacityObstacleSlot[] | undefined },
@@ -474,6 +523,7 @@ export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
     strainer: normalizeStrainerState(state.strainer),
     iceSlots: normalizeIceSlots(state.iceSlots, cups.length),
     capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, cups.length),
+    teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, cups.length),
   };
 }
 

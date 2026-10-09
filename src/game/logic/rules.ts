@@ -73,6 +73,8 @@ import {
   SinkingIngredientId,
   SinkingIngredientSlot,
   STANDARD_CUP_CAPACITY,
+  TeaBudId,
+  TeaBudSlot,
   TeaId,
   cupCapacity,
   cupConstraintSignature,
@@ -89,6 +91,7 @@ import {
   normalizeIceSlots,
   normalizeSinkingIngredients,
   normalizeStrainerState,
+  normalizeTeaBudSlots,
 } from '../types';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
@@ -239,9 +242,11 @@ export function isInFinalState(
   layers: TeaId[],
   c: CupConstraint | undefined,
   obstacle?: CapacityObstacleSlot | undefined | null,
+  teaBud?: TeaBudSlot | undefined | null,
 ): boolean {
   if (layers.length === 0 || !isHomogeneous(layers)) return false;
   if (obstacle != null) return false;
+  if (teaBud != null) return false;
   return cupEndStateSatisfied(layers, c);
 }
 
@@ -267,9 +272,12 @@ function isPrunableHomogeneousToEmpty(
   toC: CupConstraint | undefined,
   fromObstacle?: CapacityObstacleSlot | undefined | null,
   toObstacle?: CapacityObstacleSlot | undefined | null,
+  fromBud?: TeaBudSlot | undefined | null,
+  toBud?: TeaBudSlot | undefined | null,
 ): boolean {
   if (!isHomogeneous(source)) return false;
   if (fromObstacle != null || toObstacle != null) return false;
+  if (fromBud != null || toBud != null) return false;
   const fromSig = cupConstraintSignature(fromC ?? PLAIN_NORMAL_CONSTRAINT);
   const toSig = cupConstraintSignature(toC ?? PLAIN_NORMAL_CONSTRAINT);
   if (fromSig !== toSig) return false;
@@ -293,6 +301,7 @@ function teaRejectCodeBetween(
   toIdx: number,
   constraints?: readonly CupConstraint[],
   obstacles?: readonly (CapacityObstacleSlot | undefined | null)[] | undefined,
+  buds?: readonly (TeaBudSlot | undefined | null)[] | undefined,
 ): PourRejectCode {
   if (fromIdx === toIdx) return 'same-cup';
   if (fromIdx < 0 || fromIdx >= cups.length) return 'out-of-range';
@@ -336,6 +345,8 @@ function teaRejectCodeBetween(
       constraints?.[toIdx],
       obstacles?.[fromIdx],
       obstacles?.[toIdx],
+      buds?.[fromIdx],
+      buds?.[toIdx],
     )
   ) {
     return 'complete-to-empty';
@@ -366,7 +377,8 @@ export function unstrainedPourCountState(
   constraints?: readonly CupConstraint[],
 ): number {
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
-  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles);
+  const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles, buds);
   if (tea !== 'ok') {
     // Melt exemption mirrors pourRejectCodeState (§52): the transfer count
     // for a genuine melt pour is computed normally below.
@@ -420,6 +432,7 @@ function completeToEmptyMeltExempt(
       toIdx,
       constraints,
       normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
+      normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
     ) === 'complete-to-empty'
   );
 }
@@ -454,7 +467,8 @@ export function pourRejectCodeState(
   constraints?: readonly CupConstraint[],
 ): PourRejectCode {
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
-  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles);
+  const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles, buds);
   const n = state.cups.length;
   const ice = normalizeIceSlots(state.iceSlots, n);
   const fromIn = fromIdx >= 0 && fromIdx < n;
@@ -659,6 +673,22 @@ export function isConstructiveMoveState(
       return canonicalPuzzleKey(state, constraints) !== canonicalPuzzleKey(after.state, constraints);
     }
   }
+  // Tea-bud bloom (Gauntlet 12 §39–40): a pour that empties the
+  // dormant-bud host changes objective state — never a mere vessel
+  // permutation, even full-homogeneous bud tea into an empty normal cup.
+  // Fail-closed: any pour touching an active bud stays constructive here,
+  // and the prune below also disables on either side.
+  const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+  if (buds[fromIdx] != null) {
+    const src = state.cups[fromIdx] as TeaId[];
+    const dst = state.cups[toIdx] as TeaId[];
+    const obsForM = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+    const m = Math.min(
+      topCountOf(src),
+      effectiveCupCapacity(constraints?.[toIdx], obsForM[toIdx]) - dst.length,
+    );
+    if (m > 0 && src.length - m === 0) return true;
+  }
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
@@ -670,6 +700,8 @@ export function isConstructiveMoveState(
       constraints?.[toIdx],
       obstacles[fromIdx],
       obstacles[toIdx],
+      buds[fromIdx],
+      buds[toIdx],
     )
   ) {
     return false;
@@ -741,6 +773,8 @@ export interface PourStateResult {
   iceMelted?: IceId;
   /** Capacity obstacle removed by this pour, when the source emptied (animation metadata only). */
   capacityObstacleRemoved?: CapacityObstacleId;
+  /** Tea bud bloomed by this pour, when the dormant host emptied (presentation metadata only). */
+  teaBudBloomed?: TeaBudId | null;
 }
 
 /**
@@ -762,6 +796,12 @@ export interface PourStateResult {
  *   COMPLETELY EMPTY removes the source's capacity obstacle atomically
  *   with the tea transfer (any m, strained or not). Partial outflows and
  *   all inflows leave it untouched; receiving never removes. One-way.
+ * - Tea bud (Gauntlet 12): a successful POUR outflow that leaves the source
+ *   COMPLETELY EMPTY clears the source's dormant bud atomically with the
+ *   tea transfer (any m, strained or not; `teaBudBloomed: 'tea_bud'`).
+ *   Partial outflows (tea remains) and all inflows leave it untouched;
+ *   receiving never blooms; rejected pours never bloom. One-way (undo
+ *   restores it exactly). The bud changes NO pour legality.
  * - Illegal pours (including would-be single-layer pours while attached,
  *   `strainer-needs-two-layers`, `target-sinking-occupied`, `source-frozen`
  *   and `target-frozen-needs-hot`) return null with NO mutation.
@@ -783,6 +823,7 @@ export function applyPourState(
   const nextStrainer = normalizeStrainerState(state.strainer);
   const nextIce = normalizeIceSlots(state.iceSlots, state.cups.length);
   const nextObstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+  const nextBuds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
   const source = nextCups[fromIdx] as TeaId[];
   const target = nextCups[toIdx] as TeaId[];
   const layer = topLayerOf(source) as TeaId;
@@ -829,8 +870,16 @@ export function applyPourState(
     capacityObstacleRemoved = nextObstacles[fromIdx] as CapacityObstacleId;
     nextObstacles[fromIdx] = null;
   }
+  // Bloom (Gauntlet 12 §9–12): dormant bud + successful outflow + post-source
+  // tea count === 0 → clear atomically. Any m; partial outflows and all
+  // inflows leave the bud dormant.
+  let teaBudBloomed: TeaBudId | null = null;
+  if (nextBuds[fromIdx] != null && nextCups[fromIdx]?.length === 0) {
+    nextBuds[fromIdx] = null;
+    teaBudBloomed = 'tea_bud';
+  }
   return {
-    state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles },
+    state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
     transferred: m,
     received,
     layer,
@@ -840,6 +889,7 @@ export function applyPourState(
     sinkingIngredientMoved,
     iceMelted,
     capacityObstacleRemoved,
+    teaBudBloomed,
   };
 }
 
@@ -905,6 +955,7 @@ export function applyPlaceStrainerState(
     strainer: { present: true, attachedCupIndex: toIdx, heldTea: null },
     iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
     capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
+    teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
   };
 }
 
@@ -966,6 +1017,7 @@ export function applyReleaseStrainerState(
       strainer: { present: true, attachedCupIndex: null, heldTea: null },
       iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
       capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
+      teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
     },
     layer: held,
   };
@@ -1060,6 +1112,7 @@ export interface ApplyPuzzleActionResult {
   sinkingIngredientMoved?: SinkingIngredientId;
   iceMelted?: IceId;
   capacityObstacleRemoved?: CapacityObstacleId;
+  teaBudBloomed?: TeaBudId | null;
 }
 
 export function applyPuzzleActionState(
@@ -1090,6 +1143,7 @@ export function applyPuzzleActionState(
     sinkingIngredientMoved: res.sinkingIngredientMoved,
     iceMelted: res.iceMelted,
     capacityObstacleRemoved: res.capacityObstacleRemoved,
+    teaBudBloomed: res.teaBudBloomed,
   };
 }
 
@@ -1245,7 +1299,9 @@ export function sinkingIngredientGoalsSatisfied(
  * ingredient under its correct completed tea AND no active ice (a frozen
  * vessel is never a finished vessel, §38–39) AND no active capacity
  * obstacle (a blocked vessel is never finished — the player must unlock
- * it, Gauntlet 11). An attached-but-empty tool may be anywhere at victory.
+ * it, Gauntlet 11) AND no dormant tea bud (the route objective must have
+ * bloomed — a dormant bud blocks victory, Gauntlet 12). An
+ * attached-but-empty tool may be anywhere at victory.
  */
 export function isPuzzleWonState(
   state: ReadonlyPuzzleState,
@@ -1260,6 +1316,8 @@ export function isPuzzleWonState(
   if (ice.some((slot) => slot !== null)) return false;
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
   if (obstacles.some((slot) => slot !== null)) return false;
+  const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+  if (buds.some((slot) => slot !== null)) return false;
   return true;
 }
 
@@ -1561,6 +1619,56 @@ function groupedCapacityKey(
     .join('||');
 }
 
+/**
+ * Tea-bud-aware canonical key (Gauntlet 12 §30): the dormant-bud marker
+ * joins the CUP CONTENT encoding (`…#sink:<m>#ice:<i>#cap:<c>#bud:<b>`),
+ * travelling WITH the tea as one unit inside the same vessel-signature
+ * group — swapping interchangeable vessels (contents + bud together) stays
+ * canonical, while active vs cleared placements key differently.
+ * `#bud:tea_bud` segments never appear in pre-G12 keys, so bud boards can
+ * never collide with bud-free ones. Boards with all-null buds take the
+ * legacy paths verbatim (byte-identical G11 keys). Once the bud clears the
+ * cup is semantically ordinary and may collapse with equivalent normal cups
+ * again (§33).
+ */
+function groupedTeaBudKey(
+  state: ReadonlyPuzzleState,
+  slots: FloatingIngredientSlot[],
+  sinkSlots: SinkingIngredientSlot[],
+  iceArr: IceSlot[],
+  capArr: CapacityObstacleSlot[],
+  budArr: TeaBudSlot[],
+  hasLemon: boolean,
+  toolMarkerAt: (idx: number) => string | null,
+  constraints?: readonly CupConstraint[],
+): string {
+  const normalized = normalizeCupConstraints(constraints, state.cups.length);
+  const groups = new Map<string, string[]>();
+  state.cups.forEach((cup, idx) => {
+    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const lemonMarker = slots[idx] ?? '_';
+    const sinkMarker = sinkSlots[idx] ?? '_';
+    const iceMarker = iceArr[idx] ?? '_';
+    const capMarker = capArr[idx] ?? '_';
+    const budMarker = budArr[idx] ?? '_';
+    let enc = hasLemon ? `${cup.join(',')}#${lemonMarker}` : cup.join(',');
+    const tool = toolMarkerAt(idx);
+    if (tool !== null) enc += `#${tool}`;
+    enc += `#sink:${sinkMarker}#ice:${iceMarker}#cap:${capMarker}#bud:${budMarker}`;
+    const arr = groups.get(sig);
+    if (arr) arr.push(enc);
+    else groups.set(sig, [enc]);
+  });
+  const orderedSigs = [...groups.keys()].sort();
+  return orderedSigs
+    .map((sig) => {
+      const arr = groups.get(sig) as string[];
+      arr.sort();
+      return `${sig}:${arr.join('|')}`;
+    })
+    .join('||');
+}
+
 export function canonicalPuzzleKey(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
@@ -1568,6 +1676,38 @@ export function canonicalPuzzleKey(
   const sinkSlots = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
   const iceArr = normalizeIceSlots(state.iceSlots, state.cups.length);
   const capArr = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+  const budArr = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+  const hasBud = budArr.some((s) => s != null);
+  if (hasBud) {
+    const strainer = normalizeStrainerState(state.strainer);
+    const slots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+    const hasLemon = slots.some((s) => s != null);
+    const noTool = (_idx: number): string | null => null;
+    if (!strainer.present) {
+      return groupedTeaBudKey(state, slots, sinkSlots, iceArr, capArr, budArr, hasLemon, noTool, constraints);
+    }
+    if (strainer.heldTea !== null) {
+      const base = groupedTeaBudKey(state, slots, sinkSlots, iceArr, capArr, budArr, hasLemon, noTool, constraints);
+      const host =
+        strainer.attachedCupIndex === null ? 'STAND' : `CUP:${strainer.attachedCupIndex}`;
+      return `${base}||STR:${host}:HOLD:${strainer.heldTea}`;
+    }
+    if (strainer.attachedCupIndex === null) {
+      const base = groupedTeaBudKey(state, slots, sinkSlots, iceArr, capArr, budArr, hasLemon, noTool, constraints);
+      return `${base}||STR:STAND:EMPTY`;
+    }
+    return groupedTeaBudKey(
+      state,
+      slots,
+      sinkSlots,
+      iceArr,
+      capArr,
+      budArr,
+      hasLemon,
+      (idx) => (strainer.attachedCupIndex === idx ? 'STR' : '_'),
+      constraints,
+    );
+  }
   const hasCap = capArr.some((s) => s != null);
   if (!sinkSlots.some((s) => s != null) && !iceArr.some((s) => s != null) && !hasCap) {
     return canonicalPuzzleKeyNoHoney(state, constraints);
