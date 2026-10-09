@@ -107,6 +107,7 @@ describe('rollout 65–72 (Gauntlet 9 frozen-cup introduction)', () => {
       strainer: false,
       honey: false,
       frozen: false,
+      thermos: false,
     };
     expect(mechanicPlanForLevel(65)).toEqual({ ...CLEAN });
     expect(mechanicPlanForLevel(66)).toEqual({ ...CLEAN, frozen: true });

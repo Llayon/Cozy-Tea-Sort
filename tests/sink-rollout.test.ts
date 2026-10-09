@@ -67,8 +67,8 @@ describe('rollout 17–24 (Gauntlet 3 guest-cup introduction)', () => {
         expect(cfg.targetTeaIds).toEqual([]);
       }
     }
-    expect(mechanicPlanForLevel(18)).toEqual({ teapot: false, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false });
-    expect(mechanicPlanForLevel(22)).toEqual({ teapot: true, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false });
+    expect(mechanicPlanForLevel(18)).toEqual({ teapot: false, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false });
+    expect(mechanicPlanForLevel(22)).toEqual({ teapot: true, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false });
   });
 
   it('level 18/19/22 subtitles match the specified product copy', () => {
@@ -114,9 +114,11 @@ describe('rollout invariants 1–200', () => {
 
   it('later-cycle rotation uses sink without targets', () => {
     // Challenge rotation must include pure sink and teapot+targets over a
-    // cycle window (pure sink recurs every 8 cycles from level 70).
+    // full cycle window (G10 lengthened the challenge cycle to 15 with the
+    // standalone thermos slot; teapot+targets recurs at level 102, so the
+    // window spans 25–120 to cover a full period).
     const seen = new Set<string>();
-    for (let lvl = 25; lvl <= 100; lvl++) {
+    for (let lvl = 25; lvl <= 120; lvl++) {
       const cfg = getLevelConfig(lvl);
       if (cfg.phase !== 'challenge') continue;
       seen.add(

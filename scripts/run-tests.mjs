@@ -119,6 +119,24 @@ const batches = [
     ],
   },
   { name: 'frozen-cup stress', files: ['tests/frozen-cup-stress.test.ts'] },
+  {
+    name: 'thermos matrix + solver + canonical',
+    files: [
+      'tests/thermos.test.ts',
+      'tests/thermos-solver.test.ts',
+      'tests/thermos-canonical.test.ts',
+    ],
+  },
+  {
+    name: 'thermos templates + fast path + rollout + view',
+    files: [
+      'tests/thermos-templates.test.ts',
+      'tests/thermos-fastpath.test.ts',
+      'tests/thermos-rollout.test.ts',
+      'tests/thermos-view.test.ts',
+    ],
+  },
+  { name: 'thermos stress', files: ['tests/thermos-stress.test.ts'] },
 ];
 
 function runBatch(batch) {
