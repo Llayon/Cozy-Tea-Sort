@@ -25,6 +25,8 @@ import {
   SinkingIngredientSlot,
   TEA_TYPES,
   THERMOS_CAPACITY,
+  TeaBudId,
+  TeaBudSlot,
   TeaId,
   cloneCupConstraint,
   cupCapacity,
@@ -550,6 +552,12 @@ export const CINNAMON_STICK_TILT = 0.18;
 export const CINNAMON_PROTRUSION = 18;
 /** Removal-flourish duration after the tea lands (spec: ~250-400ms). */
 export const CINNAMON_REMOVAL_MS = 320;
+/** Bloom-flourish duration after the final tea leaves (spec: ~350-550ms). */
+export const TEA_BLOOM_MS = 450;
+/** Dormant bud width (fits inside the 64-wide standard vessel bottom). */
+export const TEA_BUD_W = 22;
+/** Dormant bud height (sits at the physical bottom, below the tea). */
+export const TEA_BUD_H = 16;
 /** Blocked upper slots while the stick is present (base 4 - effective 2). */
 export const CINNAMON_BLOCKED_SLOTS = STANDARD_CUP_CAPACITY - CINNAMON_EFFECTIVE_CAPACITY;
 
@@ -657,6 +665,115 @@ export function blockedCapacityOverlay(
 /** Alias set for forward-compat with alternate test import names. */
 export const getBlockedCapacityOverlay = blockedCapacityOverlay;
 export const blockedSlotOverlay = blockedCapacityOverlay;
+
+/**
+ * Dormant-bud anchor (pure, Gauntlet 12): the physical bottom of the cup
+ * interior where the tied-tea bud rests BELOW the tea. Single anchor shared
+ * by the static bud and the bloom flourish — never a second offset truth.
+ * Tea layers keep the base-4 geometry (bud consumes no capacity, displaces
+ * no layer); the bud reads through the tea via its own outline + front
+ * silhouette, never by stretching tea.
+ */
+export function teaBudBottomPoint(width = 64, height = 142): { x: number; y: number } {
+  void width;
+  const bottomY = height - 6;
+  return { x: width / 2, y: bottomY - TEA_BUD_H / 2 + 2 };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getTeaBudBottomPoint = teaBudBottomPoint;
+export const teaBudGeometry = teaBudBottomPoint;
+
+/**
+ * Bud scale for a cup width (pure): the standard 64-wide glass uses scale
+ * 1; narrower vessels (thermos 56) shrink proportionally. Presentation only.
+ */
+export function teaBudScaleForCup(width = 64): number {
+  return Math.max(0.7, Math.min(1.15, width / 64));
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getTeaBudScaleForCup = teaBudScaleForCup;
+
+/**
+ * Bloom plan (pure, Gauntlet 12): whether the emptied pour must run the
+ * flower-opening flourish. The ONLY signal is the rules metadata
+ * `teaBudBloomed` — never a view-owned wasBud flag.
+ * - `'tea_bud'` → animate once for TEA_BLOOM_MS.
+ * - null/undefined → no flourish, the static bud stays (partial outflow).
+ */
+export interface TeaBloomVisualPlan {
+  shouldAnimate: boolean;
+  durMs: number;
+}
+
+export function teaBloomVisualPlan(teaBudBloomed: TeaBudSlot): TeaBloomVisualPlan {
+  if (teaBudBloomed === 'tea_bud') {
+    return { shouldAnimate: true, durMs: TEA_BLOOM_MS };
+  }
+  return { shouldAnimate: false, durMs: 0 };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getTeaBloomVisualPlan = teaBloomVisualPlan;
+export const teaBloomTransitPlan = teaBloomVisualPlan;
+
+/**
+ * Cozy tied-tea bud (Gauntlet 12): small organic botanical bundle — a
+ * brown-green tied tea knot with two tiny closed sepals + a tied-thread
+ * line, drawn with a readable darker outline so the silhouette stays legible
+ * through tea layers (distinct botanical tied-bundle shape, not color
+ * alone — never confused with honey/lemon/cinnamon). No emoji, no text.
+ */
+export function drawTeaBud(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  scale = 1,
+  alpha = 1,
+): void {
+  const w = TEA_BUD_W * scale;
+  const h = TEA_BUD_H * scale;
+  // Tied-bundle body (rounded knot, bark-brown with green undertone).
+  g.ellipse(cx, cy, w / 2, h / 2).fill({ color: 0x5a6b3a, alpha: 0.95 * alpha });
+  g.ellipse(cx, cy, w / 2, h / 2).stroke({ width: 1.8, color: 0x2e3a1e, alpha: 0.9 * alpha });
+  // Two closed sepals (small green leaves hugging the knot).
+  g.ellipse(cx - w * 0.22, cy - h * 0.28, w * 0.2, h * 0.3).fill({ color: 0x6f8f4a, alpha: 0.95 * alpha });
+  g.ellipse(cx + w * 0.22, cy - h * 0.28, w * 0.2, h * 0.3).fill({ color: 0x6f8f4a, alpha: 0.95 * alpha });
+  // Tied thread (thin wrapped line around the middle).
+  g.rect(cx - w / 2 + 2, cy - 1, w - 4, 2).fill({ color: 0xd8c890, alpha: 0.9 * alpha });
+}
+
+/**
+ * Opening tea flower (Gauntlet 12): restrained botanical bloom drawn at
+ * `progress` 0..1 — soft petals expanding from the knot center, cozy and
+ * fast (never a 2-second celebration). Presentation only; after the flourish
+ * the cup renders as an ordinary normal vessel (no persistent marker).
+ */
+export function drawTeaBloom(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  progress: number,
+  scale = 1,
+): void {
+  const p = Math.min(1, Math.max(0, progress));
+  const alpha = 1 - p * 0.9;
+  const spread = (4 + p * 14) * scale;
+  const petalR = (3 + p * 5) * scale;
+  const petalColors = [0xe8a8c0, 0xf2c9d8, 0xd890b0, 0xe8a8c0, 0xf2d9e0];
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    const px = cx + Math.cos(angle) * spread * 0.7;
+    const py = cy + Math.sin(angle) * spread * 0.55 - p * 8 * scale;
+    g.ellipse(px, py, petalR, petalR * 0.72).fill({ color: petalColors[i] as number, alpha: Math.max(0, alpha) });
+  }
+  // Fading knot center.
+  g.ellipse(cx, cy - p * 8 * scale, 5 * scale * (1 - p * 0.5), 4 * scale * (1 - p * 0.5)).fill({
+    color: 0x8fae5a,
+    alpha: Math.max(0, 0.9 - p),
+  });
+}
 
 /**
  * Cozy cinnamon stick (Gauntlet 11): warm brown rolled-bark silhouette
@@ -898,6 +1015,13 @@ export class CupView {
    * coincide with this static. Never intercepts pointer (eventMode none).
    */
   cinnamonGraphics: Graphics;
+  /**
+   * Dormant-bud layer (Gauntlet 12): small tied-tea bundle drawn at the
+   * physical bottom from the authoritative `Cup.teaBud` — no view-owned
+   * bud index, never a second mutable truth. Clears to empty when the bud
+   * is null so post-bloom cups render as ordinary normal vessels.
+   */
+  teaBudGraphics: Graphics;
   glassOverlay: Graphics;
   glowGraphics: Graphics;
   /**
@@ -1097,6 +1221,37 @@ export class CupView {
   }
 
   /**
+   * Dormant-bud center in container-local coords (Gauntlet 12): the ONE
+   * shared anchor used by BOTH static rendering and the bloom flourish.
+   * Delegates to the pure `teaBudBottomPoint` helper — never a second
+   * offset truth. Fixed anchor: partial outflows and inflows keep the bud
+   * exactly here with no flicker.
+   */
+  teaBudLocalPoint(): { x: number; y: number } {
+    return teaBudBottomPoint(this.width, this.height);
+  }
+
+  /**
+   * Dormant-bud center in stage space (Gauntlet 12): the ACTUAL transformed
+   * bud anchor — same pivot/rotation/lift/scale convention as the cinnamon
+   * anchor, shake ignored. A tilted pouring source therefore launches the
+   * bloom flourish from where its bud really is, never rest pose.
+   */
+  teaBudStagePoint(): { x: number; y: number } {
+    const pivot = this.cupBodyContainer.pivot;
+    const local = this.teaBudLocalPoint();
+    const r = rotatePoint2D(
+      local.x - pivot.x,
+      local.y - pivot.y,
+      this.cupBodyContainer.rotation,
+    );
+    return {
+      x: this.container.x + (this.width / 2 + r.x) * this.scale,
+      y: this.container.y + (pivot.y + this.currentLift + r.y) * this.scale,
+    };
+  }
+
+  /**
    * Attached-tool anchor in container-local coords (Gauntlet 6 §35):
    * centered over the OPENING (teapot lid center, never spout/handle),
    * hovering just above the rim so tea color and Mystery markers below
@@ -1272,6 +1427,14 @@ export class CupView {
     this.cinnamonGraphics = new Graphics();
     this.cinnamonGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.cinnamonGraphics);
+
+    // Dormant tea bud (Gauntlet 12): at the physical bottom, above the
+    // liquid so the tied-bundle silhouette reads through tea (strong
+    // outline, glass-front rendering), below the target motif. Never
+    // intercepts pointer (eventMode none). Tea geometry unchanged.
+    this.teaBudGraphics = new Graphics();
+    this.teaBudGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.teaBudGraphics);
 
     this.targetGraphics = new Graphics();
     this.cupBodyContainer.addChild(this.targetGraphics);
@@ -1950,6 +2113,28 @@ export class CupView {
     drawCinnamonStick(g, geo.x, geo.y, geo.w, geo.h, geo.tilt, 1);
   }
 
+  /**
+   * Dormant tea bud (Gauntlet 12): drawn from the authoritative
+   * `Cup.teaBud` at the ONE shared bottom anchor (`teaBudLocalPoint`,
+   * never a second offset truth). The bud keeps the STANDARD cup
+   * body/geometry; tea layers always use the base-4 slot height (never
+   * displaced, never stretched — the bud consumes no capacity). The bud
+   * silhouette draws ABOVE the liquid with a strong outline so it stays
+   * readable even under four tea layers, while tea colors above stay
+   * readable; no displaced bottom layer, no capacity loss. Post-bloom
+   * (bud null) this clears to an empty layer so the cup is
+   * indistinguishable from standard normal.
+   */
+  renderTeaBud(cup: Cup) {
+    const g = this.teaBudGraphics;
+    g.clear();
+    const bud: TeaBudSlot = cup.teaBud;
+    if (bud == null || bud !== 'tea_bud') return;
+    // Bud-free levels render byte-identical to before (null clears empty).
+    const pt = this.teaBudLocalPoint();
+    drawTeaBud(g, pt.x, pt.y, teaBudScaleForCup(this.width), 1);
+  }
+
   renderLiquid(cup: Cup) {
     this.lastCup = cup;
     this.renderTargetMotif(cup);
@@ -1957,6 +2142,7 @@ export class CupView {
     this.renderHoney(cup);
     this.renderIce(cup);
     this.renderCinnamon(cup);
+    this.renderTeaBud(cup);
     // Sink glow lives in glowGraphics (behind the liquid, like the
     // selection ring); re-apply it on every liquid redraw unless a
     // selection ring is active (setSelection owns the layer then).
@@ -2243,6 +2429,22 @@ export class TeaSortView {
 
   /** Removal-flourish layer (Gauntlet 11, existing ticker only). */
   cinnamonTransitGraphics = new Graphics();
+  /** Bloom-flourish layer (Gauntlet 12, existing ticker only). */
+  teaBloomTransitGraphics = new Graphics();
+  /**
+   * Active tea-bloom flourish (Gauntlet 12): the static bud is already gone
+   * from logic (post-move bud null), so this transit layer draws the
+   * opening flower at the emptied source bottom for TEA_BLOOM_MS under the
+   * EXISTING ticker (no second ticker). Reads ONLY the `teaBudBloomed`
+   * transition metadata — never a view-owned bud index. Exactly one visual
+   * bud representation at any time (static suppression).
+   */
+  private teaBloom: {
+    x: number;
+    y: number;
+    startMs: number;
+    durMs: number;
+  } | null = null;
   /**
    * Active cinnamon removal flourish (Gauntlet 11): the static stick is
    * already gone from logic (post-move obstacle null), so this transit
@@ -2427,6 +2629,13 @@ export class TeaSortView {
     // the ice/honey/lemon layers so a joint visual never erases another.
     this.cinnamonTransitGraphics.eventMode = 'none';
     this.rootContainer.addChild(this.cinnamonTransitGraphics);
+    // Tea-bloom flourish (Gauntlet 12): dedicated layer on the EXISTING
+    // ticker (no second ticker), above cups so the opening flower reads,
+    // below particles so bloom sparkles read over it. Separate from the
+    // cinnamon/ice/honey/lemon layers so a joint visual never erases
+    // another.
+    this.teaBloomTransitGraphics.eventMode = 'none';
+    this.rootContainer.addChild(this.teaBloomTransitGraphics);
 
     this.setupInteractivity();
     this.setupCups();
@@ -3098,6 +3307,7 @@ export class TeaSortView {
           res.sinkingIngredientMoved ?? null,
           res.iceMelted ?? null,
           res.capacityObstacleRemoved ?? null,
+          res.teaBudBloomed ?? null,
         );
       }
     } else {
@@ -3430,6 +3640,46 @@ export class TeaSortView {
     }
   }
 
+  /** Tea-bud point in stage space (tilted pour pose — like cinnamon). */
+  private teaBloomStagePoint(view: CupView): { x: number; y: number } {
+    return view.teaBudStagePoint();
+  }
+
+  /**
+   * Begin the tea-bloom flourish (Gauntlet 12): the final tea has left and
+   * logic bud is already null, so draw the opening flower at the emptied
+   * source bottom for TEA_BLOOM_MS. Stage-space point captured while the
+   * source is still hovered/tilted (actual pour pose, never rest pose).
+   */
+  private startTeaBloom(x: number, y: number): void {
+    const plan = teaBloomVisualPlan('tea_bud');
+    this.teaBloom = { x, y, startMs: performance.now(), durMs: plan.durMs };
+  }
+
+  private clearTeaBloom(): void {
+    this.teaBloom = null;
+    try {
+      this.teaBloomTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Draw the opening flower (existing ticker). */
+  private drawTeaBloom(): void {
+    const t = this.teaBloom;
+    if (!t) return;
+    const progress = Math.min(1, Math.max(0, (performance.now() - t.startMs) / t.durMs));
+    // The flower opens in place at the emptied bottom and fades — a
+    // rewarding but restrained objective payoff, never a second pour.
+    try {
+      this.teaBloomTransitGraphics.clear();
+    } catch {
+      // ignore
+    }
+    drawTeaBloom(this.teaBloomTransitGraphics, t.x, t.y, progress, 1);
+  }
+
   /** Draw the lifting/tilting removal stick (existing ticker). */
   private drawCinnamonRemoval(): void {
     const t = this.cinnamonRemoval;
@@ -3526,6 +3776,7 @@ export class TeaSortView {
     sinkingIngredientMoved: SinkingIngredientSlot = null,
     iceMelted: IceSlot = null,
     capacityObstacleRemoved: CapacityObstacleSlot = null,
+    teaBudBloomed: TeaBudSlot = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -3782,6 +4033,32 @@ export class TeaSortView {
       }
     }
 
+    // Tea-bloom flourish (Gauntlet 12): the final tea has left and the
+    // source is completely empty with logic bud already null, so the flower
+    // opens at the emptied source bottom (~450ms total extra). Part of THIS
+    // pour — same single ticker, same isAnimating lock, never a second
+    // onMoveComplete (exactly one). Exactly one visual bud at any time: the
+    // static bud is gone from logic, only this transit draws (static
+    // suppression). Partial outflows (null) keep the static dormant bud
+    // with no transit/flicker; inflows keep it too; post-bloom the cup
+    // renders as standard normal. Signal is rules metadata only
+    // (`teaBudBloomed`), never a view-owned wasBud flag.
+    if (teaBloomVisualPlan(teaBudBloomed).shouldAnimate) {
+      try {
+        const p = this.teaBloomStagePoint(sourceView);
+        this.startTeaBloom(p.x, p.y);
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        this.triggerRevealSparkles(p.x, p.y);
+        await this.wait(TEA_BLOOM_MS);
+      } catch {
+        // Failure path: refresh from logic state (bud already null).
+      } finally {
+        this.clearTeaBloom();
+        this.renderAllCups();
+      }
+    }
+
     // Strained catch reveal (Gauntlet 6 §40): near completion the caught
     // layer appears in the mesh on the source, then the loaded tool
     // returns to its stand. Part of THIS pour — never a second move.
@@ -4016,6 +4293,10 @@ export class TeaSortView {
     // Cinnamon removal flourish rides the SAME single ticker (no second ticker).
     if (this.cinnamonRemoval !== null) {
       this.drawCinnamonRemoval();
+    }
+    // Tea-bloom flourish rides the SAME single ticker (no second ticker).
+    if (this.teaBloom !== null) {
+      this.drawTeaBloom();
     }
     this.drawStrainerTransit();
     if (this.strainerStandShake > 0) {

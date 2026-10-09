@@ -68,6 +68,8 @@ export interface LevelConfig {
   hasThermos?: boolean;
   /** True when this level includes the cinnamon stick (Gauntlet 11, authored 4,4,3,3,2,0 topology). */
   hasCinnamon?: boolean;
+  /** True when this level includes the dormant tea bud (Gauntlet 12, authored 4,4,4,4,0,0 topology). */
+  hasTeaBloom?: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

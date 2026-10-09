@@ -27,7 +27,7 @@ import {
   HelpCircle,
   Shuffle,
 } from 'lucide-react';
-import { CapacityObstacleSlot, CupConstraint, FloatingIngredientSlot, IceSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaId, cloneCupConstraint, normalizeCapacityObstacles, normalizeIceSlots, normalizeSinkingIngredients, normalizeStrainerState } from './game/types';
+import { CapacityObstacleSlot, CupConstraint, FloatingIngredientSlot, IceSlot, SinkingIngredientSlot, StrainerState, TEA_TYPES, TeaBudSlot, TeaId, cloneCupConstraint, normalizeCapacityObstacles, normalizeIceSlots, normalizeSinkingIngredients, normalizeStrainerState, normalizeTeaBudSlots } from './game/types';
 import { TeaSortLogic } from './game/logic/teaSortLogic';
 import { isWonState } from './game/logic/rules';
 import { TeaSortView } from './game/view/TeaSortView';
@@ -54,6 +54,7 @@ interface LevelBackupState {
   sinkingIngredients: SinkingIngredientSlot[];
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
+  teaBudSlots: TeaBudSlot[];
 }
 
 export default function App() {
@@ -119,7 +120,7 @@ export default function App() {
   const [justUnlockedSkin, setJustUnlockedSkin] = useState<CupSkin | undefined>();
 
   // Initial state store for Level restart
-  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [], iceSlots: [], capacityObstacles: [] });
+  const initialLevelStateRef = useRef<LevelBackupState>({ cups: [], hiddenCounts: [], cupConstraints: [], floatingIngredients: [], strainer: { present: false, attachedCupIndex: null, heldTea: null }, sinkingIngredients: [], iceSlots: [], capacityObstacles: [], teaBudSlots: [] });
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
@@ -146,6 +147,7 @@ export default function App() {
         frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
         thermosCupCount: cfg.hasThermos ? 1 : 0,
         cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
+        teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -162,6 +164,7 @@ export default function App() {
       sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
+      teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
     };
 
     return new TeaSortLogic(
@@ -173,6 +176,7 @@ export default function App() {
       normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       normalizeIceSlots(generated.iceSlots, generated.cups.length),
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
+      normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
     );
   };
 
@@ -241,6 +245,7 @@ export default function App() {
         frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
         thermosCupCount: cfg.hasThermos ? 1 : 0,
         cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
+        teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -257,6 +262,7 @@ export default function App() {
       sinkingIngredients: normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
+      teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
     };
 
     const logic = new TeaSortLogic(
@@ -268,6 +274,7 @@ export default function App() {
       normalizeSinkingIngredients(generated.sinkingIngredients, generated.cups.length),
       normalizeIceSlots(generated.iceSlots, generated.cups.length),
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
+      normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
     );
     logicRef.current = logic;
 
@@ -408,8 +415,9 @@ export default function App() {
     const restoredSinking = normalizeSinkingIngredients(backup.sinkingIngredients, restoredCups.length);
     const restoredIce = normalizeIceSlots(backup.iceSlots, restoredCups.length);
     const restoredObstacles = normalizeCapacityObstacles(backup.capacityObstacles, restoredCups.length);
+    const restoredBuds = normalizeTeaBudSlots(backup.teaBudSlots, restoredCups.length);
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -674,6 +682,18 @@ export default function App() {
         </div>
       )}
 
+      {/* Tea-bloom first-encounter onboarding (Level 90 only): compact,
+           never blocking. NOT shown on 94 (no tutorial repeat). */}
+      {currentConfig.hasTeaBloom && currentLevel === 90 && moves === 0 && !isWon && (
+        <div
+          id="tea-bloom-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#1E2A1A]/95 border-b border-[#4A6B3E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#D4E8B8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#9AC878] shrink-0" />
+          <span>На дне спрятан чайный бутон. Полностью опустоши чашку — он распустится.</span>
+        </div>
+      )}
+
       {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
            compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
       {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
@@ -914,6 +934,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8A05E] font-bold">🪵</span>
                 <span>Пока в чашке палочка корицы, в неё помещается только 2 слоя. Полностью опустоши чашку — палочка уберётся, и чашка снова будет вмещать 4.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#9AC878] font-bold">🌱</span>
+                <span>Чайный бутон распустится, когда его чашка полностью опустеет. После этого чашка остаётся обычной и её можно снова использовать.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>
