@@ -143,6 +143,7 @@ export default function App() {
         hasStrainer: cfg.hasStrainer,
         sinkingIngredient: cfg.sinkingIngredient,
         frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
+        thermosCupCount: cfg.hasThermos ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -234,6 +235,7 @@ export default function App() {
         hasStrainer: cfg.hasStrainer,
         sinkingIngredient: cfg.sinkingIngredient,
         frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
+        thermosCupCount: cfg.hasThermos ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -640,6 +642,18 @@ export default function App() {
         </div>
       )}
 
+      {/* Thermos first-encounter onboarding (Level 74 only): compact,
+          never blocking. NOT shown on 78 (no tutorial repeat). */}
+      {currentConfig.hasThermos && currentLevel === 74 && moves === 0 && !isWon && (
+        <div
+          id="thermos-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2A2118]/95 border-b border-[#6B5A3E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0D9A8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#E8C878] shrink-0" />
+          <span>В высокий термос помещается 5 слоёв. Это удобный временный запас, но к концу термос нужно опустошить.</span>
+        </div>
+      )}
+
       {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
            compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
       {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
@@ -872,6 +886,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#8AC9E8] font-bold">🧊</span>
                 <span>Из замёрзшей чашки нельзя переливать. Налей в неё облепиховый чай — лёд растает, и чашка станет обычной.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#E8C878] font-bold">🧉</span>
+                <span>Высокий термос вмещает 5 слоёв и переливает чай как обычная чашка. Но в конце уровня термос должен остаться пустым.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

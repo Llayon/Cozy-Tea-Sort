@@ -64,6 +64,8 @@ export interface LevelConfig {
   hasStrainer: boolean;
   /** True when this level includes the frozen cup / ice overlay (Gauntlet 9, authored 4,4,4,3,1,0 topology). */
   hasFrozenCup: boolean;
+  /** True when this level includes the high thermos (Gauntlet 10, authored 4,4,3,2,0 + T3 thermos-3 topology). */
+  hasThermos?: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

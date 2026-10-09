@@ -60,9 +60,10 @@ interface MechanicPlan {
   strainer: boolean;
   honey: boolean;
   frozen: boolean;
+  thermos: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -215,20 +216,41 @@ const PINNED_ROLLOUT_65_72: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–72, then a deterministic
+ * Pinned rollout 73–80 (Gauntlet 10 — high thermos «Высокий термос»):
+ * 73 warmup clean · 74 challenge THERMOS (tutorial) · 75 peak
+ * STRAINER+mystery (familiar G6 mechanic, already-valid peak) ·
+ * 76 relax clean · 77 warmup clean · 78 challenge THERMOS (no tutorial
+ * repeat) · 79 peak HONEY+mystery (familiar G7 combination) ·
+ * 80 relax clean.
+ */
+const PINNED_ROLLOUT_73_80: Record<number, MechanicPlan> = {
+  73: { ...CLEAN },
+  74: { ...CLEAN, thermos: true },
+  75: { ...CLEAN, strainer: true },
+  76: { ...CLEAN },
+  77: { ...CLEAN },
+  78: { ...CLEAN, thermos: true },
+  79: { ...CLEAN, honey: true },
+  80: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–80, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
  * combos, never honey + lemon / strainer / sink / tasting / targets except
  * the dedicated lemon+honey interaction, never strainer + lemon / sink /
  * tasting / targets, never lemon + sink / lemon + tasting / lemon +
  * targets / sink + targets / tasting + sink / tasting + targets, never
- * three specials together; frozen cup stays standalone, §112–113).
+ * three specials together; frozen cup and thermos stay standalone,
+ * §112–113; no thermos combinations yet).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
     PINNED_ROLLOUT_1_16[levelNum] ?? PINNED_ROLLOUT_17_24[levelNum] ??
     PINNED_ROLLOUT_25_32[levelNum] ?? PINNED_ROLLOUT_33_40[levelNum] ??
     PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum] ??
-    PINNED_ROLLOUT_57_64[levelNum] ?? PINNED_ROLLOUT_65_72[levelNum];
+    PINNED_ROLLOUT_57_64[levelNum] ?? PINNED_ROLLOUT_65_72[levelNum] ??
+    PINNED_ROLLOUT_73_80[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
@@ -237,9 +259,10 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
     // challenge (no mystery): honey → teapot+honey → strainer →
     // teapot+strainer → lemon → teapot+lemon → tasting → teapot+tasting →
     // sink → teapot+sink → targets → teapot+targets → lemon+honey →
-    // frozen cup.
-    // (Cases 0–12 preserve the pre-G9 mapping exactly; G9 appends case 13.)
-    switch (cycleNumber % 14) {
+    // frozen cup → thermos (standalone, no combos).
+    // (Cases 0–12 preserve the pre-G9 mapping exactly; G9 appends case 13;
+    // G10 appends case 14.)
+    switch (cycleNumber % 15) {
       case 0: return { ...CLEAN, honey: true };
       case 1: return { ...CLEAN, teapot: true, honey: true };
       case 2: return { ...CLEAN, strainer: true };
@@ -253,7 +276,8 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
       case 10: return { ...CLEAN, targets: true };
       case 11: return { ...CLEAN, teapot: true, targets: true };
       case 12: return { ...CLEAN, lemon: true, honey: true };
-      default: return { ...CLEAN, frozen: true };
+      case 13: return { ...CLEAN, frozen: true };
+      default: return { ...CLEAN, thermos: true };
     }
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
@@ -360,7 +384,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
 
 
   // Special-mechanic overlay: single source of truth for
-  // teapot/targets/sink/tasting/lemon/strainer.
+  // teapot/targets/sink/tasting/lemon/strainer/frozen/thermos.
   const plan = mechanicPlanForLevel(levelNum);
   hasSourceOnlyTeapot = plan.teapot;
   const targetTeaIds: TeaId[] = plan.targets ? pickTargetPair(colors) : [];
@@ -368,6 +392,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasTastingBowl = plan.tasting;
   const hasStrainer = plan.strainer;
   const hasFrozenCup = plan.frozen;
+  const hasThermos = plan.thermos;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -411,6 +436,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if (plan.thermos) {
+    phaseSubtitle = 'Высокий термос • 6 сосудов';
   } else if (plan.frozen) {
     phaseSubtitle = 'Замёрзшая чашка • 6 сосудов';
   } else if (plan.honey && plan.teapot) {
@@ -451,6 +478,19 @@ export function getLevelConfig(levelNum: number): LevelConfig {
       phase === 'challenge' ? 'Чайник-раздатчик • 6 сосудов' : 'Чайник и таинственный настой • 7 сосудов';
   }
 
+  // Gauntlet 10 standalone enforcement (§§105-107): thermos challenge is
+  // always the canonical 4c/6v layout (4 teas, 2 nominal empties → 6
+  // vessels), no Mystery, no teapot. Phase is already challenge via pinned
+  // 74/78 and the post-80 challenge-only rotation; re-assert here so the
+  // contract holds even if the base phase defaults shift.
+  if (hasThermos) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Высокий термос • 6 сосудов';
+  }
+
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
   if (levelNum === 1) rewardRecipeId = 'matcha';
@@ -481,6 +521,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasTastingBowl,
     hasStrainer,
     hasFrozenCup,
+    hasThermos,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

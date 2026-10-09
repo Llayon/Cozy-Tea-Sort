@@ -21,10 +21,12 @@ import {
   IceSlot,
   SinkingIngredientSlot,
   TEA_TYPES,
+  THERMOS_CAPACITY,
   TeaId,
   cloneCupConstraint,
   cupCapacity,
   isTastingCupConstraint,
+  isThermosCupConstraint,
 } from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
 import {
@@ -52,13 +54,48 @@ export const TASTING_BOWL_BODY_H = 66;
 const STANDARD_SLOT_H = 29;
 
 /**
- * Full-vessel UX copy (Gauntlet 4 §35): capacity-aware, vessel-friendly.
- * Standard cups keep the exact legacy `4/4` wording; the tasting bowl
- * reports `2/2`. Pure helper — unit-tested, no Pixi.
+ * High-thermos body height (Gauntlet 10): visibly taller than the standard
+ * 142-tall cell (+18) yet fitting the mobile 3+3 layout. Deliberately NOT
+ * the naive 142*5/4=177.5 scale (which collides rows/stand on 360x800);
+ * +18 keeps two rows + stand inside ~430px content height at scale<=1.08.
+ * The vessel is slightly narrower (see THERMOS_WIDTH) so 3 columns still
+ * fit 360px. Container height for thermos views equals this constant;
+ * standard/tasting heights are unchanged.
+ */
+export const THERMOS_BODY_H = 160;
+
+/** High-thermos body width: slightly narrower than the standard 64 glass. */
+export const THERMOS_WIDTH = 56;
+
+/**
+ * Thermos liquid slot height for a given container height: the interior
+ * (rim inset → base, minus the standard 16px rim air gap) divided by the
+ * authoritative thermos capacity — 5 individually readable layers, never
+ * compressed to illegibility. Default height yields 26px (vs 29 standard,
+ * only ~10% smaller). Pure helper — unit-testable, no Pixi.
+ */
+export function thermosSlotH(height: number = THERMOS_BODY_H): number {
+  const bottomY = height - 6;
+  const interiorTop = 4 + 4;
+  const airGap = 16;
+  return (bottomY - interiorTop - airGap) / THERMOS_CAPACITY;
+}
+
+/** Thermos slot height at the canonical body height (26px, readable). */
+export const THERMOS_SLOT_H = 26;
+
+/**
+ * Full-vessel UX copy (Gauntlet 4 §35, extended Gauntlet 10): capacity-aware,
+ * vessel-friendly. Standard cups keep the exact legacy `4/4` wording; the
+ * tasting bowl reports `2/2`; the high thermos reports `5/5`. Pure helper —
+ * unit-tested, no Pixi.
  */
 export function fullVesselHint(constraint: CupConstraint): string {
   if (isTastingCupConstraint(constraint)) {
     return 'Пиала заполнена (2/2)! Выберите другой сосуд или пустой стакан.';
+  }
+  if (isThermosCupConstraint(constraint)) {
+    return 'Термос заполнен (5/5)! Выберите другой сосуд или пустой стакан.';
   }
   const cap = cupCapacity(constraint);
   return `Стакан полон (${cap}/${cap})! Выберите другой сосуд или пустой стакан.`;
@@ -286,7 +323,9 @@ export function lemonSurfaceLocalY(
   if (layerCount <= 0) return height - TASTING_BOWL_BODY_H + 6;
   const slotH = isTastingCupConstraint(constraint)
     ? (bottomY - (height - TASTING_BOWL_BODY_H + 4)) / cupCapacity(constraint)
-    : STANDARD_SLOT_H;
+    : isThermosCupConstraint(constraint)
+      ? thermosSlotH(height)
+      : STANDARD_SLOT_H;
   return bottomY - layerCount * slotH;
 }
 
@@ -361,6 +400,11 @@ export function honeyBottomLocalY(constraint: CupConstraint, height = 142): numb
   }
   if (isTastingCupConstraint(constraint)) {
     return height - 14;
+  }
+  if (isThermosCupConstraint(constraint)) {
+    // Tall translucent vessel: same bottom-anchored logic as standard cups,
+    // height-derived so the taller body lands correctly above the base.
+    return height - 6 - 10;
   }
   return height - 6 - 10;
 }
@@ -704,7 +748,7 @@ export class CupView {
   fillingCount = 0;
 
   readonly width: number;
-  readonly height = 142;
+  readonly height: number;
   readonly cornerRadius = 18;
 
   /** Source-only teapot: wider body + spout + handle, same skin language. */
@@ -723,23 +767,42 @@ export class CupView {
   }
 
   /**
+   * High thermos (высокий термос, Gauntlet 10): normal flow, capacity 5,
+   * must end empty, no named target. Derived from the authoritative
+   * constraint via `isThermosCupConstraint` — no parallel view state.
+   */
+  get isThermos(): boolean {
+    return isThermosCupConstraint(this.constraint);
+  }
+
+  /**
    * Rim Y in container-local coords — the stream origin/destination anchor.
-   * Tall vessels pour from y=4; the bottom-aligned bowl pours from its own
-   * rim, never from empty air where a tall rim would have been.
+   * Tall vessels (standard + thermos) pour from y=4 so the rim is never
+   * clipped; the bottom-aligned bowl pours from its own rim, never from
+   * empty air where a tall rim would have been.
    */
   get rimLocalY(): number {
     return this.isTastingBowl ? this.height - TASTING_BOWL_BODY_H : 4;
   }
 
   /**
-   * Logical liquid slot height: tall vessels use the fixed 4-slot rhythm;
-   * the bowl divides its own interior (rim inset → base) by its effective
-   * capacity — exactly 2 readable slots, never 4 compressed slots.
+   * Logical liquid slot height, derived from the authoritative
+   * `cupCapacity`: standard vessels keep the fixed 4-slot rhythm (29px);
+   * the tasting bowl divides its own interior by its effective capacity
+   * (exactly 2 readable slots); the high thermos divides its taller
+   * interior by its effective capacity (exactly 5 readable slots via
+   * `thermosSlotH`, never 4 compressed slots). Standard/tasting geometry
+   * is unchanged.
    */
   slotHeightFor(c: CupConstraint): number {
-    if (!isTastingCupConstraint(c)) return STANDARD_SLOT_H;
-    const bottomY = this.height - 6;
-    return (bottomY - (this.rimLocalY + 4)) / cupCapacity(c);
+    if (isTastingCupConstraint(c)) {
+      const bottomY = this.height - 6;
+      return (bottomY - (this.rimLocalY + 4)) / cupCapacity(c);
+    }
+    if (isThermosCupConstraint(c)) {
+      return thermosSlotH(this.height);
+    }
+    return STANDARD_SLOT_H;
   }
 
   /**
@@ -910,7 +973,16 @@ export class CupView {
     this.constraint = cloneCupConstraint(constraint ?? { mode: 'normal' });
     // Teapot reads as a teapot: a restrained wider belly (72 vs 64).
     // Spout/handle overflow into the inter-cup gap padding, so rows stay clean.
-    this.width = this.constraint.mode === 'source-only' ? 72 : 64;
+    // Thermos reads taller + slightly narrower (56 vs 64) so 3 columns still
+    // fit 360px; height equals THERMOS_BODY_H so 5 slots stay readable.
+    if (this.constraint.mode === 'source-only') {
+      this.width = 72;
+    } else if (isThermosCupConstraint(this.constraint)) {
+      this.width = THERMOS_WIDTH;
+    } else {
+      this.width = 64;
+    }
+    this.height = isThermosCupConstraint(this.constraint) ? THERMOS_BODY_H : 142;
     this.container = new Container();
 
     this.shadowGraphics = new Graphics();
@@ -1019,6 +1091,16 @@ export class CupView {
         .roundRect(3, this.rimLocalY + 4, w - 6, h - 6 - (this.rimLocalY + 4), 10)
         .fill({ color: 0xffffff });
       this.drawTastingBowlFrame(w, h);
+      return;
+    }
+
+    // High thermos (Gauntlet 10): tall slim translucent vessel — same
+    // full-height liquid mask as standard cups (all 5 layers readable),
+    // narrower silhouette, cozy glass language. No text, no logos.
+    if (this.isThermos) {
+      this.liquidMask.clear();
+      this.liquidMask.roundRect(2, 4, w - 4, h - 6, r).fill({ color: 0xffffff });
+      this.drawThermosFrame(w, h);
       return;
     }
 
@@ -1371,6 +1453,77 @@ export class CupView {
 
     // Soft highlight on the left wall (keeps tea layers readable).
     g.roundRect(7, rimY + 10, 3.5, h - rimY - 26, 2).fill({ color: 0xffffff, alpha: 0.28 });
+  }
+
+  /**
+   * High thermos (Gauntlet 10): tall slim translucent vessel in the active
+   * skin language — full-height liquid box (all 5 layers readable through
+   * low-alpha walls, never an opaque flask), slightly narrower silhouette,
+   * cozy glass highlights. The restrained gold rim + base accent adapts the
+   * tasting-bowl must-end-empty cue (temporary storage, not a target cup):
+   * no medallion ever renders here (no targetTeaId by construction), no
+   * text, no logos. The slim cap knob sits above the liquid column so tea
+   * identity stays fully readable.
+   */
+  private drawThermosFrame(w: number, h: number) {
+    const g = this.glassOverlay;
+    const r = this.cornerRadius;
+    let bodyFill = 0xffffff;
+    let bodyFillAlpha = 0.12;
+    let edgeColor = 0xffffff;
+    let edgeAlpha = 0.82;
+    let goldColor = 0xd4af37;
+    if (this.skinId === 'ceramic') {
+      bodyFill = 0x5a3d2b;
+      bodyFillAlpha = 0.22;
+      edgeColor = 0xc49a75;
+      edgeAlpha = 0.95;
+      goldColor = 0xe8c878;
+    } else if (this.skinId === 'porcelain') {
+      bodyFill = 0xfffaea;
+      bodyFillAlpha = 0.24;
+      edgeColor = 0xffffff;
+      edgeAlpha = 0.9;
+      goldColor = 0xd4af37;
+    }
+
+    // Tall slim translucent body.
+    g.beginPath();
+    g.moveTo(0, 4);
+    g.lineTo(w, 4);
+    g.lineTo(w, h - r);
+    g.quadraticCurveTo(w, h, w - r, h);
+    g.lineTo(r, h);
+    g.quadraticCurveTo(0, h, 0, h - r);
+    g.closePath();
+    g.fill({ color: bodyFill, alpha: bodyFillAlpha });
+    g.beginPath();
+    g.moveTo(0, 4);
+    g.lineTo(0, h - r);
+    g.quadraticCurveTo(0, h, r, h);
+    g.lineTo(w - r, h);
+    g.quadraticCurveTo(w, h, w, h - r);
+    g.lineTo(w, 4);
+    g.stroke({ width: 2.6, color: edgeColor, alpha: edgeAlpha });
+
+    // Base shade (keeps the bottom layer readable, never opaque).
+    g.roundRect(4, h - 10, w - 8, 8, 3).fill({ color: 0xffffff, alpha: 0.28 });
+
+    // Temporary-storage cue (tasting adaptation): restrained gold rim band.
+    g.roundRect(-2, 1, w + 4, 6, 3).fill({ color: goldColor, alpha: 0.9 });
+    g.ellipse(w / 2, 4, w / 2, 2.8).stroke({ width: 1.4, color: 0xfff3c4, alpha: 0.9 });
+
+    // Slim cap knob above the liquid column (thermos read, half above the
+    // rim like the teapot knob — never covering tea, no text, no logo).
+    g.roundRect(w / 2 - 8, -2, 16, 5, 2).fill({ color: edgeColor, alpha: 0.85 });
+    g.roundRect(w / 2 - 8, -2, 16, 5, 2).stroke({ width: 1, color: goldColor, alpha: 0.7 });
+
+    // Thin gold base accent (guest/tasting language for special vessels).
+    g.roundRect(5, h - 5, w - 10, 3, 1.5).fill({ color: goldColor, alpha: 0.85 });
+
+    // Cozy highlights, low alpha so all 5 layers stay readable.
+    g.roundRect(5, 12, 3.5, h - 34, 2).fill({ color: 0xffffff, alpha: 0.3 });
+    g.roundRect(w - 8, 14, 2.5, h - 38, 1.2).fill({ color: 0xffffff, alpha: 0.22 });
   }
 
   /**
@@ -2005,8 +2158,10 @@ export class TeaSortView {
       // keep the touch target at least as usable as a normal vessel with
       // a wider padded hit area (saucer extends below the body too). The
       // tasting bowl keeps the full-cell interaction target even though
-      // its visible ceramic is smaller — never shrink to the saucer.
-      const padX = view.isTeapot ? 22 : view.isSinkOnly || view.isTastingBowl ? 20 : 16;
+      // its visible ceramic is smaller — never shrink to the saucer. The
+      // slim thermos keeps the same padded target (>=44px both axes).
+      const padX =
+        view.isTeapot ? 22 : view.isSinkOnly || view.isTastingBowl || view.isThermos ? 20 : 16;
       const padBottom = view.isSinkOnly ? 40 : 32;
       view.container.hitArea = new Rectangle(-padX, -16, view.width + padX * 2, view.height + padBottom);
 
@@ -2033,8 +2188,11 @@ export class TeaSortView {
     const count = this.cupViews.length;
     // Teapot vessels are slightly wider (72 vs 64): lay out on the max
     // cell width and center narrower cups so rows stay clean on 360–430px.
+    // Thermos vessels are taller (THERMOS_BODY_H vs 142): lay out on the max
+    // cell height so the taller body never collides rows/stand; scale and
+    // vertical gaps derive from that max, keeping the mobile 3+3 fit.
     const baseCupW = Math.max(64, ...this.cupViews.map((v) => v.width));
-    const baseCupH = 142;
+    const baseCupH = Math.max(142, ...this.cupViews.map((v) => v.height));
 
     let rows: number[][] = [];
     const minPaddingX = 24;
@@ -2447,10 +2605,12 @@ export class TeaSortView {
         const view = this.cupViews[i] as CupView;
         const x = view.container.x;
         const y = view.container.y;
-        // Teapot spout/handle, guest-cup saucer/handle and the tasting
-        // bowl extend beyond (or sit small inside) the body: widen the
-        // touch padding so special vessels stay at least as tappable.
-        const touchPadding = view.isTeapot ? 26 : view.isSinkOnly || view.isTastingBowl ? 24 : 20;
+        // Teapot spout/handle, guest-cup saucer/handle, the tasting bowl and
+        // the slim thermos extend beyond (or sit small inside) the body:
+        // widen the touch padding so special vessels stay at least as
+        // tappable (>=44px target for the narrower thermos too).
+        const touchPadding =
+          view.isTeapot ? 26 : view.isSinkOnly || view.isTastingBowl || view.isThermos ? 24 : 20;
 
         if (
           clickPos.x >= x - touchPadding &&
