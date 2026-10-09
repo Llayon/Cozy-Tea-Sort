@@ -137,6 +137,24 @@ const batches = [
     ],
   },
   { name: 'thermos stress', files: ['tests/thermos-stress.test.ts'] },
+  {
+    name: 'cinnamon matrix + solver + canonical',
+    files: [
+      'tests/cinnamon.test.ts',
+      'tests/cinnamon-solver.test.ts',
+      'tests/cinnamon-canonical.test.ts',
+    ],
+  },
+  {
+    name: 'cinnamon templates + fast path + rollout + view',
+    files: [
+      'tests/cinnamon-templates.test.ts',
+      'tests/cinnamon-fastpath.test.ts',
+      'tests/cinnamon-rollout.test.ts',
+      'tests/cinnamon-view.test.ts',
+    ],
+  },
+  { name: 'cinnamon stress', files: ['tests/cinnamon-stress.test.ts'] },
 ];
 
 function runBatch(batch) {
