@@ -79,6 +79,7 @@ describe('pure sinking state', () => {
       sinkingIngredients: ['honey'],
       strainer: { present: false, attachedCupIndex: null, heldTea: null },
       iceSlots: [null],
+      capacityObstacles: [null],
     };
     const c = clonePuzzleState(src);
     expect(c).toEqual(src);

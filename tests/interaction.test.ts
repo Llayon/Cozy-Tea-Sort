@@ -172,6 +172,7 @@ describe('§14 collision matrix', () => {
       sinkingIngredients: [...st.sinkingIngredients],
       strainer: { present: false, attachedCupIndex: null, heldTea: null },
       iceSlots: [null, null],
+      capacityObstacles: [null, null],
     };
     expect(applyPourState(st, 0, 1, cons)).toBe(null);
     expect(st.cups).toEqual(before.cups);

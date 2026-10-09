@@ -285,14 +285,16 @@ export interface PuzzleState {
   sinkingIngredients: SinkingIngredientSlot[];
   strainer: StrainerState;
   iceSlots: IceSlot[];
+  capacityObstacles: CapacityObstacleSlot[];
 }
 
 /**
  * Read-only view of puzzle state accepted by every state-aware rule,
  * solver and generator helper (callers may hold mutable or readonly
  * arrays; legacy tea-only arrays are never accepted here — normalize
- * first). `strainer`/`sinkingIngredients`/`iceSlots` optional for legacy
- * callers (absent = no tool / no honey / no ice).
+ * first). `strainer`/`sinkingIngredients`/`iceSlots`/`capacityObstacles`
+ * optional for legacy callers (absent = no tool / no honey / no ice /
+ * no obstacle).
  */
 export interface ReadonlyPuzzleState {
   cups: readonly TeaId[][];
@@ -300,6 +302,7 @@ export interface ReadonlyPuzzleState {
   sinkingIngredients?: readonly SinkingIngredientSlot[] | undefined;
   strainer?: ReadonlyStrainerState | undefined;
   iceSlots?: readonly IceSlot[] | undefined;
+  capacityObstacles?: readonly CapacityObstacleSlot[] | undefined;
 }
 
 /** All-null slots for a vessel count (ordinary old levels). */
@@ -407,6 +410,60 @@ export function countIceSlots(state: {
   return (state.iceSlots ?? []).filter((s) => s !== null).length;
 }
 
+/** All-null capacity-obstacle slots for a vessel count (ordinary old levels). */
+export function emptyCapacityObstacles(count: number): CapacityObstacleSlot[] {
+  return Array.from({ length: count }, () => null);
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers without obstacles
+ * synthesize all-null slots. Wrong-length arrays are padded/truncated
+ * defensively (production validation rejects them).
+ */
+export function normalizeCapacityObstacles(
+  slots: readonly CapacityObstacleSlot[] | undefined,
+  count: number,
+): CapacityObstacleSlot[] {
+  if (!slots) return emptyCapacityObstacles(count);
+  const out: CapacityObstacleSlot[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(slots[i] ?? null);
+  }
+  return out;
+}
+
+/** Total capacity obstacles present in a state (production max 1). */
+export function countCapacityObstacles(state: {
+  capacityObstacles: readonly CapacityObstacleSlot[] | undefined;
+}): number {
+  return (state.capacityObstacles ?? []).filter((s) => s !== null).length;
+}
+
+/** Vessel index hosting a capacity obstacle id, or -1 when absent. */
+export function capacityObstacleIndex(
+  state: { capacityObstacles: readonly CapacityObstacleSlot[] | undefined },
+  id: CapacityObstacleId,
+): number {
+  return (state.capacityObstacles ?? []).findIndex((s) => s === id);
+}
+
+/**
+ * Dynamic capacity obstacle (Gauntlet 11 — «Палочка корицы»): a state
+ * overlay on a vessel, NOT tea. It never counts toward tea color totals,
+ * never transforms/consumes/produces tea. Exactly one vessel may carry it
+ * in production. While present the vessel's EFFECTIVE tea capacity is
+ * restricted (cinnamon: min(base, 2)); completely emptying the host
+ * removes it atomically (one-way; undo restores it exactly). The static
+ * `CupConstraint` (base capacity 4) is never mutated.
+ */
+export type CapacityObstacleId = 'cinnamon';
+
+/** Per-vessel capacity-obstacle slot: `'cinnamon'` while blocked, or null. The ONE authoritative obstacle location. */
+export type CapacityObstacleSlot = CapacityObstacleId | null;
+
+/** Effective tea capacity while a cinnamon stick is present (Gauntlet 11). */
+export const CINNAMON_EFFECTIVE_CAPACITY = 2;
+
 /** Defensive deep copy of a puzzle state (no shared arrays). */
 export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
   const cups = (state.cups as TeaId[][]).map((c) => [...c]);
@@ -416,6 +473,7 @@ export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
     sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, cups.length),
     strainer: normalizeStrainerState(state.strainer),
     iceSlots: normalizeIceSlots(state.iceSlots, cups.length),
+    capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, cups.length),
   };
 }
 
@@ -568,6 +626,25 @@ export function cupCapacity(c: CupConstraint | undefined): number {
   if (v === undefined) return STANDARD_CUP_CAPACITY;
   if (!Number.isFinite(v) || (v as number) <= 0) return STANDARD_CUP_CAPACITY;
   return Math.floor(v as number);
+}
+
+/**
+ * SINGLE dynamic effective-capacity truth (Gauntlet 11).
+ *
+ * - no obstacle → static `cupCapacity(constraint)`.
+ * - cinnamon (or any non-null obstacle, fail-closed) → min(base, 2).
+ *
+ * `cupCapacity` keeps meaning STATIC base capacity and must never depend
+ * on PuzzleState; every "how much tea can currently fit?" question uses
+ * this helper when dynamic state matters.
+ */
+export function effectiveCupCapacity(
+  c: CupConstraint | undefined,
+  obstacle: CapacityObstacleSlot | undefined | null,
+): number {
+  const base = cupCapacity(c);
+  if (obstacle == null) return base;
+  return Math.min(base, CINNAMON_EFFECTIVE_CAPACITY);
 }
 
 /** Effective must-end-empty flag (explicit `true`, else false). */

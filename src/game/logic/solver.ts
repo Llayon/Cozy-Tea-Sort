@@ -12,6 +12,7 @@
  */
 
 import {
+  CapacityObstacleSlot,
   CupConstraint,
   FloatingIngredientSlot,
   IceSlot,
@@ -22,6 +23,7 @@ import {
   TeaId,
   isPlaceStrainerAction,
   isReleaseStrainerAction,
+  normalizeCapacityObstacles,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
   normalizeIceSlots,
@@ -69,6 +71,7 @@ export interface SolverOptions {
   sinkingIngredients?: readonly SinkingIngredientSlot[];
   strainer?: { present: boolean; attachedCupIndex: number | null; heldTea: TeaId | null };
   iceSlots?: readonly IceSlot[];
+  capacityObstacles?: readonly CapacityObstacleSlot[];
 }
 
 const DEFAULT_MAX_VISITED = 200_000;
@@ -88,6 +91,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     sinkingIngredients: normalizeSinkingIngredients(opts.sinkingIngredients, cups.length),
     strainer: normalizeStrainerState(opts.strainer),
     iceSlots: normalizeIceSlots(opts.iceSlots, cups.length),
+    capacityObstacles: normalizeCapacityObstacles(opts.capacityObstacles, cups.length),
   };
 
   if (isPuzzleWonState(start, constraints)) {
@@ -229,6 +233,7 @@ export function applySolutionState(
     sinkingIngredients: normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length),
     strainer: normalizeStrainerState(state.strainer),
     iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
+    capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
   };
   for (const step of solution) {
     const kind = (step as SolverAction).kind;
