@@ -71,6 +71,7 @@
  */
 
 import {
+  CapacityObstacleSlot,
   CupConstraint,
   FLOATING_INGREDIENT_TYPES,
   FloatingIngredientSlot,
@@ -87,6 +88,7 @@ import {
   countSinkingIngredients,
   cupCapacity,
   defaultCupConstraints,
+  emptyCapacityObstacles,
   emptyFloatingIngredients,
   emptyIceSlots,
   emptySinkingIngredients,
@@ -96,6 +98,7 @@ import {
   isTastingCupConstraint,
   isThermosCupConstraint,
   mustEndEmpty,
+  normalizeCapacityObstacles,
   normalizeFloatingIngredients,
   normalizeIceSlots,
   normalizeSinkingIngredients,
@@ -184,6 +187,13 @@ import {
   instantiateThermosTemplate,
 } from './thermosTemplates';
 import {
+  CINNAMON_DEPTH_ACCEPT,
+  CINNAMON_TEMPLATE_ATTEMPTS,
+  CINNAMON_TEMPLATE_BANK,
+  CinnamonTemplateKind,
+  instantiateCinnamonTemplate,
+} from './cinnamonTemplates';
+import {
   depthDistance,
   RhythmPhase,
   depthAccepted,
@@ -267,6 +277,15 @@ export interface GenerateRequest {
    * max 1; every sibling special is rejected loudly. No thermos+tasting.
    */
   thermosCupCount?: number;
+  /**
+   * Number of cinnamon-stick (dynamic capacity 2→4) vessels requested
+   * (Gauntlet 11 — «Палочка корицы»). 0 = standard level. G11 uses exactly
+   * 1: one standard normal base-cap4 vessel starting with exactly 2 MIXED
+   * tea layers + active cinnamon (effective cap 2), inside the authored
+   * 4,4,3,3,2,0 topology. Emptying it removes the stick (effective cap 4).
+   * Production supports max 1; every sibling special is rejected loudly.
+   */
+  cinnamonCupCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -299,6 +318,13 @@ export interface GeneratedLevel {
    * runtime never guesses whether the field exists.
    */
   iceSlots?: IceSlot[];
+  /**
+   * Dynamic capacity-obstacle slots, aligned with `cups` indices
+   * (Gauntlet 11). ALWAYS returned in production (all-null for
+   * pre-cinnamon levels) so runtime never guesses whether the field
+   * exists. No duplicate cinnamon index anywhere.
+   */
+  capacityObstacles?: CapacityObstacleSlot[];
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -394,6 +420,13 @@ export function requestedFrozenCupCount(req: GenerateRequest): number {
 /** Requested high-thermos count, normalized (default 0, clamped to >= 0). */
 export function requestedThermosCupCount(req: GenerateRequest): number {
   const v = (req as GenerateRequest).thermosCupCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested cinnamon-stick count, normalized (default 0, clamped to >= 0). */
+export function requestedCinnamonCupCount(req: GenerateRequest): number {
+  const v = req.cinnamonCupCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -526,6 +559,9 @@ export function validateFrozenCupRequest(req: GenerateRequest): void {
   if (requestedThermosCupCount(req) > 0) {
     throw new Error('validateFrozenCupRequest: frozen cup + thermos is out of scope for Gauntlet 9');
   }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateFrozenCupRequest: frozen cup + cinnamon is out of scope for Gauntlet 9');
+  }
 }
 
 /**
@@ -571,6 +607,59 @@ export function validateThermosRequest(req: GenerateRequest): void {
   }
   if (requestedFrozenCupCount(req) > 0) {
     throw new Error('validateThermosRequest: thermos + frozen cup is out of scope for Gauntlet 10');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateThermosRequest: thermos + cinnamon is out of scope for Gauntlet 10');
+  }
+}
+
+/**
+ * Fail-fast request validation for cinnamon sticks (programming errors,
+ * not generation luck). Gauntlet 11 supports exactly the standalone
+ * interaction: one active cinnamon obstacle on a standard normal base-4
+ * vessel holding exactly 2 mixed layers, inside the authored 4c/6v
+ * 4,4,3,3,2,0 topology (numColors 4, nominal emptyCups 2 → 6 vessels),
+ * no Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen/
+ * thermos. Production max 1; anything more is rejected loudly (GI/GJ).
+ */
+export function validateCinnamonRequest(req: GenerateRequest): void {
+  const cinnamon = requestedCinnamonCupCount(req);
+  if (cinnamon === 0) return;
+  if (cinnamon > 1) {
+    throw new Error(`validateCinnamonRequest: cinnamonCupCount ${cinnamon} unsupported (production max 1)`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateCinnamonRequest: cinnamon requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+    );
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateCinnamonRequest: cinnamon + targets is out of scope for Gauntlet 11');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateCinnamonRequest: cinnamon + sink-only is out of scope for Gauntlet 11');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateCinnamonRequest: cinnamon + tasting bowl is out of scope for Gauntlet 11');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateCinnamonRequest: cinnamon + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 11`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateCinnamonRequest: cinnamon + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 11`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateCinnamonRequest: cinnamon + strainer is out of scope for Gauntlet 11');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateCinnamonRequest: cinnamon + frozen cup is out of scope for Gauntlet 11');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateCinnamonRequest: cinnamon + thermos is out of scope for Gauntlet 11');
   }
 }
 
@@ -1034,6 +1123,102 @@ export function analyzeThermosParticipation(
   return out;
 }
 
+export interface CinnamonParticipation {
+  unlocks: number;
+  expandedUses: number;
+  fourthSlotUses: number;
+  expandedDrains: number;
+  finalRepurpose: boolean;
+  firstUnlockDepth: number | null;
+  firstExpandedUseDepth: number | null;
+  firstFourthSlotDepth: number | null;
+  firstExpandedDrainDepth: number | null;
+  maxPostUnlockOccupancy: number;
+  finalObstacleCleared: boolean;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal cinnamon solution and count CAPACITY_UNLOCK events (a
+ * successful outflow emptying the active host, removing cinnamon),
+ * EXPANDED_USE events (later pours leaving the host at >=3),
+ * FOURTH_SLOT_USE (host reaches 4), EXPANDED_DRAIN (later source uses
+ * after expansion) and FINAL_REPURPOSE (host ends 4 homogeneous), plus
+ * final cleared/win verdicts. Production templates require unlock >= 1
+ * AND expanded use >= 1 AND cleared obstacle AND win (GX–HA); L3A/L3B is
+ * offline curation truth (§109). Analysis only — never PuzzleState.
+ */
+export function analyzeCinnamonParticipation(
+  startCups: TeaId[][],
+  startObstacles: readonly CapacityObstacleSlot[],
+  cinnamonHost: number,
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): CinnamonParticipation {
+  const out: CinnamonParticipation = {
+    unlocks: 0,
+    expandedUses: 0,
+    fourthSlotUses: 0,
+    expandedDrains: 0,
+    finalRepurpose: false,
+    firstUnlockDepth: null,
+    firstExpandedUseDepth: null,
+    firstFourthSlotDepth: null,
+    firstExpandedDrainDepth: null,
+    maxPostUnlockOccupancy: 0,
+    finalObstacleCleared: false,
+    win: false,
+  };
+  let cups = startCups.map((c) => [...c]);
+  let obstacles = normalizeCapacityObstacles(startObstacles, startCups.length);
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') continue;
+    const from = (a as { from: number }).from;
+    const res = applyPourState(
+      { cups, floatingIngredients: emptyFloatingIngredients(cups.length), capacityObstacles: [...obstacles] },
+      from,
+      (a as { to: number }).to,
+      cupConstraints,
+    );
+    if (!res) return out;
+    cups = res.state.cups;
+    obstacles = [...res.state.capacityObstacles];
+    if (res.capacityObstacleRemoved === 'cinnamon') {
+      out.unlocks++;
+      if (out.firstUnlockDepth === null) out.firstUnlockDepth = i;
+    }
+    if (out.firstUnlockDepth !== null && i > (out.firstUnlockDepth as number)) {
+      const occ = (cups[cinnamonHost] as TeaId[]).length;
+      out.maxPostUnlockOccupancy = Math.max(out.maxPostUnlockOccupancy, occ);
+      if (occ >= 3) {
+        out.expandedUses++;
+        if (out.firstExpandedUseDepth === null) out.firstExpandedUseDepth = i;
+      }
+      if (occ === 4 && out.firstFourthSlotDepth === null) {
+        out.fourthSlotUses++;
+        out.firstFourthSlotDepth = i;
+      }
+      if (
+        from === cinnamonHost &&
+        out.firstExpandedUseDepth !== null &&
+        i > (out.firstExpandedUseDepth as number)
+      ) {
+        out.expandedDrains++;
+        if (out.firstExpandedDrainDepth === null) out.firstExpandedDrainDepth = i;
+      }
+    }
+  }
+  const hostFinal = cups[cinnamonHost] as TeaId[];
+  out.finalRepurpose = hostFinal.length === 4 && hostFinal.every((t) => t === hostFinal[0]);
+  out.finalObstacleCleared = obstacles.every((s) => s === null);
+  out.win = isPuzzleWonState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length), capacityObstacles: [...obstacles] },
+    cupConstraints,
+  );
+  return out;
+}
+
 /**
  * Multi-ingredient interaction trace (Gauntlet 8 §38, ANALYSIS ONLY —
  * never gameplay state). Replays a solution and counts, at deterministic
@@ -1439,6 +1624,7 @@ function finalizeCandidate(
   strainer?: StrainerState,
   sinkingIngredients?: readonly SinkingIngredientSlot[],
   iceSlots?: readonly IceSlot[],
+  capacityObstacles?: readonly CapacityObstacleSlot[],
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -1732,9 +1918,49 @@ function finalizeCandidate(
     if (countTastingCups(normalized) > 0) return null;
     if (icePresent.length > 0) return null;
   }
+  // GI–GT: cinnamon initial-state invariant (Gauntlet 11 standalone dynamic cap).
+  const wantCinnamon = requestedCinnamonCupCount(req);
+  const obstacles: CapacityObstacleSlot[] = normalizeCapacityObstacles(capacityObstacles, cups.length);
+  if (obstacles.filter((s) => s !== null).length !== wantCinnamon) return null; // GL (GI recognized at validation)
+  if (wantCinnamon > 1) return null; // GJ: production max one
+  if (wantCinnamon > 0) {
+    if (obstacles.filter((s) => s === 'cinnamon').length !== 1) return null; // GL
+    const host = obstacles.findIndex((s) => s === 'cinnamon');
+    const hostCup = cups[host] as TeaId[];
+    const hostC = normalized[host] as CupConstraint;
+    if (hostC.mode !== 'normal') return null; // GM
+    if (cupCapacity(hostC) !== STANDARD_CUP_CAPACITY) return null; // GN: base cap 4
+    if (hostC.targetTeaId !== undefined) return null; // GM: no target
+    if (hostCup.length !== 2) return null; // GO: starts length 2
+    const first = hostCup[0] as TeaId;
+    if (!hostCup.some((t) => t !== first)) return null; // GP: starts mixed
+    // GQ: global layer multiset 4,4,3,3,2,0.
+    const counts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(counts) !== JSON.stringify([0, 2, 3, 3, 4, 4])) return null;
+    // GR: exactly 4 units per color (checked in validateLevelStructure; re-checked defensively).
+    const unitCount = new Map<TeaId, number>();
+    for (const cup of cups) for (const t of cup as TeaId[]) unitCount.set(t, (unitCount.get(t) ?? 0) + 1);
+    for (const [, n] of unitCount) if (n !== TEA_UNITS_PER_COLOR) return null;
+    // GS: exactly one true empty normal vessel.
+    if (cups.filter((c) => c.length === 0).length !== 1) return null;
+    const emptyIdx = cups.findIndex((c) => c.length === 0);
+    const emptyC = normalized[emptyIdx] as CupConstraint;
+    if (emptyC.mode !== 'normal' || emptyC.targetTeaId !== undefined) return null;
+    if (cupCapacity(emptyC) !== STANDARD_CUP_CAPACITY || mustEndEmpty(emptyC)) return null;
+    if ((hiddenCounts[host] ?? 0) !== 0) return null; // never hide cinnamon host
+    // GT: no other special.
+    if (presentIds.length > 0) return null;
+    if (sinkPresent.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+    if (icePresent.length > 0) return null;
+    if (countThermosCups(normalized) > 0) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
-  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice }, normalized)) return null; // D (lemon/honey/strainer/ice-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0) {
+  if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon-aware)
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -1904,6 +2130,50 @@ function finalizeCandidate(
       seed,
       minMoves: thermosSolved.minMoves,
       visitedStates: thermosSolved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null;
+    return level;
+  }
+  // GU–HA: cinnamon production gate (Gauntlet 11). The obstacle is
+  // friction/unlock, not rescue — no plain-control comparison at runtime
+  // (§111: L3 is offline curation truth). The optimal replay must UNLOCK
+  // the host, later reach >=3 there (EXPANDED_USE), clear the obstacle
+  // and win (L2). Happy path is exactly 1 solve (§111).
+  if (wantCinnamon > 0) {
+    if (stats) stats.solverCalls++;
+    const cinnamonSolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      capacityObstacles: obstacles,
+    });
+    if (!cinnamonSolved.solvable || cinnamonSolved.truncated) return null; // GU, GV
+    if (cinnamonSolved.minMoves === undefined) return null;
+    if (
+      cinnamonSolved.minMoves < CINNAMON_DEPTH_ACCEPT.min ||
+      cinnamonSolved.minMoves > CINNAMON_DEPTH_ACCEPT.max
+    ) {
+      return null; // GW
+    }
+    const cinnamonHost = obstacles.findIndex((s) => s === 'cinnamon');
+    const cinnamonSolution = (cinnamonSolved.solution ?? []) as SolverAction[];
+    const cpart = analyzeCinnamonParticipation(cups, obstacles, cinnamonHost, cinnamonSolution, normalized);
+    if (cpart.unlocks < 1) return null; // GX
+    if (cpart.firstExpandedUseDepth === null) return null; // GY
+    if (!cpart.finalObstacleCleared) return null; // GZ
+    if (!cpart.win) return null; // HA
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      iceSlots: ice,
+      capacityObstacles: obstacles,
+      seed,
+      minMoves: cinnamonSolved.minMoves,
+      visitedStates: cinnamonSolved.visitedStates,
     };
     if (!validateLevelStructure(level, req).ok) return null;
     return level;
@@ -2585,6 +2855,33 @@ function thermosFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong L2 cinnamon fallback topology (depth 11, delayed unlock,
+ * L3B repurpose): instantiated with the identity role mapping (c0..c3 in
+ * palette order — a full isomorphism), so the recorded depth holds
+ * exactly. Passes through `finalizeCandidate` — never trusted blindly.
+ * Backup pins cover the (near-impossible) miss.
+ */
+const CINNAMON_FALLBACK_TEMPLATE_ID = 'cinnamon-11-200263';
+const CINNAMON_FALLBACK_BACKUP_IDS = ['cinnamon-11-200024', 'cinnamon-10-200706'];
+
+function cinnamonFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[]; cinnamonHost: number }> {
+  if (cinnamonTemplateKindFor(req) === null) return [];
+  const kind = cinnamonTemplateKindFor(req) as CinnamonTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors || palette.some((c) => c === undefined)) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; cinnamonHost: number }> = [];
+  for (const id of [CINNAMON_FALLBACK_TEMPLATE_ID, ...CINNAMON_FALLBACK_BACKUP_IDS]) {
+    const tpl = CINNAMON_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateCinnamonTemplate(tpl, palette, [...palette]);
+    out.push({ cups: inst.cups, constraints: defaultCupConstraints(inst.cups.length), cinnamonHost: inst.cinnamonHost });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -2594,6 +2891,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateSinkingIngredientRequest(req);
   validateFrozenCupRequest(req);
   validateThermosRequest(req);
+  validateCinnamonRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -2604,6 +2902,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantHoney = requestedSinkingIngredient(req);
   const wantFrozen = requestedFrozenCupCount(req);
   const wantThermos = requestedThermosCupCount(req);
+  const wantCinnamon = requestedCinnamonCupCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
@@ -2612,9 +2911,15 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantStrainer ? ':strainer' : ''}` +
     `${wantHoney !== undefined ? `:${wantHoney}` : ''}` +
     `${wantFrozen > 0 ? ':frozen-cup' : ''}` +
-    `${wantThermos > 0 ? ':thermos' : ''}`;
+    `${wantThermos > 0 ? ':thermos' : ''}` +
+    `${wantCinnamon > 0 ? ':cinnamon' : ''}`;
 
-  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null }> = [];
+  const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null }> = [];
+  // Dedicated cinnamon shapes go first for cinnamon requests (identity
+  // role mapping — recorded depths hold exactly).
+  if (wantCinnamon > 0) {
+    shapeEntries.push(...cinnamonFallbackEntries(req));
+  }
   // Dedicated thermos shapes go first for thermos requests (identity role
   // mapping — recorded depths hold exactly).
   if (wantThermos > 0) {
@@ -2691,6 +2996,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       lemonHost?: number | null;
       honeyHost?: number | null;
       frozenHost?: number | null;
+      cinnamonHost?: number | null;
     };
     const cups = entry.cups;
     let constraints = entry.constraints;
@@ -2708,6 +3014,11 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     const shapeIceSlots: IceSlot[] = emptyIceSlots(cups.length);
     if (wantFrozen > 0 && entry.frozenHost !== undefined && entry.frozenHost !== null) {
       shapeIceSlots[entry.frozenHost] = 'ice';
+    }
+    // Capacity-obstacle slots for this shape (all-null when no cinnamon requested).
+    const shapeObstacleSlots: CapacityObstacleSlot[] = emptyCapacityObstacles(cups.length);
+    if (wantCinnamon > 0 && entry.cinnamonHost !== undefined && entry.cinnamonHost !== null) {
+      shapeObstacleSlots[entry.cinnamonHost] = 'cinnamon';
     }
     // Named serving roles are assigned deterministically (first eligible
     // cup per tea); failure rejects this shape, never forces a bad role.
@@ -2762,6 +3073,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
       wantStrainer ? standStrainerState() : undefined,
       shapeSinkSlots,
       shapeIceSlots,
+      shapeObstacleSlots,
     );
     if (level) {
       if (stats) stats.usedFallback = true;
@@ -3429,6 +3741,78 @@ function generateFromLemonHoneyTemplateBank(
 }
 
 /**
+ * Match a request against the cinnamon bank (Gauntlet 11). Recognized
+ * ONLY for the exact production combination: cinnamonCupCount 1, 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * Anything else keeps the existing paths (validation throws for bad combos).
+ */
+export function cinnamonTemplateKindFor(req: GenerateRequest): CinnamonTemplateKind | null {
+  if (requestedCinnamonCupCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'cinnamon';
+  }
+  return null;
+}
+
+/**
+ * Bounded cinnamon fast path (Gauntlet 11 §107): seeded template choice →
+ * seeded full permutation of c0..c3 roles (a full isomorphism, so the bank
+ * depth is preserved) → one active cinnamon obstacle on the template host
+ * → single `finalizeCandidate` validation (L2 trace inside). At most
+ * CINNAMON_TEMPLATE_ATTEMPTS validations, never a 150-deal scan. Returns
+ * null when no template validates (caller uses the fallback ladder).
+ */
+function generateFromCinnamonTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = cinnamonTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = CINNAMON_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < CINNAMON_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: full permutation of all four roles.
+    // A bijection — depth preserved exactly, cinnamon profile isomorphic.
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateCinnamonTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    const obstacles: CapacityObstacleSlot[] = emptyCapacityObstacles(inst.cups.length);
+    obstacles[inst.cinnamonHost] = 'cinnamon';
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#cinnamon:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      obstacles,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Match a request against the thermos bank (Gauntlet 10). Recognized
  * ONLY for the exact production combination: thermosCupCount 1, 4 colors,
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
@@ -3681,6 +4065,16 @@ export function generateLevel(
   // or the validated fallback ladder.
   if (thermosTemplateKindFor(req) !== null) {
     const fast = generateFromThermosTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical cinnamon configs skip the random scan entirely (Gauntlet 11
+  // §107): bounded CINNAMON_TEMPLATE_ATTEMPTS validations, never a
+  // 150-deal scan. maxRetries: 0 still yields a valid level through the
+  // fast path or the validated fallback ladder.
+  if (cinnamonTemplateKindFor(req) !== null) {
+    const fast = generateFromCinnamonTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -4363,6 +4757,75 @@ export function validateLevelStructure(
   } else {
     if (constraints.some((c) => isThermosCupConstraint(c))) {
       reasons.push('unexpected thermos without request (FM)');
+    }
+  }
+  // GI–HA: cinnamon structural invariant (solver L2 items GU–HA live in
+  // finalizeCandidate, not here).
+  const wantCinnamon = requestedCinnamonCupCount(req);
+  const obstacleSlots = normalizeCapacityObstacles(level.capacityObstacles, level.cups.length);
+  const gotCinnamon = obstacleSlots.filter((s) => s !== null).length;
+  if (gotCinnamon !== wantCinnamon) {
+    reasons.push(`expected ${wantCinnamon} cinnamon obstacles, got ${gotCinnamon} (GL)`);
+  }
+  if (wantCinnamon > 1) {
+    reasons.push(`cinnamon production max one (GJ), got ${wantCinnamon}`);
+  }
+  if (wantCinnamon > 0) {
+    if (obstacleSlots.filter((s) => s === 'cinnamon').length !== 1) {
+      reasons.push(`expected exactly one cinnamon obstacle (GL), got [${obstacleSlots.join(',')}]`);
+    } else {
+      const host = obstacleSlots.findIndex((s) => s === 'cinnamon');
+      const hostCup = level.cups[host] as TeaId[];
+      const hostC = constraints[host] as CupConstraint | undefined;
+      if (!hostC || hostC.mode !== 'normal' || hostC.targetTeaId !== undefined) {
+        reasons.push(`cinnamon host ${host} must be untargeted plain normal (GM)`);
+      }
+      if (hostC && cupCapacity(hostC) !== STANDARD_CUP_CAPACITY) {
+        reasons.push(`cinnamon host ${host} must keep base capacity 4 (GN)`);
+      }
+      if (!hostCup || hostCup.length !== 2) reasons.push(`cinnamon host ${host} must hold exactly 2 layers (GO)`);
+      if (hostCup && hostCup.length > 0) {
+        const first = hostCup[0] as TeaId;
+        if (!hostCup.some((t) => t !== first)) reasons.push(`cinnamon host ${host} must start mixed (GP)`);
+      }
+      if ((level.hiddenCounts[host] ?? 0) !== 0) {
+        reasons.push(`cinnamon host ${host} must not hide mystery`);
+      }
+    }
+    const lens = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(lens) !== JSON.stringify([0, 2, 3, 3, 4, 4])) {
+      reasons.push(`cinnamon levels must start 4,4,3,3,2,0 (GQ), got [${lens.join(',')}]`);
+    }
+    if (level.cups.filter((c) => c.length === 0).length !== 1) {
+      reasons.push('cinnamon levels must keep exactly one truly empty normal (GS)');
+    }
+    if (presentIds.length > 0) reasons.push('cinnamon + lemon is out of scope for Gauntlet 11 (GT)');
+    if (sinkPresentForD.length > 0) reasons.push('cinnamon + honey is out of scope for Gauntlet 11 (GT)');
+    if (normalizeStrainerState(level.strainer).present) {
+      reasons.push('cinnamon + strainer is out of scope for Gauntlet 11 (GT)');
+    }
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('cinnamon + sink is out of scope for Gauntlet 11 (GT)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('cinnamon + targets is out of scope for Gauntlet 11 (GT)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('cinnamon + tasting is out of scope for Gauntlet 11 (GT)');
+    }
+    if (icePresentForD.length > 0) reasons.push('cinnamon + frozen cup is out of scope for Gauntlet 11 (GT)');
+    if (constraints.some((c) => isThermosCupConstraint(c))) {
+      reasons.push('cinnamon + thermos is out of scope for Gauntlet 11 (GT)');
+    }
+    if (requestedSourceOnlyCount(req) > 0) {
+      reasons.push('cinnamon + teapot is out of scope for Gauntlet 11 (GT)');
+    }
+    if (req.hasMysteryLayer) {
+      reasons.push('cinnamon + Mystery is out of scope for Gauntlet 11 (GT)');
+    }
+  } else {
+    if (obstacleSlots.some((s) => s !== null)) {
+      reasons.push('unexpected capacity obstacle without request (GI)');
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.
