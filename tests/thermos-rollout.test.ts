@@ -116,7 +116,7 @@ describe('rollout 73–80 (Gauntlet 10 thermos introduction)', () => {
       honey: false,
       frozen: false,
       thermos: false,
-      cinnamon: false,
+      cinnamon: false, teaBloom: false,
     };
     expect(mechanicPlanForLevel(73)).toEqual({ ...CLEAN });
     expect(mechanicPlanForLevel(74)).toEqual({ ...CLEAN, thermos: true });

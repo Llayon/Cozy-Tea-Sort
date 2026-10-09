@@ -71,34 +71,34 @@ describe('rollout 1–48 unchanged (Gauntlets 0–6 spot-check, honey:false)', (
       if (lemon !== undefined) expect(cfg.colors).toContain('sea_buckthorn');
     }
     expect(mechanicPlanForLevel(6)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(10)).toEqual({
-      teapot: false, targets: true, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: true, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(18)).toEqual({
-      teapot: false, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: true, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(26)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(34)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(38)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(42)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(43)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(46)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(47)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: true, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
   });
 });
@@ -138,16 +138,16 @@ describe('rollout 49–56 (Gauntlet 7 sinking-honey introduction)', () => {
       if (strainer) expect(cfg.emptyCups).toBe(1);
     }
     expect(mechanicPlanForLevel(50)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: true, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: true, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(51)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: true, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: true, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(54)).toEqual({
-      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: true, frozen: false, thermos: false, cinnamon: false,
+      teapot: true, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: true, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
     expect(mechanicPlanForLevel(55)).toEqual({
-      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false,
+      teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: true, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false,
     });
   });
 

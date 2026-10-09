@@ -93,7 +93,7 @@ describe('A–E. pure dynamic state', () => {
   });
 
   it('D. clone does not alias source arrays', () => {
-    const src: PuzzleState = { cups: [[M]], floatingIngredients: ['lemon'], sinkingIngredients: [null], strainer: { present: false, attachedCupIndex: null, heldTea: null }, iceSlots: [null], capacityObstacles: [null] };
+    const src: PuzzleState = { cups: [[M]], floatingIngredients: ['lemon'], sinkingIngredients: [null], strainer: { present: false, attachedCupIndex: null, heldTea: null }, iceSlots: [null], capacityObstacles: [null], teaBudSlots: [null] };
     const c = clonePuzzleState(src);
     expect(c).toEqual(src);
     expect(c.cups).not.toBe(src.cups);

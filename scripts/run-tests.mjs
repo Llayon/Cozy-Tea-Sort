@@ -155,6 +155,25 @@ const batches = [
     ],
   },
   { name: 'cinnamon stress', files: ['tests/cinnamon-stress.test.ts'] },
+  {
+    name: 'tea-bloom matrix + solver + canonical + undo',
+    files: [
+      'tests/tea-bloom.test.ts',
+      'tests/tea-bloom-solver.test.ts',
+      'tests/tea-bloom-canonical.test.ts',
+      'tests/tea-bloom-undo.test.ts',
+    ],
+  },
+  {
+    name: 'tea-bloom templates + fast path + rollout + view',
+    files: [
+      'tests/tea-bloom-templates.test.ts',
+      'tests/tea-bloom-fastpath.test.ts',
+      'tests/tea-bloom-rollout.test.ts',
+      'tests/tea-bloom-view.test.ts',
+    ],
+  },
+  { name: 'tea-bloom stress', files: ['tests/tea-bloom-stress.test.ts'] },
 ];
 
 function runBatch(batch) {
