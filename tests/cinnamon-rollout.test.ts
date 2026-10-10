@@ -124,7 +124,7 @@ describe('rollout 81–88 (Gauntlet 11 cinnamon introduction)', () => {
       honey: false,
       frozen: false,
       thermos: false,
-      cinnamon: false, teaBloom: false,
+      cinnamon: false, teaBloom: false, blend: false,
     };
     expect(mechanicPlanForLevel(81)).toEqual({ ...CLEAN });
     expect(mechanicPlanForLevel(82)).toEqual({ ...CLEAN, cinnamon: true });
