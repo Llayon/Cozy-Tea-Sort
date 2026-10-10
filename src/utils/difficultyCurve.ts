@@ -63,9 +63,10 @@ interface MechanicPlan {
   thermos: boolean;
   cinnamon: boolean;
   teaBloom: boolean;
+  blend: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -274,6 +275,24 @@ const PINNED_ROLLOUT_89_96: Record<number, MechanicPlan> = {
 };
 
 /**
+ * Pinned rollout 97–104 (Gauntlet 13 — milk-tea blend «Молочный купаж»):
+ * 97 warmup clean · 98 challenge BLEND (tutorial) · 99 peak
+ * HONEY+mystery (already-valid familiar peak) · 100 relax clean ·
+ * 101 warmup clean · 102 challenge BLEND (no tutorial repeat) ·
+ * 103 peak LEMON+mystery (already-valid familiar peak) · 104 relax clean.
+ */
+const PINNED_ROLLOUT_97_104: Record<number, MechanicPlan> = {
+  97: { ...CLEAN },
+  98: { ...CLEAN, blend: true },
+  99: { ...CLEAN, honey: true },
+  100: { ...CLEAN },
+  101: { ...CLEAN },
+  102: { ...CLEAN, blend: true },
+  103: { ...CLEAN, lemon: true },
+  104: { ...CLEAN },
+};
+
+/**
  * Mechanic plan for any level: pinned table for 1–96, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
  * combos, never honey + lemon / strainer / sink / tasting / targets except
@@ -290,7 +309,7 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
     PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum] ??
     PINNED_ROLLOUT_57_64[levelNum] ?? PINNED_ROLLOUT_65_72[levelNum] ??
     PINNED_ROLLOUT_73_80[levelNum] ?? PINNED_ROLLOUT_81_88[levelNum] ??
-    PINNED_ROLLOUT_89_96[levelNum];
+    PINNED_ROLLOUT_89_96[levelNum] ?? PINNED_ROLLOUT_97_104[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
@@ -298,13 +317,13 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   if (cycleIndex === 1) {
     // challenge (no mystery): tea bloom → cinnamon → thermos → frozen cup →
     // lemon+honey → honey → teapot+honey → strainer → teapot+strainer →
-    // lemon → teapot+lemon → tasting → teapot+tasting → sink →
-    // teapot+sink → targets → teapot+targets (all standalone except the
-    // established ≤2-special combos; NO bloom combinations).
-    // (Levels 1–96 are pinned, so this rotation only affects 97+; the
-    // pre-G12 16-cycle order is preserved after the leading tea-bloom
-    // case.)
-    switch (cycleNumber % 17) {
+    // lemon → teapot+lemon → tasting → teapot+tasting → sink → teapot+sink →
+    // targets → teapot+targets → milk-tea blend (all standalone except the
+    // established ≤2-special combos; NO bloom or blend combinations).
+    // (Levels 1–104 are pinned, so this rotation only affects 105+; the
+    // pre-G13 17-cycle order is preserved exactly, with blend appended as
+    // the new 18th residue so no existing mechanic shifts.)
+    switch (cycleNumber % 18) {
       case 0: return { ...CLEAN, teaBloom: true };
       case 1: return { ...CLEAN, cinnamon: true };
       case 2: return { ...CLEAN, thermos: true };
@@ -321,6 +340,7 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
       case 13: return { ...CLEAN, sink: true };
       case 14: return { ...CLEAN, teapot: true, sink: true };
       case 15: return { ...CLEAN, targets: true };
+      case 17: return { ...CLEAN, blend: true };
       default: return { ...CLEAN, teapot: true, targets: true };
     }
   }
@@ -428,7 +448,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
 
 
   // Special-mechanic overlay: single source of truth for
-  // teapot/targets/sink/tasting/lemon/strainer/frozen/thermos/cinnamon.
+  // teapot/targets/sink/tasting/lemon/strainer/frozen/thermos/cinnamon/
+  // tea-bloom/blend.
   const plan = mechanicPlanForLevel(levelNum);
   hasSourceOnlyTeapot = plan.teapot;
   const targetTeaIds: TeaId[] = plan.targets ? pickTargetPair(colors) : [];
@@ -439,6 +460,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasThermos = plan.thermos;
   const hasCinnamon = plan.cinnamon;
   const hasTeaBloom = plan.teaBloom;
+  const hasBlend = plan.blend;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -482,6 +504,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if (plan.blend) {
+    phaseSubtitle = 'Молочный купаж • 6 сосудов';
   } else if (plan.teaBloom) {
     phaseSubtitle = 'Чайный бутон • 6 сосудов';
   } else if (plan.cinnamon) {
@@ -565,6 +589,34 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     phaseSubtitle = 'Чайный бутон • 6 сосудов';
   }
 
+  // Gauntlet 13 standalone enforcement: blend challenge is always the
+  // canonical 4c/6v layout (4 teas, 2 nominal empties → 6 vessels), no
+  // Mystery, no teapot. Palette is fixed recipe pair + two fillers.
+  if (hasBlend) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Молочный купаж • 6 сосудов';
+    // L98 tutorial uses matcha + sea_buckthorn fillers; L102 uses
+    // lavender + buckwheat; post-104 blend rotation alternates deterministically.
+    if (levelNum === 98) {
+      colors = ['black_tea', 'milk', 'matcha', 'sea_buckthorn'];
+    } else if (levelNum === 102) {
+      colors = ['black_tea', 'milk', 'lavender', 'buckwheat'];
+    } else {
+      // Post-104 blend: deterministic filler rotation (never milk_oolong).
+      const pairs: Array<[TeaId, TeaId]> = [
+        ['matcha', 'sea_buckthorn'],
+        ['karkade', 'buckwheat'],
+        ['lavender', 'saffron'],
+        ['matcha', 'karkade'],
+      ];
+      const pick = pairs[Math.floor(levelNum / 4) % pairs.length] as [TeaId, TeaId];
+      colors = ['black_tea', 'milk', pick[0], pick[1]];
+    }
+  }
+
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
   if (levelNum === 1) rewardRecipeId = 'matcha';
@@ -598,6 +650,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasThermos,
     hasCinnamon,
     hasTeaBloom,
+    hasBlend,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

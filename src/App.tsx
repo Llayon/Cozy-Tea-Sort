@@ -55,6 +55,7 @@ interface LevelBackupState {
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
+  blendRecipe?: import('./game/logic/blendRecipe').BlendRecipe | undefined;
 }
 
 export default function App() {
@@ -148,6 +149,7 @@ export default function App() {
         thermosCupCount: cfg.hasThermos ? 1 : 0,
         cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
+        blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -165,6 +167,7 @@ export default function App() {
       iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
+      blendRecipe: generated.blendRecipe,
     };
 
     return new TeaSortLogic(
@@ -177,6 +180,7 @@ export default function App() {
       normalizeIceSlots(generated.iceSlots, generated.cups.length),
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
+      generated.blendRecipe,
     );
   };
 
@@ -246,6 +250,7 @@ export default function App() {
         thermosCupCount: cfg.hasThermos ? 1 : 0,
         cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
+        blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -263,6 +268,7 @@ export default function App() {
       iceSlots: normalizeIceSlots(generated.iceSlots, generated.cups.length),
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
+      blendRecipe: generated.blendRecipe,
     };
 
     const logic = new TeaSortLogic(
@@ -275,6 +281,7 @@ export default function App() {
       normalizeIceSlots(generated.iceSlots, generated.cups.length),
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
+      generated.blendRecipe,
     );
     logicRef.current = logic;
 
@@ -416,8 +423,9 @@ export default function App() {
     const restoredIce = normalizeIceSlots(backup.iceSlots, restoredCups.length);
     const restoredObstacles = normalizeCapacityObstacles(backup.capacityObstacles, restoredCups.length);
     const restoredBuds = normalizeTeaBudSlots(backup.teaBudSlots, restoredCups.length);
+    const restoredBlend = backup.blendRecipe;
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds, restoredBlend);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();
@@ -694,6 +702,18 @@ export default function App() {
         </div>
       )}
 
+      {/* Blend first-encounter onboarding (Level 98 only): compact,
+           never blocking. NOT shown on 102 (no tutorial repeat). */}
+      {currentConfig.hasBlend && currentLevel === 98 && moves === 0 && !isWon && (
+        <div
+          id="blend-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2E2118]/95 border-b border-[#7A5A3E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0D9B8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#D8A05E] shrink-0" />
+          <span>Чёрный чай и молоко соединяются при соприкосновении. Два слоя превращаются в один молочный чай.</span>
+        </div>
+      )}
+
       {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
            compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
       {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
@@ -938,6 +958,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#9AC878] font-bold">🌱</span>
                 <span>Чайный бутон распустится, когда его чашка полностью опустеет. После этого чашка остаётся обычной и её можно снова использовать.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#D8A05E] font-bold">🥛</span>
+                <span>Если чёрный чай и молоко соприкасаются, они соединяются в один слой молочного чая. Реакция работает в обе стороны.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

@@ -34,6 +34,7 @@ import {
   isThermosCupConstraint,
 } from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
+import type { BlendReactionMetadata } from '../logic/blendRecipe';
 import {
   canActAsSource,
   floatingIngredientHostSatisfied,
@@ -3285,7 +3286,7 @@ export class TeaSortView {
       return;
     }
 
-    if (sourceCup.canPourInto(clickedCup)) {
+    if (this.logic.canMakeMove(sourceIdx, clickedIdx)) {
       this.lastInvalidTargetIndex = null;
       const res = this.logic.makeMove(sourceIdx, clickedIdx);
       if (res) {
@@ -3295,6 +3296,11 @@ export class TeaSortView {
         // keeps the mesh on the source at start, shows m-1 arriving +
         // catch, then returns loaded to stand (part of the pour, never a
         // second onMoveComplete).
+        // Blend reaction (Gauntlet 13): logic already popped one source
+        // reactant and replaced the destination top with milk_tea (no push,
+        // dest occupancy unchanged). Animation moves exactly ONE source
+        // layer which merges INTO the existing top (no fifth layer), then a
+        // brief blend flourish crossfades the dest top.
         void this.animatePour(
           sourceIdx,
           clickedIdx,
@@ -3308,6 +3314,7 @@ export class TeaSortView {
           res.iceMelted ?? null,
           res.capacityObstacleRemoved ?? null,
           res.teaBudBloomed ?? null,
+          res.reaction ?? null,
         );
       }
     } else {
@@ -3777,6 +3784,7 @@ export class TeaSortView {
     iceMelted: IceSlot = null,
     capacityObstacleRemoved: CapacityObstacleSlot = null,
     teaBudBloomed: TeaBudSlot = null,
+    reaction: BlendReactionMetadata | null = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -3810,7 +3818,14 @@ export class TeaSortView {
 
     // Strained catch-one (Gauntlet 6 §39): source loses m, dest gains m-1,
     // tool catches 1. Ordinary pours drain/fill the same m.
-    const fillCount = strained ? Math.max(0, count - 1) : count;
+    // Blend reaction (Gauntlet 13): exactly ONE source layer travels and
+    // merges INTO the existing top (no push, no fifth layer) — so the
+    // filling overlay stays suppressed (fillCount 0); the destination top
+    // is already the product in logic state and crossfades via the flourish
+    // below. This keeps old-target-top + animated-product + static-product
+    // from ever rendering as three layers.
+    const isReaction = reaction != null;
+    const fillCount = isReaction ? 0 : strained ? Math.max(0, count - 1) : count;
     sourceView.drainingCount = count;
     sourceView.drainingLayer = layer;
     targetView.fillingCount = fillCount;
@@ -3938,6 +3953,33 @@ export class TeaSortView {
     sourceView.drainingCount = 0;
     targetView.fillAmount = 0;
     targetView.fillingCount = 0;
+    // Blend flourish (Gauntlet 13 §132): the moving reactant has merged INTO
+    // the existing top (no fifth layer); logic dest top is already milk_tea.
+    // A brief cozy swirl (~300–450ms total with the pour): soft steam bloom
+    // + sparkles at the destination surface, success haptic (never error).
+    // Part of THIS pour — same ticker, same lock, never a second ticker or
+    // second onMoveComplete. No permanent badge; milk_tea renders ordinarily
+    // afterwards.
+    if (isReaction && reaction) {
+      try {
+        const toCup = this.logic.cups[toIdx];
+        const layers = toCup?.layers.length ?? 0;
+        const p = this.iceStagePoint(targetView, layers);
+        const prodTea = TEA_TYPES[reaction.product];
+        // Cream/tea swirl: a few product-tinted bubbles at the surface.
+        for (let b = 0; b < 6; b++) {
+          this.spawnBubble(p.x + (Math.random() - 0.5) * 24, p.y + (Math.random() - 0.5) * 8, prodTea.colorNum);
+        }
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        this.triggerRevealSparkles(p.x, p.y);
+        await this.wait(340);
+      } catch {
+        // Failure path: logic state already correct; just redraw.
+      } finally {
+        this.renderAllCups();
+      }
+    }
     // Landing: reveal the destination static lemon, then redraw.
     // Layer-specific (§85): lemon-only pours must not touch honey
     // suppression and vice versa — joint moves clear both via both paths.

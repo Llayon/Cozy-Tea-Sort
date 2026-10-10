@@ -206,6 +206,19 @@ import {
   instantiateTeaBloomTemplate,
 } from './teaBloomTemplates';
 import {
+  BLEND_DEPTH_ACCEPT,
+  BLEND_TEMPLATE_ATTEMPTS,
+  BLEND_TEMPLATE_BANK,
+  BlendTemplateKind,
+  instantiateBlendTemplate,
+} from './blendTemplates';
+import {
+  MILK_TEA_BLEND_RECIPE,
+  BlendRecipe,
+  BlendRecipeId,
+  resolveBlendRecipe,
+} from './blendRecipe';
+import {
   depthDistance,
   RhythmPhase,
   depthAccepted,
@@ -308,6 +321,14 @@ export interface GenerateRequest {
    * special is rejected loudly.
    */
   teaBudCount?: number;
+  /**
+   * Blend recipe requested (Gauntlet 13 — «Молочный купаж»).
+   * `undefined` = classic level without chemistry; `'milk-tea'` = exactly
+   * ONE immutable recipe (black_tea + milk → milk_tea, target 4) inside the
+   * authored 4,4,4,4,0,0 topology (6 standard normal vessels, no specials).
+   * Only the milk-tea recipe is supported; anything else is rejected loudly.
+   */
+  blendRecipeId?: BlendRecipeId;
 }
 
 export interface GeneratedLevel {
@@ -353,6 +374,12 @@ export interface GeneratedLevel {
    * runtime never guesses whether the field exists. No index duplication.
    */
   teaBudSlots?: TeaBudSlot[];
+  /**
+   * Static blend recipe (Gauntlet 13). Immutable level data — NOT
+   * PuzzleState. Present only on blend levels; absent everywhere else so
+   * legacy content stays byte-identical.
+   */
+  blendRecipe?: BlendRecipe;
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */
@@ -464,6 +491,11 @@ export function requestedTeaBudCount(req: GenerateRequest): number {
   const v = req.teaBudCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
+}
+
+/** Requested blend recipe (`undefined` = classic level without chemistry). */
+export function requestedBlendRecipeId(req: GenerateRequest): BlendRecipeId | undefined {
+  return req.blendRecipeId ?? undefined;
 }
 
 /**
@@ -757,6 +789,66 @@ export function validateTeaBudRequest(req: GenerateRequest): void {
   }
   if (requestedCinnamonCupCount(req) > 0) {
     throw new Error('validateTeaBudRequest: tea bud + cinnamon is out of scope for Gauntlet 12');
+  }
+  if (requestedBlendRecipeId(req) !== undefined) {
+    throw new Error('validateTeaBudRequest: tea bud + blend is out of scope for Gauntlet 12');
+  }
+}
+
+/**
+ * Fail-fast request validation for milk-tea blend (programming errors, not
+ * generation luck). Gauntlet 13 supports exactly the standalone chemistry:
+ * blendRecipeId 'milk-tea' inside the authored 4c/6v 4,4,4,4,0,0 topology
+ * (numColors 4, nominal emptyCups 2 → 6 vessels), no Mystery/teapot/targets/
+ * sink/tasting/lemon/honey/strainer/frozen/thermos/cinnamon/tea-bud.
+ * Only the milk-tea recipe is supported (HV); every sibling special is
+ * rejected loudly (HW). Production palette must carry black_tea + milk
+ * plus two eligible legacy fillers (c0/c1); milk_tea must NOT be initial.
+ */
+export function validateBlendRequest(req: GenerateRequest): void {
+  const id = requestedBlendRecipeId(req);
+  if (id === undefined) return;
+  if (id !== 'milk-tea') {
+    throw new Error(`validateBlendRequest: unsupported blend recipe ${id} (only milk-tea)`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateBlendRequest: blend requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+    );
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateBlendRequest: blend + targets is out of scope for Gauntlet 13');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + sink-only is out of scope for Gauntlet 13');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + tasting bowl is out of scope for Gauntlet 13');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateBlendRequest: blend + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 13`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateBlendRequest: blend + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 13`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateBlendRequest: blend + strainer is out of scope for Gauntlet 13');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + frozen cup is out of scope for Gauntlet 13');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + thermos is out of scope for Gauntlet 13');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + cinnamon is out of scope for Gauntlet 13');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + tea bud is out of scope for Gauntlet 13');
   }
 }
 
@@ -1399,6 +1491,131 @@ export function analyzeTeaBloomParticipation(
   out.win = isPuzzleWonState(
     { cups, floatingIngredients: emptyFloatingIngredients(cups.length), teaBudSlots: [...buds] },
     cupConstraints,
+  );
+  return out;
+}
+
+export interface BlendParticipation {
+  reactions: number;
+  reactionsAtoB: number;
+  reactionsBtoA: number;
+  reactionDestinationCount: number;
+  productTransfers: number;
+  ordinaryPoursBetweenFirstLastReaction: number;
+  firstReactionDepth: number | null;
+  lastReactionDepth: number | null;
+  firstProductTransferDepth: number | null;
+  maxProductRun: number;
+  finalA: number;
+  finalB: number;
+  finalProduct: number;
+  finalTotalLayers: number;
+  recipeSatisfied: boolean;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal blend solution and count REACTION events (exactly-one
+ * pair chemistry), INTERLEAVED_CRAFT (ordinary pours strictly between first
+ * and last reaction), PRODUCT_TRANSFER (ordinary P→P moves proving crafted
+ * output is a normal resource) and DISTRIBUTED_CRAFT (reactions in >=2
+ * vessels + final P×4), plus final recipe/win verdicts. Production gates
+ * require exactly 4 reactions AND interleaving AND early first reaction AND
+ * cleared recipe AND win (II–IM); L3A/L3B is bank truth. Analysis only —
+ * never PuzzleState.
+ */
+export function analyzeBlendParticipation(
+  startCups: TeaId[][],
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+  recipe: BlendRecipe,
+): BlendParticipation {
+  const out: BlendParticipation = {
+    reactions: 0,
+    reactionsAtoB: 0,
+    reactionsBtoA: 0,
+    reactionDestinationCount: 0,
+    productTransfers: 0,
+    ordinaryPoursBetweenFirstLastReaction: 0,
+    firstReactionDepth: null,
+    lastReactionDepth: null,
+    firstProductTransferDepth: null,
+    maxProductRun: 0,
+    finalA: 0,
+    finalB: 0,
+    finalProduct: 0,
+    finalTotalLayers: 0,
+    recipeSatisfied: false,
+    win: false,
+  };
+  let cups = startCups.map((c) => [...c]);
+  const dests = new Set<number>();
+  const rIdx: number[] = [];
+  for (let i = 0; i < solution.length; i++) {
+    const a = solution[i] as SolverAction;
+    if (a.kind !== 'pour') continue;
+    const from = (a as { from: number }).from;
+    const to = (a as { to: number }).to;
+    const res = applyPourState(
+      { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+      from,
+      to,
+      cupConstraints,
+      recipe,
+    );
+    if (!res) return out;
+    cups = res.state.cups as TeaId[][];
+    if (res.reaction) {
+      out.reactions++;
+      rIdx.push(i);
+      dests.add(to);
+      if (out.firstReactionDepth === null) out.firstReactionDepth = i;
+      out.lastReactionDepth = i;
+      if (res.reaction.sourceReactant === recipe.reactantA) out.reactionsAtoB++;
+      else out.reactionsBtoA++;
+    } else if (res.layer === recipe.product && (res.transferred ?? 0) > 0) {
+      out.productTransfers++;
+      if (out.firstProductTransferDepth === null) out.firstProductTransferDepth = i;
+    }
+    for (const cup of cups) {
+      let run = 0;
+      for (const layer of cup as TeaId[]) {
+        if (layer === recipe.product) {
+          run++;
+          out.maxProductRun = Math.max(out.maxProductRun, run);
+        } else run = 0;
+      }
+    }
+  }
+  out.reactionDestinationCount = dests.size;
+  if (out.firstReactionDepth !== null && out.lastReactionDepth !== null) {
+    let n = 0;
+    for (let i = out.firstReactionDepth + 1; i < out.lastReactionDepth; i++) {
+      if (!rIdx.includes(i)) n++;
+    }
+    out.ordinaryPoursBetweenFirstLastReaction = n;
+  }
+  let aN = 0;
+  let bN = 0;
+  let pN = 0;
+  let tN = 0;
+  for (const cup of cups) {
+    tN += (cup as TeaId[]).length;
+    for (const t of cup as TeaId[]) {
+      if (t === recipe.reactantA) aN++;
+      else if (t === recipe.reactantB) bN++;
+      else if (t === recipe.product) pN++;
+    }
+  }
+  out.finalA = aN;
+  out.finalB = bN;
+  out.finalProduct = pN;
+  out.finalTotalLayers = tN;
+  out.recipeSatisfied = aN === 0 && bN === 0 && pN === recipe.targetProductCount;
+  out.win = isPuzzleWonState(
+    { cups, floatingIngredients: emptyFloatingIngredients(cups.length) },
+    cupConstraints,
+    recipe,
   );
   return out;
 }
@@ -2191,7 +2408,7 @@ function finalizeCandidate(
   }
   if (isWonState(cups, normalized)) return null; // D
   if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles, teaBudSlots: buds }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon/bud-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0) {
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -2454,6 +2671,58 @@ function finalizeCandidate(
     };
     if (!validateLevelStructure(level, req).ok) return null;
     return level;
+  }
+  // HU–IN: blend production gate (Gauntlet 13). Chemistry is integrated
+  // sorting, not rescue — no ordinary-control comparison at runtime (L3 is
+  // offline curation truth). The optimal replay must perform exactly 4
+  // reactions AND interleave ordinary pours AND start reacting early AND
+  // satisfy the recipe AND win (L2). Happy path is exactly 1 solve.
+  {
+    const blendId = requestedBlendRecipeId(req);
+    if (blendId !== undefined) {
+      const recipe = resolveBlendRecipe(blendId);
+      if (!recipe) return null; // HV: only milk-tea supported
+      if (stats) stats.solverCalls++;
+      const blendSolved = solvePuzzle(cups, {
+        maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+        blendRecipe: recipe,
+      });
+      if (!blendSolved.solvable || blendSolved.truncated) return null; // IF, IG
+      if (blendSolved.minMoves === undefined) return null;
+      if (
+        blendSolved.minMoves < BLEND_DEPTH_ACCEPT.min ||
+        blendSolved.minMoves > BLEND_DEPTH_ACCEPT.max
+      ) {
+        return null; // IH
+      }
+      const blendSolution = (blendSolved.solution ?? []) as SolverAction[];
+      const bpart = analyzeBlendParticipation(cups, blendSolution, normalized, recipe);
+      if (bpart.reactions !== 4) return null; // II
+      if (!bpart.recipeSatisfied) return null; // IJ
+      if (bpart.ordinaryPoursBetweenFirstLastReaction < 1) return null; // IK
+      if (bpart.firstReactionDepth === null) return null; // IK
+      if (bpart.firstReactionDepth / Math.max(1, blendSolved.minMoves) > 0.75) return null; // IL
+      if (!bpart.win) return null; // IM
+      const level: GeneratedLevel = {
+        cups,
+        hiddenCounts,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+        sinkingIngredients: sinkSlots,
+        strainer: strainerState,
+        iceSlots: ice,
+        capacityObstacles: obstacles,
+        teaBudSlots: buds,
+        blendRecipe: recipe,
+        seed,
+        minMoves: blendSolved.minMoves,
+        visitedStates: blendSolved.visitedStates,
+      };
+      if (!validateLevelStructure(level, req).ok) return null;
+      return level;
+    }
   }
   // BP–CA: strainer production gate (rescued necessity standard).
   if (stats) stats.solverCalls++;
@@ -3186,6 +3455,35 @@ function teaBloomFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong L2 blend fallback topology (depth 12, integrated craft,
+ * L3 distributed): instantiated with the request palette fillers in order
+ * (a/b fixed — a full isomorphism for the filler swap class), so the
+ * recorded depth holds modulo tie-breaking. Passes through
+ * `finalizeCandidate` — never trusted blindly. Backup pins cover the
+ * (near-impossible) miss.
+ */
+const BLEND_FALLBACK_TEMPLATE_ID = 'blend-12-28000';
+const BLEND_FALLBACK_BACKUP_IDS = ['blend-12-37000', 'blend-12-65000'];
+
+function blendFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> {
+  if (blendTemplateKindFor(req) === null) return [];
+  const kind = blendTemplateKindFor(req) as BlendTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  const fillers = palette.filter((t) => t !== 'black_tea' && t !== 'milk' && t !== 'milk_tea');
+  if (fillers.length !== 2) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
+  for (const id of [BLEND_FALLBACK_TEMPLATE_ID, ...BLEND_FALLBACK_BACKUP_IDS]) {
+    const tpl = BLEND_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateBlendTemplate(tpl, fillers[0] as TeaId, fillers[1] as TeaId);
+    out.push({ cups: inst.cups, constraints: defaultCupConstraints(inst.cups.length) });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -3197,6 +3495,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateThermosRequest(req);
   validateCinnamonRequest(req);
   validateTeaBudRequest(req);
+  validateBlendRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -3219,9 +3518,15 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantFrozen > 0 ? ':frozen-cup' : ''}` +
     `${wantThermos > 0 ? ':thermos' : ''}` +
     `${wantCinnamon > 0 ? ':cinnamon' : ''}` +
-    `${wantBud > 0 ? ':tea-bloom' : ''}`;
+    `${wantBud > 0 ? ':tea-bloom' : ''}` +
+    `${requestedBlendRecipeId(req) !== undefined ? ':blend' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
+  // Dedicated blend shapes go first for blend requests (palette fillers in
+  // order — recorded depths hold modulo tie-breaking; finalize re-validates).
+  if (requestedBlendRecipeId(req) !== undefined) {
+    shapeEntries.push(...blendFallbackEntries(req));
+  }
   // Dedicated tea-bloom shapes go first for bud requests (identity role
   // mapping — recorded depths hold exactly).
   if (wantBud > 0) {
@@ -4208,6 +4513,101 @@ function generateFromTeaBloomTemplateBank(
 }
 
 /**
+ * Match a request against the blend bank (Gauntlet 13). Recognized ONLY
+ * for the exact production combination: blendRecipeId 'milk-tea', 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * Anything else keeps the existing paths (validation throws for bad combos).
+ */
+export function blendTemplateKindFor(req: GenerateRequest): BlendTemplateKind | null {
+  if (requestedBlendRecipeId(req) !== 'milk-tea') return null;
+  if (requestedTeaBudCount(req) !== 0) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    // Palette must carry exactly the recipe pair plus two eligible fillers.
+    const palette = req.colors.slice(0, req.numColors);
+    if (!palette.includes('black_tea' as TeaId) || !palette.includes('milk' as TeaId)) return null;
+    if ((palette as string[]).includes('milk_tea')) return null;
+    const fillers = palette.filter((t) => t !== 'black_tea' && t !== 'milk' && t !== 'milk_tea');
+    if (fillers.length !== 2) return null;
+    if (!fillers.every((f) => (BLEND_ELIGIBLE_FILLERS as readonly string[]).includes(f))) return null;
+    return 'milk-tea-blend';
+  }
+  return null;
+}
+
+/** Eligible legacy fillers for c0/c1 (never recipe IDs; milk_oolong excluded to avoid milk confusion). */
+export const BLEND_ELIGIBLE_FILLERS: readonly TeaId[] = [
+  'matcha',
+  'sea_buckthorn',
+  'karkade',
+  'lavender',
+  'saffron',
+  'buckwheat',
+];
+
+/**
+ * Bounded blend fast path (Gauntlet 13 §121/§124): validate request →
+ * seeded template choice → seeded c0/c1 mapping among eligible legacy teas
+ * (a/b fixed to black_tea/milk) → attach MILK_TEA_BLEND_RECIPE → single
+ * `finalizeCandidate` validation (L2 trace inside). At most
+ * BLEND_TEMPLATE_ATTEMPTS validations, never a 150-deal scan. Returns null
+ * when no template validates (caller uses the fallback ladder). Happy path
+ * is exactly 1 solver call (§123).
+ */
+function generateFromBlendTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = blendTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = BLEND_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const recipe = resolveBlendRecipe(requestedBlendRecipeId(req));
+  if (!recipe) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  const baseFillers = palette.filter((t) => t !== 'black_tea' && t !== 'milk' && t !== 'milk_tea');
+  if (baseFillers.length !== 2) return null;
+  for (let a = 0; a < BLEND_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded filler variation: swap the two legacy filler roles (or keep).
+    // Recipe identities stay fixed; only c0/c1 order varies.
+    const swap = rng() < 0.5;
+    const c0 = (swap ? baseFillers[1] : baseFillers[0]) as TeaId;
+    const c1 = (swap ? baseFillers[0] : baseFillers[1]) as TeaId;
+    const inst = instantiateBlendTemplate(tpl, c0, c1);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#blend:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Match a request against the thermos bank (Gauntlet 10). Recognized
  * ONLY for the exact production combination: thermosCupCount 1, 4 colors,
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
@@ -4368,6 +4768,7 @@ export function generateLevel(
   validateThermosRequest(req);
   validateCinnamonRequest(req);
   validateTeaBudRequest(req);
+  validateBlendRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -4487,6 +4888,16 @@ export function generateLevel(
   // fast path or the validated fallback ladder.
   if (teaBloomTemplateKindFor(req) !== null) {
     const fast = generateFromTeaBloomTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical blend configs skip the random scan entirely (Gauntlet 13
+  // §121): bounded BLEND_TEMPLATE_ATTEMPTS validations, never a 150-deal
+  // scan. maxRetries: 0 still yields a valid level through the fast path
+  // or the validated fallback ladder.
+  if (blendTemplateKindFor(req) !== null) {
+    const fast = generateFromBlendTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -5313,6 +5724,106 @@ export function validateLevelStructure(
   } else {
     if (budSlots.some((s) => s !== null)) {
       reasons.push('unexpected tea bud without request (HB)');
+    }
+  }
+  // HU–IN: blend structural invariant (solver L2 items IF–IM live in
+  // finalizeCandidate, not here).
+  const wantBlend = requestedBlendRecipeId(req);
+  const gotBlend = level.blendRecipe?.id;
+  if (wantBlend === undefined) {
+    if (gotBlend !== undefined) {
+      reasons.push(`unexpected blend recipe without request (HU), got ${gotBlend}`);
+    }
+    // Reaction IDs must never leak into non-blend levels (G13 leak test).
+    const leak = level.cups.flat().filter((t) => t === 'black_tea' || t === 'milk' || t === 'milk_tea');
+    if (leak.length > 0) {
+      reasons.push(`reaction IDs leak into non-blend level (HU): ${leak.join(',')}`);
+    }
+  } else {
+    if (gotBlend !== 'milk-tea') {
+      reasons.push(`expected blend recipe milk-tea (HU), got ${gotBlend ?? 'none'}`);
+    }
+    if (wantBlend !== 'milk-tea') {
+      reasons.push(`only milk-tea recipe supported (HV), got ${wantBlend}`);
+    }
+    // HW: standalone — no sibling specials.
+    if (presentIds.length > 0) reasons.push('blend + lemon is out of scope for Gauntlet 13 (HW)');
+    if (sinkPresentForD.length > 0) reasons.push('blend + honey is out of scope for Gauntlet 13 (HW)');
+    if (normalizeStrainerState(level.strainer).present) {
+      reasons.push('blend + strainer is out of scope for Gauntlet 13 (HW)');
+    }
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('blend + sink is out of scope for Gauntlet 13 (HW)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('blend + targets is out of scope for Gauntlet 13 (HW)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('blend + tasting is out of scope for Gauntlet 13 (HW)');
+    }
+    if (icePresentForD.length > 0) reasons.push('blend + frozen cup is out of scope for Gauntlet 13 (HW)');
+    if (constraints.some((c) => isThermosCupConstraint(c))) {
+      reasons.push('blend + thermos is out of scope for Gauntlet 13 (HW)');
+    }
+    if (obstacleSlots.some((s) => s !== null)) {
+      reasons.push('blend + cinnamon is out of scope for Gauntlet 13 (HW)');
+    }
+    if (budSlots.some((s) => s !== null)) {
+      reasons.push('blend + tea bud is out of scope for Gauntlet 13 (HW)');
+    }
+    if (requestedSourceOnlyCount(req) > 0) {
+      reasons.push('blend + teapot is out of scope for Gauntlet 13 (HW)');
+    }
+    if (req.hasMysteryLayer) {
+      reasons.push('blend + Mystery is out of scope for Gauntlet 13 (HW)');
+    }
+    // HX: 6 standard normal cups.
+    if (level.cups.length !== 6) {
+      reasons.push(`blend levels must have 6 vessels (HX), got ${level.cups.length}`);
+    }
+    for (let i = 0; i < constraints.length; i++) {
+      const c = constraints[i] as CupConstraint | undefined;
+      if (!c || c.mode !== 'normal' || c.targetTeaId !== undefined) {
+        reasons.push(`blend vessel ${i} must be untargeted plain normal (HX)`);
+      }
+      if (c && cupCapacity(c) !== STANDARD_CUP_CAPACITY) {
+        reasons.push(`blend vessel ${i} must keep base capacity 4 (HX)`);
+      }
+      if (c && mustEndEmpty(c)) {
+        reasons.push(`blend vessel ${i} must be a standard vessel (HX)`);
+      }
+    }
+    // HY: initial shape 4,4,4,4,0,0.
+    const lens = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(lens) !== JSON.stringify([0, 0, 4, 4, 4, 4])) {
+      reasons.push(`blend levels must start 4,4,4,4,0,0 (HY), got [${lens.join(',')}]`);
+    }
+    // HZ/IA/IB/IC/ID: exact counts black×4, milk×4, milk_tea×0, c0×4, c1×4.
+    const flat = level.cups.flat() as TeaId[];
+    const countOf = (t: TeaId) => flat.filter((x) => x === t).length;
+    if (countOf('black_tea') !== 4) reasons.push(`blend must start black_tea×4 (HZ), got ${countOf('black_tea')}`);
+    if (countOf('milk') !== 4) reasons.push(`blend must start milk×4 (IA), got ${countOf('milk')}`);
+    if (countOf('milk_tea') !== 0) reasons.push(`blend must start milk_tea×0 (IB), got ${countOf('milk_tea')}`);
+    // c0/c1 are the two non-recipe palette colors (each ×4).
+    const palette = req.colors.slice(0, req.numColors);
+    const fillers = palette.filter((t) => t !== 'black_tea' && t !== 'milk' && t !== 'milk_tea');
+    if (fillers.length !== 2) {
+      reasons.push(`blend palette must carry exactly 2 fillers (IC/ID), got [${fillers.join(',')}]`);
+    } else {
+      for (const f of fillers) {
+        if (countOf(f) !== 4) reasons.push(`blend filler ${f} must start ×4 (IC/ID), got ${countOf(f)}`);
+      }
+    }
+    // IE: all nonempty starts mixed.
+    for (let i = 0; i < level.cups.length; i++) {
+      const cup = level.cups[i] as TeaId[];
+      if (cup.length === 4) {
+        const first = cup[0] as TeaId;
+        if (!cup.some((t) => t !== first)) reasons.push(`blend vessel ${i} must start mixed (IE)`);
+      }
+      if ((level.hiddenCounts[i] ?? 0) !== 0) {
+        reasons.push(`blend vessel ${i} must not hide mystery (IN)`);
+      }
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.
