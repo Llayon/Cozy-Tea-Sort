@@ -4,9 +4,9 @@
  * 4-reactions/L2/final/win + per-move stoichiometry. No mining in CI
  * beyond this bounded stress (feasibility 1k/5k lives in scripts/dev).
  */
-import { defaultCupConstraints, emptyFloatingIngredients, type CupConstraint, type TeaId } from '../src/game/types';
+import { defaultCupConstraints, emptyFloatingIngredients, type CupConstraint, type SolverAction, type TeaId } from '../src/game/types';
 import { applyPourState, isPuzzleWonState } from '../src/game/logic/rules';
-import { solvePuzzle, type SolverAction } from '../src/game/logic/solver';
+import { solvePuzzle } from '../src/game/logic/solver';
 import { analyzeBlendParticipation, createGenerateStats, generateLevel, type GenerateRequest } from '../src/game/logic/generator';
 import { BLEND_DEPTH_ACCEPT } from '../src/game/logic/blendTemplates';
 import { MILK_TEA_BLEND_RECIPE, countTeaLayers, countTotalLayers } from '../src/game/logic/blendRecipe';
