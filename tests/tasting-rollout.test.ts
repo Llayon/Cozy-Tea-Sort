@@ -65,8 +65,8 @@ describe('rollout 25–32 (Gauntlet 4 tasting-bowl introduction)', () => {
       if (lvl === 31) expect(cfg.targetTeaIds.length).toBe(2);
       else expect(cfg.targetTeaIds).toEqual([]);
     }
-    expect(mechanicPlanForLevel(26)).toEqual({ teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false });
-    expect(mechanicPlanForLevel(30)).toEqual({ teapot: true, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false });
+    expect(mechanicPlanForLevel(26)).toEqual({ teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false });
+    expect(mechanicPlanForLevel(30)).toEqual({ teapot: true, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false });
   });
 
   it('level 26/27/30 subtitles match the specified product copy', () => {

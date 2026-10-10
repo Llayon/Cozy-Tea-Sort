@@ -174,6 +174,26 @@ const batches = [
     ],
   },
   { name: 'tea-bloom stress', files: ['tests/tea-bloom-stress.test.ts'] },
+  {
+    name: 'blend-reaction kernel Phase A (G13 feasibility)',
+    files: [
+      'tests/blend-reaction.test.ts',
+      'tests/blend-reaction-solver.test.ts',
+      'tests/blend-reaction-stoichiometry.test.ts',
+      'tests/blend-reaction-canonical.test.ts',
+      'tests/blend-reaction-undo.test.ts',
+    ],
+  },
+  {
+    name: 'blend templates + fast path + rollout + view',
+    files: [
+      'tests/blend-reaction-templates.test.ts',
+      'tests/blend-reaction-fastpath.test.ts',
+      'tests/blend-reaction-rollout.test.ts',
+      'tests/blend-reaction-view.test.ts',
+    ],
+  },
+  { name: 'blend stress', files: ['tests/blend-reaction-stress.test.ts'] },
 ];
 
 function runBatch(batch) {
