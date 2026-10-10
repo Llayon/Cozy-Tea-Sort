@@ -63,6 +63,7 @@ import {
   type StrainerPlaceRejectCode,
   type StrainerReleaseRejectCode,
 } from './rules';
+import type { BlendReactionMetadata, BlendRecipe } from './blendRecipe';
 
 /** Named initial state for a level (preferred over long positional lists). */
 export interface LevelInitialState {
@@ -75,6 +76,11 @@ export interface LevelInitialState {
   iceSlots?: readonly IceSlot[];
   capacityObstacles?: readonly CapacityObstacleSlot[];
   teaBudSlots?: readonly TeaBudSlot[];
+  /**
+   * Static blend recipe (G13). Immutable level data — never PuzzleState.
+   * When undefined every rule behaves exactly as before (legacy identical).
+   */
+  blendRecipe?: BlendRecipe | undefined | null;
 }
 
 export class Cup {
@@ -249,7 +255,7 @@ export class Cup {
     return isHomogeneous(this.layers);
   }
 
-  canPourInto(target: Cup): boolean {
+  canPourInto(target: Cup, blendRecipe?: BlendRecipe | undefined | null): boolean {
     // Delegate to the shared state-aware rule table via a lightweight
     // board view. Slots travel alongside so ingredient collision (and ice
     // legality) is honored here too.
@@ -265,10 +271,11 @@ export class Cup {
       0,
       1,
       [this.constraint, target.constraint],
+      blendRecipe,
     );
   }
 
-  pourInto(target: Cup): { transferred: number; layer: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null } | null {
+  pourInto(target: Cup, blendRecipe?: BlendRecipe | undefined | null): { transferred: number; layer: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata } | null {
     const res = applyPourState(
       {
         cups: [this.layers, target.layers],
@@ -281,6 +288,7 @@ export class Cup {
       0,
       1,
       [this.constraint, target.constraint],
+      blendRecipe,
     );
     if (!res) return null;
     this.layers = [...(res.state.cups[0] as TeaId[])];
@@ -303,6 +311,7 @@ export class Cup {
       iceMelted: res.iceMelted,
       capacityObstacleRemoved: res.capacityObstacleRemoved,
       teaBudBloomed: res.teaBudBloomed,
+      reaction: res.reaction,
     };
   }
 }
@@ -332,6 +341,12 @@ export class TeaSortLogic {
   history: GameStateSnapshot[] = [];
   movesCount = 0;
   private strainer: StrainerState = emptyStrainerState();
+  /**
+   * Static blend recipe (G13). Immutable level data — set at init, never
+   * mutated by moves/undo/restart. When undefined every rule behaves exactly
+   * as before (legacy identical).
+   */
+  blendRecipe: BlendRecipe | undefined = undefined;
 
   constructor(
     initialCups: TeaId[][] = [],
@@ -343,9 +358,12 @@ export class TeaSortLogic {
     iceSlots?: readonly IceSlot[],
     capacityObstacles?: readonly CapacityObstacleSlot[],
     teaBudSlots?: readonly TeaBudSlot[],
+    blendRecipe?: BlendRecipe | undefined | null,
   ) {
     if (initialCups.length > 0) {
-      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots, capacityObstacles, teaBudSlots);
+      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots, capacityObstacles, teaBudSlots, blendRecipe);
+    } else if (blendRecipe) {
+      this.blendRecipe = blendRecipe;
     }
   }
 
@@ -359,6 +377,7 @@ export class TeaSortLogic {
     iceSlots?: readonly IceSlot[],
     capacityObstacles?: readonly CapacityObstacleSlot[],
     teaBudSlots?: readonly TeaBudSlot[],
+    blendRecipe?: BlendRecipe | undefined | null,
   ) {
     const normalized = normalizeCupConstraints(cupConstraints, state.length);
     const slots = normalizeFloatingIngredients(floatingIngredients, state.length);
@@ -381,6 +400,7 @@ export class TeaSortLogic {
         ),
     );
     this.strainer = normalizeStrainerState(strainer);
+    this.blendRecipe = blendRecipe ?? undefined;
     this.history = [];
     this.movesCount = 0;
   }
@@ -397,6 +417,7 @@ export class TeaSortLogic {
       init.iceSlots,
       init.capacityObstacles,
       init.teaBudSlots,
+      init.blendRecipe,
     );
   }
 
@@ -445,6 +466,7 @@ export class TeaSortLogic {
     iceSlots: IceSlot[];
     capacityObstacles: CapacityObstacleSlot[];
     teaBudSlots: TeaBudSlot[];
+    blendRecipe?: BlendRecipe | undefined;
   } {
     return {
       cups: this.cups.map((c) => [...c.layers]),
@@ -456,6 +478,7 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.blendRecipe ? { blendRecipe: this.blendRecipe } : {}),
     };
   }
 
@@ -498,13 +521,13 @@ export class TeaSortLogic {
   canMakeMove(fromIdx: number, toIdx: number): boolean {
     if (fromIdx < 0 || fromIdx >= this.cups.length) return false;
     if (toIdx < 0 || toIdx >= this.cups.length) return false;
-    return canPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints());
+    return canPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints(), this.blendRecipe);
   }
 
   makeMove(
     fromIdx: number,
     toIdx: number,
-  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null } | null {
+  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
@@ -525,7 +548,7 @@ export class TeaSortLogic {
       },
     };
 
-    const res = applyPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints());
+    const res = applyPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints(), this.blendRecipe);
     if (!res) return null;
     this.applyBoardState(res.state);
 
@@ -543,6 +566,7 @@ export class TeaSortLogic {
       iceMelted: res.iceMelted,
       capacityObstacleRemoved: res.capacityObstacleRemoved,
       teaBudBloomed: res.teaBudBloomed,
+      reaction: res.reaction,
     };
   }
 
@@ -635,10 +659,10 @@ export class TeaSortLogic {
   }
 
   isWon(): boolean {
-    return isPuzzleWonState(this.puzzleState(), this.boardConstraints());
+    return isPuzzleWonState(this.puzzleState(), this.boardConstraints(), this.blendRecipe);
   }
 
   isDeadlocked(): boolean {
-    return isPuzzleDeadlockedState(this.puzzleState(), this.boardConstraints());
+    return isPuzzleDeadlockedState(this.puzzleState(), this.boardConstraints(), this.blendRecipe);
   }
 }

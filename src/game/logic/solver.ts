@@ -42,6 +42,7 @@ import {
   listConstructiveActionsState,
   puzzleActionCost,
 } from './rules';
+import type { BlendRecipe } from './blendRecipe';
 
 export interface SolverMove {
   from: number;
@@ -75,6 +76,13 @@ export interface SolverOptions {
   iceSlots?: readonly IceSlot[];
   capacityObstacles?: readonly CapacityObstacleSlot[];
   teaBudSlots?: readonly TeaBudSlot[];
+  /**
+   * Static blend recipe (G13). Immutable level data — never PuzzleState.
+   * When undefined every function behaves exactly as before (legacy
+   * byte-identical). Within one solver invocation the recipe is fixed, so
+   * canonical keys do NOT repeat it per node.
+   */
+  blendRecipe?: BlendRecipe | undefined | null;
 }
 
 const DEFAULT_MAX_VISITED = 200_000;
@@ -87,6 +95,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
   const constraints: readonly CupConstraint[] | undefined = opts.cupConstraints
     ? normalizeCupConstraints(opts.cupConstraints, cups.length)
     : undefined;
+  const blendRecipe = opts.blendRecipe ?? undefined;
 
   const start: PuzzleState = {
     cups: cups.map((c) => [...c]),
@@ -98,7 +107,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     teaBudSlots: normalizeTeaBudSlots(opts.teaBudSlots, cups.length),
   };
 
-  if (isPuzzleWonState(start, constraints)) {
+  if (isPuzzleWonState(start, constraints, blendRecipe)) {
     return { solvable: true, minMoves: 0, visitedStates: 1, solution: [], totalActions: 0, placementCount: 0, releaseCount: 0, strainedPourCount: 0 };
   }
 
@@ -149,12 +158,12 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     if (best === undefined || node.cost !== best) continue;
     if (node.cost >= maxDepth) continue;
 
-    const actions = listConstructiveActionsState(node.state, constraints);
+    const actions = listConstructiveActionsState(node.state, constraints, blendRecipe);
     for (const a of actions) {
       const stepCost = puzzleActionCost(a);
       const nextCost = node.cost + stepCost;
       if (stepCost > 0 && nextCost > maxDepth) continue;
-      const res = applyPuzzleActionState(node.state, a, constraints);
+      const res = applyPuzzleActionState(node.state, a, constraints, blendRecipe);
       if (!res) continue;
       const key = canonicalPuzzleKey(res.state, constraints);
       const known = dist.get(key);
@@ -175,10 +184,14 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
           count: res.transferred as number,
           strained: res.strained === true,
           ...(res.strained ? { caughtTea: res.caughtTea as TeaId } : {}),
+          // Reaction diagnostics only (replay re-derives chemistry).
+          ...(res.reaction
+            ? { reactionId: res.reaction.recipeId, reactionProduct: res.reaction.product }
+            : {}),
         };
       }
 
-      if (isPuzzleWonState(res.state, constraints)) {
+      if (isPuzzleWonState(res.state, constraints, blendRecipe)) {
         const solution = returnSolution ? [...node.path, step] : undefined;
         const placementCount = solution ? solution.filter((s) => s.kind === 'place-strainer').length : 0;
         const releaseCount = solution ? solution.filter((s) => s.kind === 'release-strainer').length : 0;
@@ -230,6 +243,7 @@ export function applySolutionState(
   state: ReadonlyPuzzleState,
   solution: ReadonlyArray<SolverAction | SolverMove>,
   cupConstraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): PuzzleState | null {
   let board: PuzzleState = {
     cups: state.cups.map((c) => [...c]),
@@ -243,7 +257,7 @@ export function applySolutionState(
   for (const step of solution) {
     const kind = (step as SolverAction).kind;
     if (kind === 'place-strainer' || kind === 'release-strainer' || kind === 'pour') {
-      const res = applyPuzzleActionState(board, step as SolverAction, cupConstraints);
+      const res = applyPuzzleActionState(board, step as SolverAction, cupConstraints, blendRecipe);
       if (!res) return null;
       void isHomogeneous;
       board = res.state;
@@ -251,7 +265,7 @@ export function applySolutionState(
     }
     const legacy = step as SolverMove;
     if (typeof legacy.from === 'number' && typeof legacy.to === 'number') {
-      const res = applyPourState(board, legacy.from, legacy.to, cupConstraints);
+      const res = applyPourState(board, legacy.from, legacy.to, cupConstraints, blendRecipe);
       if (!res) return null;
       void isHomogeneous;
       board = res.state;

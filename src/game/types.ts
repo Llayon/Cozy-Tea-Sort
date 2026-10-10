@@ -13,7 +13,10 @@ export type TeaId =
   | 'milk_oolong'
   | 'lavender'
   | 'saffron'
-  | 'buckwheat';
+  | 'buckwheat'
+  | 'black_tea'
+  | 'milk'
+  | 'milk_tea';
 
 export type CupSkinId = 'glass' | 'ceramic' | 'porcelain';
 
@@ -99,6 +102,36 @@ export const TEA_TYPES: Record<TeaId, TeaType> = {
     steamColor: 'rgba(196, 154, 69, 0.45)',
     description: 'Теплый медовый чай с нотками свежей выпечки',
   },
+  black_tea: {
+    id: 'black_tea',
+    name: 'Black Tea',
+    nameRu: 'Чёрный чай',
+    colorHex: '#6F3B1A',
+    colorNum: 0x6f3b1a,
+    textColor: '#F7E8D5',
+    steamColor: 'rgba(111, 59, 26, 0.45)',
+    description: 'Насыщенный тёмный чай — один из двух компонентов молочного купажа',
+  },
+  milk: {
+    id: 'milk',
+    name: 'Milk',
+    nameRu: 'Молоко',
+    colorHex: '#FFF6E8',
+    colorNum: 0xfff6e8,
+    textColor: '#4a2f18',
+    steamColor: 'rgba(255, 246, 232, 0.45)',
+    description: 'Нежное молоко — второй компонент молочного купажа',
+  },
+  milk_tea: {
+    id: 'milk_tea',
+    name: 'Milk Tea Blend',
+    nameRu: 'Молочный чай',
+    colorHex: '#D8A05E',
+    colorNum: 0xd8a05e,
+    textColor: '#3d2410',
+    steamColor: 'rgba(216, 160, 94, 0.45)',
+    description: 'Тёплый карамельный купаж чёрного чая и молока',
+  },
 };
 
 export const ALL_TEA_IDS: readonly TeaId[] = [
@@ -109,6 +142,16 @@ export const ALL_TEA_IDS: readonly TeaId[] = [
   'lavender',
   'saffron',
   'buckwheat',
+  // G13 reaction-only identities (black_tea/milk/milk_tea). They are valid
+  // TeaId-compatible pourable layers for this gauntlet only and MUST NOT leak
+  // into pre-G13 random palettes, old generator requests, fallback banks or
+  // levels 1–96. Palettes for legacy levels are hardcoded in
+  // difficultyCurve (old IDs only); the generator only uses new IDs when an
+  // explicit blendRecipeId request carries them. ALL_TEA_IDS extension here
+  // only widens the KNOWN_RECIPES storage allowlist (safe).
+  'black_tea',
+  'milk',
+  'milk_tea',
 ];
 
 /**
@@ -190,6 +233,14 @@ export type SolverPourAction = {
   count: number;
   strained: boolean;
   caughtTea?: TeaId;
+  /**
+   * Blend reaction diagnostics (G13): present when this pour performed
+   * chemistry (source reactant → product). Replay never trusts this —
+   * applyPuzzleActionState re-derives chemistry from state + from/to +
+   * static recipe.
+   */
+  reactionId?: string;
+  reactionProduct?: TeaId;
 };
 
 export type SolverPlaceAction = { kind: 'place-strainer'; to: number };

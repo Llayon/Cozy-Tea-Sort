@@ -93,8 +93,97 @@ import {
   normalizeStrainerState,
   normalizeTeaBudSlots,
 } from '../types';
+import {
+  BlendReactionMetadata,
+  BlendRecipe,
+  countTeaLayers,
+  isReactivePair,
+  isValidBlendRecipe,
+} from './blendRecipe';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
+
+/**
+ * Fail-closed unsupported-composition gate for blend reactions (G13 §46).
+ *
+ * Production blend is standalone chemistry only (no Mystery/teapot/targets/
+ * sink/tasting/thermos/lemon/honey/strainer/ice/cinnamon/tea-bloom). If a
+ * malformed/manual state enables BlendRecipe together with any dynamic
+ * special/tool or non-standard vessel role, the core does NOT invent
+ * composition semantics — reactive pours are disabled (treated as ordinary
+ * color-mismatch, since A≠B can never ordinarily pour).
+ *
+ * Conservative: ANY special anywhere blocks ALL reactions (not just the two
+ * vessels involved). Phase A topology (6 standard normal vessels, no specials)
+ * never triggers this.
+ */
+function isBlendCompositionBlocked(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+): boolean {
+  const n = state.cups.length;
+  const strainer = normalizeStrainerState(state.strainer);
+  if (strainer.present) return true;
+  const floating = normalizeFloatingIngredients(state.floatingIngredients, n);
+  if (floating.some((s) => s != null)) return true;
+  const sinking = normalizeSinkingIngredients(state.sinkingIngredients, n);
+  if (sinking.some((s) => s != null)) return true;
+  const ice = normalizeIceSlots(state.iceSlots, n);
+  if (ice.some((s) => s != null)) return true;
+  const obstacles = normalizeCapacityObstacles(state.capacityObstacles, n);
+  if (obstacles.some((s) => s != null)) return true;
+  const buds = normalizeTeaBudSlots(state.teaBudSlots, n);
+  if (buds.some((s) => s != null)) return true;
+  if (constraints) {
+    for (const c of constraints) {
+      if (!c) continue;
+      if (c.mode !== 'normal') return true;
+      if (c.targetTeaId !== undefined) return true;
+      if (cupCapacity(c) !== STANDARD_CUP_CAPACITY) return true;
+      if (mustEndEmpty(c)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether a reactive pour is attempted (both tops present forming the recipe
+ * pair with a non-empty destination). Legality still requires the
+ * composition gate to pass; this helper only detects the chemical contact.
+ */
+function isBlendReactionAttempt(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  recipe: BlendRecipe | undefined | null,
+): boolean {
+  if (!recipe || !isValidBlendRecipe(recipe)) return false;
+  if (fromIdx < 0 || fromIdx >= state.cups.length) return false;
+  if (toIdx < 0 || toIdx >= state.cups.length) return false;
+  const source = state.cups[fromIdx] as TeaId[] | undefined;
+  const target = state.cups[toIdx] as TeaId[] | undefined;
+  if (!source || !target) return false;
+  if (source.length === 0 || target.length === 0) return false;
+  return isReactivePair(topLayerOf(source), topLayerOf(target), recipe);
+}
+
+/** Build reaction metadata for a legal reactive pour (presentation only). */
+function blendReactionMetadata(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  _toIdx: number,
+  recipe: BlendRecipe,
+): BlendReactionMetadata {
+  const source = state.cups[fromIdx] as TeaId[];
+  const sourceReactant = topLayerOf(source) as TeaId;
+  const targetReactant = sourceReactant === recipe.reactantA ? recipe.reactantB : recipe.reactantA;
+  return {
+    recipeId: recipe.id,
+    sourceReactant,
+    targetReactant,
+    product: recipe.product,
+  };
+}
 
 /** Machine-readable rejection reason (UI maps codes to localized strings). */
 export type PourRejectCode =
@@ -302,6 +391,7 @@ function teaRejectCodeBetween(
   constraints?: readonly CupConstraint[],
   obstacles?: readonly (CapacityObstacleSlot | undefined | null)[] | undefined,
   buds?: readonly (TeaBudSlot | undefined | null)[] | undefined,
+  blendRecipe?: BlendRecipe | undefined | null,
 ): PourRejectCode {
   if (fromIdx === toIdx) return 'same-cup';
   if (fromIdx < 0 || fromIdx >= cups.length) return 'out-of-range';
@@ -336,7 +426,19 @@ function teaRejectCodeBetween(
   const srcCap = obstacles
     ? effectiveCupCapacity(constraints?.[fromIdx], obstacles[fromIdx])
     : cupCapacity(constraints?.[fromIdx]);
+  // G13 safe pruning option (§34): when a BlendRecipe is active, the
+  // homogeneous→empty legality prune is DISABLED (a full homogeneous
+  // reactant cup is NOT globally final while the recipe still requires those
+  // reactants to disappear). Legacy levels (recipe absent) keep the exact
+  // prune. This slightly enlarges the recipe-enabled state space; the
+  // feasibility harness reports the cost.
   if (
+    target.length === 0 &&
+    blendRecipe != null &&
+    isValidBlendRecipe(blendRecipe)
+  ) {
+    // Fall through to ordinary empty-target legality below (no prune).
+  } else if (
     target.length === 0 &&
     source.length === srcCap &&
     isPrunableHomogeneousToEmpty(
@@ -375,10 +477,24 @@ export function unstrainedPourCountState(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): number {
+  // Reaction transfer is exactly ONE layer (no top-run, no capacity bound).
+  if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
+    if (isBlendCompositionBlocked(state, constraints)) return 0;
+    // Role/empty preconditions mirror pourRejectCodeState priority.
+    if (fromIdx === toIdx) return 0;
+    if (fromIdx < 0 || fromIdx >= state.cups.length) return 0;
+    if (toIdx < 0 || toIdx >= state.cups.length) return 0;
+    const srcMode = constraints?.[fromIdx]?.mode ?? 'normal';
+    const dstMode = constraints?.[toIdx]?.mode ?? 'normal';
+    if (srcMode === 'sink-only' || dstMode === 'source-only') return 0;
+    if ((state.cups[fromIdx] as TeaId[]).length === 0) return 0;
+    return 1;
+  }
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
   const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
-  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles, buds);
+  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles, buds, blendRecipe);
   if (tea !== 'ok') {
     // Melt exemption mirrors pourRejectCodeState (§52): the transfer count
     // for a genuine melt pour is computed normally below.
@@ -465,10 +581,34 @@ export function pourRejectCodeState(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): PourRejectCode {
+  // G13 reaction priority (§35): same/out-of-range, source role, destination
+  // role, source empty, then reactive-pair detection. A genuine reactive
+  // contact is legal EVEN when the destination is full (no fifth layer is
+  // created — the top is REPLACED). All other capacity/pruning/color rules
+  // apply only to non-reactive pours.
+  if (blendRecipe && isValidBlendRecipe(blendRecipe)) {
+    if (fromIdx === toIdx) return 'same-cup';
+    if (fromIdx < 0 || fromIdx >= state.cups.length) return 'out-of-range';
+    if (toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+    const srcModeEarly = constraints?.[fromIdx]?.mode ?? 'normal';
+    const dstModeEarly = constraints?.[toIdx]?.mode ?? 'normal';
+    if (srcModeEarly === 'sink-only') return 'source-sink-only';
+    if (dstModeEarly === 'source-only') return 'target-source-only';
+    const srcEarly = state.cups[fromIdx] as TeaId[] | undefined;
+    if (!srcEarly || srcEarly.length === 0) return 'source-empty';
+    if (isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
+      // Fail-closed (§46): any sibling special/tool/role blocks chemistry.
+      if (isBlendCompositionBlocked(state, constraints)) return 'color-mismatch';
+      return 'ok';
+    }
+    // Non-reactive with an active recipe falls through to ordinary logic
+    // below (with the homogeneous→empty prune disabled via tea core).
+  }
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
   const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
-  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles, buds);
+  const tea = teaRejectCodeBetween(state.cups, fromIdx, toIdx, constraints, obstacles, buds, blendRecipe);
   const n = state.cups.length;
   const ice = normalizeIceSlots(state.iceSlots, n);
   const fromIn = fromIdx >= 0 && fromIdx < n;
@@ -558,8 +698,9 @@ export function canPourState(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
-  return pourRejectCodeState(state, fromIdx, toIdx, constraints) === 'ok';
+  return pourRejectCodeState(state, fromIdx, toIdx, constraints, blendRecipe) === 'ok';
 }
 
 /**
@@ -583,8 +724,13 @@ export function pourCountState(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): number {
-  if (!canPourState(state, fromIdx, toIdx, constraints)) return 0;
+  if (!canPourState(state, fromIdx, toIdx, constraints, blendRecipe)) return 0;
+  // Reaction moves exactly ONE layer (no top-run, no capacity bound).
+  if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
+    return 1;
+  }
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
   // Transfer is bounded by the DESTINATION's EFFECTIVE free space: AAAA
@@ -639,8 +785,26 @@ export function isConstructiveMoveState(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
-  if (!canPourState(state, fromIdx, toIdx, constraints)) return false;
+  if (!canPourState(state, fromIdx, toIdx, constraints, blendRecipe)) return false;
+  // G13: every legal reactive contact changes chemistry (2 layers → 1
+  // product layer) — never a mere vessel permutation. Reactions are always
+  // constructive.
+  if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
+    return true;
+  }
+  // G13 safe pruning option (§34): with an active recipe the
+  // homogeneous→empty prune is DISABLED entirely (reactant full cups must
+  // stay searchable). Every other legal non-reactive pour stays
+  // constructive — this enlarges the recipe-enabled state space slightly;
+  // the harness reports the cost. Legacy (recipe absent) keeps the exact
+  // prune below.
+  if (blendRecipe && isValidBlendRecipe(blendRecipe)) {
+    // Still honor the strained/melt/honey/bud early-true paths implicitly
+    // (they all return true below as well); the prune below is skipped.
+    return true;
+  }
   // Strained catches change the partition AND external hold — never the
   // symmetry-only full-group relocation the legacy prune targets.
   if (isStrainedCatchSource(state, fromIdx)) return true;
@@ -727,16 +891,17 @@ export function listLegalMovesState(
   state: ReadonlyPuzzleState,
   constructiveOnly = false,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): Array<{ from: number; to: number; count: number }> {
   const out: Array<{ from: number; to: number; count: number }> = [];
   for (let from = 0; from < state.cups.length; from++) {
     for (let to = 0; to < state.cups.length; to++) {
       if (from === to) continue;
       const ok = constructiveOnly
-        ? isConstructiveMoveState(state, from, to, constraints)
-        : canPourState(state, from, to, constraints);
+        ? isConstructiveMoveState(state, from, to, constraints, blendRecipe)
+        : canPourState(state, from, to, constraints, blendRecipe);
       if (!ok) continue;
-      out.push({ from, to, count: pourCountState(state, from, to, constraints) });
+      out.push({ from, to, count: pourCountState(state, from, to, constraints, blendRecipe) });
     }
   }
   return out;
@@ -775,6 +940,8 @@ export interface PourStateResult {
   capacityObstacleRemoved?: CapacityObstacleId;
   /** Tea bud bloomed by this pour, when the dormant host emptied (presentation metadata only). */
   teaBudBloomed?: TeaBudId | null;
+  /** Blend reaction metadata, when this pour performed chemistry (presentation/trace only). */
+  reaction?: BlendReactionMetadata;
 }
 
 /**
@@ -811,10 +978,47 @@ export function applyPourState(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): PourStateResult | null {
-  if (!canPourState(state, fromIdx, toIdx, constraints)) return null;
+  if (!canPourState(state, fromIdx, toIdx, constraints, blendRecipe)) return null;
+  // G13 reaction path (ONE authoritative transition truth — no second
+  // applyReactionPour implementation). Exactly ONE pair reacts per move:
+  // source.pop() once, destination top REPLACED by product, no push.
+  // Destination occupancy unchanged; source decreases by one; global layers -1.
+  if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
+    if (isBlendCompositionBlocked(state, constraints)) return null;
+    const nextCups: TeaId[][] = state.cups.map((c) => [...c]);
+    const nextSlots = normalizeFloatingIngredients(state.floatingIngredients, state.cups.length);
+    const nextSink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
+    const nextStrainer = normalizeStrainerState(state.strainer);
+    const nextIce = normalizeIceSlots(state.iceSlots, state.cups.length);
+    const nextObstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+    const nextBuds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+    const source = nextCups[fromIdx] as TeaId[];
+    const target = nextCups[toIdx] as TeaId[];
+    if (source.length === 0 || target.length === 0) return null;
+    const sourceReactant = topLayerOf(source) as TeaId;
+    const targetReactant = topLayerOf(target) as TeaId;
+    if (!isReactivePair(sourceReactant, targetReactant, blendRecipe)) return null;
+    source.pop();
+    target[target.length - 1] = blendRecipe.product;
+    const reaction: BlendReactionMetadata = {
+      recipeId: blendRecipe.id,
+      sourceReactant,
+      targetReactant,
+      product: blendRecipe.product,
+    };
+    return {
+      state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
+      transferred: 1,
+      received: 0,
+      layer: sourceReactant,
+      strained: false,
+      reaction,
+    };
+  }
   const strained = isStrainedCatchSource(state, fromIdx);
-  const m = unstrainedPourCountState(state, fromIdx, toIdx, constraints);
+  const m = unstrainedPourCountState(state, fromIdx, toIdx, constraints, blendRecipe);
   if (m <= 0) return null;
   if (strained && m < 2) return null;
   const nextCups: TeaId[][] = state.cups.map((c) => [...c]);
@@ -1054,12 +1258,13 @@ export function isConstructiveReleaseState(
 export function listLegalActionsState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): PuzzleAction[] {
   const out: PuzzleAction[] = [];
   for (let from = 0; from < state.cups.length; from++) {
     for (let to = 0; to < state.cups.length; to++) {
       if (from === to) continue;
-      if (canPourState(state, from, to, constraints)) out.push({ kind: 'pour', from, to });
+      if (canPourState(state, from, to, constraints, blendRecipe)) out.push({ kind: 'pour', from, to });
     }
   }
   const s = normalizeStrainerState(state.strainer);
@@ -1079,12 +1284,13 @@ export function listLegalActionsState(
 export function listConstructiveActionsState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): PuzzleAction[] {
   const out: PuzzleAction[] = [];
   for (let from = 0; from < state.cups.length; from++) {
     for (let to = 0; to < state.cups.length; to++) {
       if (from === to) continue;
-      if (isConstructiveMoveState(state, from, to, constraints)) out.push({ kind: 'pour', from, to });
+      if (isConstructiveMoveState(state, from, to, constraints, blendRecipe)) out.push({ kind: 'pour', from, to });
     }
   }
   const s = normalizeStrainerState(state.strainer);
@@ -1113,12 +1319,14 @@ export interface ApplyPuzzleActionResult {
   iceMelted?: IceId;
   capacityObstacleRemoved?: CapacityObstacleId;
   teaBudBloomed?: TeaBudId | null;
+  reaction?: BlendReactionMetadata;
 }
 
 export function applyPuzzleActionState(
   state: ReadonlyPuzzleState,
   action: PuzzleAction,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): ApplyPuzzleActionResult | null {
   if (isPlaceStrainerAction(action)) {
     const next = applyPlaceStrainerState(state, action.to, constraints);
@@ -1130,7 +1338,7 @@ export function applyPuzzleActionState(
     if (!res) return null;
     return { state: res.state, transferred: 1, received: 1, layer: res.layer, strained: false };
   }
-  const res = applyPourState(state, action.from, action.to, constraints);
+  const res = applyPourState(state, action.from, action.to, constraints, blendRecipe);
   if (!res) return null;
   return {
     state: res.state,
@@ -1144,6 +1352,7 @@ export function applyPuzzleActionState(
     iceMelted: res.iceMelted,
     capacityObstacleRemoved: res.capacityObstacleRemoved,
     teaBudBloomed: res.teaBudBloomed,
+    reaction: res.reaction,
   };
 }
 
@@ -1306,8 +1515,21 @@ export function sinkingIngredientGoalsSatisfied(
 export function isPuzzleWonState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
   if (!teaWonState(state.cups, constraints)) return false;
+  // G13 recipe win (§28): ordinary vessel end-state AND recipe complete
+  // (A==0, B==0, P==target). An ordinarily-sorted A4/B4/C4/D4 board with an
+  // active recipe is NOT won — A and B must still be crafted.
+  if (blendRecipe && isValidBlendRecipe(blendRecipe)) {
+    if (
+      countTeaLayers(state.cups, blendRecipe.reactantA) !== 0 ||
+      countTeaLayers(state.cups, blendRecipe.reactantB) !== 0 ||
+      countTeaLayers(state.cups, blendRecipe.product) !== blendRecipe.targetProductCount
+    ) {
+      return false;
+    }
+  }
   if (!floatingIngredientGoalsSatisfied(state, constraints)) return false;
   if (!sinkingIngredientGoalsSatisfied(state, constraints)) return false;
   const s = normalizeStrainerState(state.strainer);
@@ -1345,9 +1567,10 @@ export function isDeadlockedState(
 export function isPuzzleDeadlockedState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
-  if (isPuzzleWonState(state, constraints)) return false;
-  return listConstructiveActionsState(state, constraints).length === 0;
+  if (isPuzzleWonState(state, constraints, blendRecipe)) return false;
+  return listConstructiveActionsState(state, constraints, blendRecipe).length === 0;
 }
 
 /**
