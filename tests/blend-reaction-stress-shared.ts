@@ -5,7 +5,7 @@
  * beyond this bounded stress (feasibility 1k/5k lives in scripts/dev).
  */
 import { defaultCupConstraints, emptyFloatingIngredients, type CupConstraint, type SolverAction, type TeaId } from '../src/game/types';
-import { applyPourState, isPuzzleWonState } from '../src/game/logic/rules';
+import { applyPourState, canonicalPuzzleKey, isPuzzleWonState, listConstructiveActionsState } from '../src/game/logic/rules';
 import { solvePuzzle } from '../src/game/logic/solver';
 import { analyzeBlendParticipation, createGenerateStats, generateLevel, type GenerateRequest } from '../src/game/logic/generator';
 import { BLEND_DEPTH_ACCEPT } from '../src/game/logic/blendTemplates';
@@ -45,13 +45,23 @@ export interface BlendStressResult {
   depth: number;
   templateAttempts: number;
   solverCalls: number;
+  /** Wall-clock ms for generateLevel (includes its 1 solver call). */
+  genMs: number;
+  /** Wall-clock ms for the explicit re-solve. */
+  solveMs: number;
+  /** Constructive pour actions at the root (fairness: planning breadth). */
+  rootConstructive: number;
+  /** Canonical key of the initial board (variety: distinct starts). */
+  startKey: string;
 }
 
 export function runOneBlendSeed(seedIdx: number): BlendStressResult {
   const req = blendReqFor(seedIdx);
   const seed = `blend-stress-${seedIdx}`;
   const stats = createGenerateStats();
+  const tGen = Date.now();
   const lvl = generateLevel(req, seed, { stats });
+  const genMs = Date.now() - tGen;
   if (lvl.blendRecipe?.id !== 'milk-tea') throw new Error(`seed ${seedIdx}: missing recipe`);
   if (lvl.cups.length !== 6) throw new Error(`seed ${seedIdx}: vessels`);
   const lens = lvl.cups.map((c) => c.length).sort((a, b) => a - b);
@@ -66,11 +76,17 @@ export function runOneBlendSeed(seedIdx: number): BlendStressResult {
     throw new Error(`seed ${seedIdx}: band ${lvl.minMoves}`);
   }
   // Re-solve explicitly to verify determinism + replay invariants per move.
+  const tSolve = Date.now();
   const r = solvePuzzle(lvl.cups, { cupConstraints: lvl.cupConstraints, blendRecipe: R });
+  const solveMs = Date.now() - tSolve;
   if (!r.solvable || r.truncated || r.minMoves === undefined || !r.solution) {
     throw new Error(`seed ${seedIdx}: unsolvable`);
   }
   if (r.minMoves !== lvl.minMoves) throw new Error(`seed ${seedIdx}: depth drift`);
+  const rootConstructive = listConstructiveActionsState(
+    { cups: lvl.cups, floatingIngredients: emptyFloatingIngredients(6) },
+    lvl.cupConstraints, R,
+  ).filter((a) => a.kind === 'pour').length;
   let board = lvl.cups.map((c) => [...c]);
   let reactions = 0;
   for (const a of r.solution as SolverAction[]) {
@@ -114,5 +130,7 @@ export function runOneBlendSeed(seedIdx: number): BlendStressResult {
     dests: part.reactionDestinationCount,
     firstDiv: (part.firstReactionDepth as number) / Math.max(1, lvl.minMoves),
     depth: lvl.minMoves, templateAttempts: stats.templateAttempts, solverCalls: stats.solverCalls,
+    genMs, solveMs, rootConstructive,
+    startKey: canonicalPuzzleKey({ cups: lvl.cups, floatingIngredients: emptyFloatingIngredients(6) }, lvl.cupConstraints),
   };
 }

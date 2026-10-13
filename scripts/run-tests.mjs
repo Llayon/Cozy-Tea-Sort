@@ -193,7 +193,8 @@ const batches = [
       'tests/blend-reaction-view.test.ts',
     ],
   },
-  { name: 'blend stress', files: ['tests/blend-reaction-stress.test.ts'] },
+  { name: 'blend stress A (seeds 0-99)', files: ['tests/blend-reaction-stress-a.test.ts'] },
+  { name: 'blend stress B (seeds 100-199)', files: ['tests/blend-reaction-stress-b.test.ts'] },
 ];
 
 function runBatch(batch) {
