@@ -326,16 +326,31 @@ function modeOf(constraints: readonly CupConstraint[] | undefined, idx: number):
  * relative to its effective capacity (e.g. `[A,A]` + cinnamon) still
  * requires unlocking. Pass the vessel's obstacle when known; legacy
  * callers without obstacles behave exactly as before.
+ *
+ * Blend chemistry (Gauntlet 13.1 — recipe-finality): a full homogeneous
+ * REACTANT stack (reactantA/B ×4) is NEVER final while its recipe is
+ * active. Proof without global state: a length-4 reactant stack holds the
+ * entire reactant pool (initial 4, reactions only consume), so product is
+ * 0 < target and the recipe is necessarily unfinished. This is EXACT, not
+ * conservative. Partial reactant stacks are never final either (they fail
+ * `cupEndStateSatisfied` like any partial stack). Product/filler full
+ * stacks keep legacy finality. Recipe-absent callers behave exactly as
+ * before.
  */
 export function isInFinalState(
   layers: TeaId[],
   c: CupConstraint | undefined,
   obstacle?: CapacityObstacleSlot | undefined | null,
   teaBud?: TeaBudSlot | undefined | null,
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
   if (layers.length === 0 || !isHomogeneous(layers)) return false;
   if (obstacle != null) return false;
   if (teaBud != null) return false;
+  if (blendRecipe && isValidBlendRecipe(blendRecipe)) {
+    const top = topLayerOf(layers);
+    if (top === blendRecipe.reactantA || top === blendRecipe.reactantB) return false;
+  }
   return cupEndStateSatisfied(layers, c);
 }
 
@@ -354,6 +369,11 @@ export function isInFinalState(
  * obstacle (a semantic state change, never a mere permutation), and
  * receiving into one changes decorated-vessel contents. Fail-closed:
  * active obstacle on either side disables the prune.
+ *
+ * Blend chemistry (Gauntlet 13.1): `blendRecipe` threads recipe-aware
+ * finality into the FULL-stack check (a full reactant stack is never
+ * final, so legality keeps it movable). Recipe-absent callers behave
+ * exactly as before.
  */
 function isPrunableHomogeneousToEmpty(
   source: TeaId[],
@@ -363,6 +383,7 @@ function isPrunableHomogeneousToEmpty(
   toObstacle?: CapacityObstacleSlot | undefined | null,
   fromBud?: TeaBudSlot | undefined | null,
   toBud?: TeaBudSlot | undefined | null,
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
   if (!isHomogeneous(source)) return false;
   if (fromObstacle != null || toObstacle != null) return false;
@@ -370,7 +391,7 @@ function isPrunableHomogeneousToEmpty(
   const fromSig = cupConstraintSignature(fromC ?? PLAIN_NORMAL_CONSTRAINT);
   const toSig = cupConstraintSignature(toC ?? PLAIN_NORMAL_CONSTRAINT);
   if (fromSig !== toSig) return false;
-  if (source.length === cupCapacity(fromC)) return isInFinalState(source, fromC);
+  if (source.length === cupCapacity(fromC)) return isInFinalState(source, fromC, undefined, undefined, blendRecipe);
   return true;
 }
 
@@ -426,19 +447,14 @@ function teaRejectCodeBetween(
   const srcCap = obstacles
     ? effectiveCupCapacity(constraints?.[fromIdx], obstacles[fromIdx])
     : cupCapacity(constraints?.[fromIdx]);
-  // G13 safe pruning option (§34): when a BlendRecipe is active, the
-  // homogeneous→empty legality prune is DISABLED (a full homogeneous
-  // reactant cup is NOT globally final while the recipe still requires those
-  // reactants to disappear). Legacy levels (recipe absent) keep the exact
-  // prune. This slightly enlarges the recipe-enabled state space; the
-  // feasibility harness reports the cost.
+  // G13.1 precise pruning: recipe-finality ≠ relocation-prunability.
+  // The homogeneous→empty legality prune is RESTORED for recipe levels, but
+  // with recipe-aware finality (a full homogeneous REACTANT stack is never
+  // final, so it stays movable; full product/filler stacks are rejected as
+  // meaningless loops exactly like legacy). Only genuine vessel
+  // permutations are pruned — no strategic state is lost (the canonical key
+  // is invariant under whole-stack relocation into an identical empty cup).
   if (
-    target.length === 0 &&
-    blendRecipe != null &&
-    isValidBlendRecipe(blendRecipe)
-  ) {
-    // Fall through to ordinary empty-target legality below (no prune).
-  } else if (
     target.length === 0 &&
     source.length === srcCap &&
     isPrunableHomogeneousToEmpty(
@@ -449,6 +465,7 @@ function teaRejectCodeBetween(
       obstacles?.[toIdx],
       buds?.[fromIdx],
       buds?.[toIdx],
+      blendRecipe,
     )
   ) {
     return 'complete-to-empty';
@@ -500,7 +517,7 @@ export function unstrainedPourCountState(
     // for a genuine melt pour is computed normally below.
     if (
       tea !== 'complete-to-empty' ||
-      !completeToEmptyMeltExempt(state, fromIdx, toIdx, constraints)
+      !completeToEmptyMeltExempt(state, fromIdx, toIdx, constraints, blendRecipe)
     ) {
       return 0;
     }
@@ -535,6 +552,7 @@ function completeToEmptyMeltExempt(
   fromIdx: number,
   toIdx: number,
   constraints?: readonly CupConstraint[],
+  blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
   if (fromIdx < 0 || fromIdx >= state.cups.length) return false;
   if (toIdx < 0 || toIdx >= state.cups.length) return false;
@@ -549,6 +567,7 @@ function completeToEmptyMeltExempt(
       constraints,
       normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
       normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
+      blendRecipe,
     ) === 'complete-to-empty'
   );
 }
@@ -631,7 +650,7 @@ export function pourRejectCodeState(
   if (tea !== 'ok') {
     // Melt pours are never mere permutations (§52): a hot full-homogeneous
     // source into a frozen empty vessel proceeds to the checks below.
-    if (tea === 'complete-to-empty' && completeToEmptyMeltExempt(state, fromIdx, toIdx, constraints)) {
+    if (tea === 'complete-to-empty' && completeToEmptyMeltExempt(state, fromIdx, toIdx, constraints, blendRecipe)) {
       // fall through to floating/honey/strainer validation
     } else {
       return tea;
@@ -794,15 +813,34 @@ export function isConstructiveMoveState(
   if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
     return true;
   }
-  // G13 safe pruning option (§34): with an active recipe the
-  // homogeneous→empty prune is DISABLED entirely (reactant full cups must
-  // stay searchable). Every other legal non-reactive pour stays
-  // constructive — this enlarges the recipe-enabled state space slightly;
-  // the harness reports the cost. Legacy (recipe absent) keeps the exact
-  // prune below.
+  // G13.1 precise pruning (recipe-finality ≠ relocation-prunability):
+  // with an active recipe, a homogeneous stack relocated into an empty cup
+  // of the SAME signature group is still a mere vessel permutation — the
+  // canonical key is invariant under it (whole-stack relocation, any size,
+  // INCLUDING full reactant stacks). Pruning it from search loses no
+  // reachable canonical state (dropped edges are key-space self-loops), so
+  // it is non-constructive exactly like legacy. This does NOT declare
+  // reactant cups "finally solved" (see recipe-aware `isInFinalState`):
+  // full A×4/B×4 relocation stays LEGAL (no `complete-to-empty`), merely
+  // uninteresting for the solver. Legacy (recipe absent) keeps the exact
+  // prune below (full stacks additionally gated on finality there).
   if (blendRecipe && isValidBlendRecipe(blendRecipe)) {
-    // Still honor the strained/melt/honey/bud early-true paths implicitly
-    // (they all return true below as well); the prune below is skipped.
+    const rSource = state.cups[fromIdx] as TeaId[];
+    const rTarget = state.cups[toIdx] as TeaId[];
+    const rObstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+    const rBuds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
+    if (
+      rTarget.length === 0 &&
+      isHomogeneous(rSource) &&
+      rObstacles[fromIdx] == null &&
+      rObstacles[toIdx] == null &&
+      rBuds[fromIdx] == null &&
+      rBuds[toIdx] == null &&
+      cupConstraintSignature(constraints?.[fromIdx] ?? PLAIN_NORMAL_CONSTRAINT) ===
+        cupConstraintSignature(constraints?.[toIdx] ?? PLAIN_NORMAL_CONSTRAINT)
+    ) {
+      return false;
+    }
     return true;
   }
   // Strained catches change the partition AND external hold — never the

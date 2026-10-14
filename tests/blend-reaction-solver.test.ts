@@ -11,6 +11,7 @@ import {
   applyPuzzleActionState,
   canPourState,
   isConstructiveMoveState,
+  isInFinalState,
   isPuzzleWonState,
   pourRejectCodeState,
 } from '../src/game/logic/rules';
@@ -54,19 +55,47 @@ describe('§63 recipe win: P4/C4/D4 + empties', () => {
   });
 });
 
-describe('§64 reactant full NOT final (pruning)', () => {
-  it('A×4 → empty stays constructive AND legal under recipe (control prunes)', () => {
+describe('§64 reactant full NOT final, but relocation pruned (G13.1 split)', () => {
+  it('A×4 → empty stays LEGAL under recipe (no complete-to-empty; control prunes)', () => {
     const s = { cups: [[A, A, A, A], []] as TeaId[][], floatingIngredients: [null, null] };
-    expect(isConstructiveMoveState(s, 0, 1, [N, N], undefined)).toBe(false);
-    expect(isConstructiveMoveState(s, 0, 1, [N, N], R)).toBe(true);
-    // Legality prune also disabled: complete-to-empty no longer rejects.
+    expect(pourRejectCodeState(s, 0, 1, [N, N], undefined)).toBe('complete-to-empty');
     expect(pourRejectCodeState(s, 0, 1, [N, N], R)).toBe('ok');
     expect(canPourState(s, 0, 1, [N, N], R)).toBe(true);
+  });
+
+  it('A×4 → empty is NON-constructive under recipe (canonical symmetry, not finality)', () => {
+    const s = { cups: [[A, A, A, A], []] as TeaId[][], floatingIngredients: [null, null] };
+    expect(isConstructiveMoveState(s, 0, 1, [N, N], undefined)).toBe(false);
+    // G13.1: pruned as a pure vessel permutation — WITHOUT declaring A×4 final.
+    expect(isConstructiveMoveState(s, 0, 1, [N, N], R)).toBe(false);
+  });
+
+  it('partial [A,A] → empty is legal but non-constructive under recipe', () => {
+    const s = { cups: [[A, A], []] as TeaId[][], floatingIngredients: [null, null] };
+    expect(canPourState(s, 0, 1, [N, N], R)).toBe(true);
+    expect(isConstructiveMoveState(s, 0, 1, [N, N], R)).toBe(false);
+    expect(isConstructiveMoveState(s, 0, 1, [N, N], undefined)).toBe(false);
+  });
+
+  it('full P×4/C×4 → empty is rejected again under recipe (final like legacy)', () => {
+    const p = { cups: [[P, P, P, P], []] as TeaId[][], floatingIngredients: [null, null] };
+    expect(pourRejectCodeState(p, 0, 1, [N, N], R)).toBe('complete-to-empty');
+    expect(canPourState(p, 0, 1, [N, N], R)).toBe(false);
+    const c = { cups: [[C, C, C, C], []] as TeaId[][], floatingIngredients: [null, null] };
+    expect(pourRejectCodeState(c, 0, 1, [N, N], R)).toBe('complete-to-empty');
+  });
+
+  it('isInFinalState: reactant full never final under recipe; product/filler keep legacy', () => {
+    expect(isInFinalState([A, A, A, A], N, undefined, undefined, R)).toBe(false);
+    expect(isInFinalState([B, B, B, B], N, undefined, undefined, R)).toBe(false);
+    expect(isInFinalState([P, P, P, P], N, undefined, undefined, R)).toBe(true);
+    expect(isInFinalState([C, C, C, C], N, undefined, undefined, R)).toBe(true);
+    expect(isInFinalState([A, A, A, A], N)).toBe(true);
   });
 });
 
 describe('§65 product full final', () => {
-  it('P×4 behaves like an ordinary complete cup (prune disabled globally under recipe, win holds)', () => {
+  it('P×4 satisfies ordinary end-state and recipe win holds', () => {
     const won: TeaId[][] = [[P, P, P, P], [C, C, C, C], [D, D, D, D], [], [], []];
     expect(isPuzzleWonState({ cups: won, floatingIngredients: won.map(() => null) }, CONS6, R)).toBe(true);
   });
