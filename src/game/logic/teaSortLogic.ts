@@ -527,7 +527,7 @@ export class TeaSortLogic {
   makeMove(
     fromIdx: number,
     toIdx: number,
-  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata } | null {
+  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata; serveCompleted?: number | null } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
@@ -567,6 +567,7 @@ export class TeaSortLogic {
       capacityObstacleRemoved: res.capacityObstacleRemoved,
       teaBudBloomed: res.teaBudBloomed,
       reaction: res.reaction,
+      serveCompleted: res.serveCompleted ?? null,
     };
   }
 

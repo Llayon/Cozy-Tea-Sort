@@ -661,11 +661,21 @@ export const THERMOS_CAPACITY = 5;
  *     (tasting bowl — even a full homogeneous bowl is NOT complete).
  *
  * Target is NOT a pouring mode: during play a target cup pours exactly
- * like a normal cup (any legal tea in or out, mistakes allowed). The
+ * like an ordinary cup (any legal tea in or out, mistakes allowed). The
  * constraint binds ONLY the final solved state.
  *
  * A tasting bowl is NOT a flow mode: it pours exactly like a normal cup
  * in both directions. Only its capacity and end-state rule differ.
+ *
+ * - `serveOrder` controls SERVING ORDER (Gauntlet 14 — «Порядок подачи»):
+ *   - absent        : ordinary vessel, no ordering semantics.
+ *   - present (1,2) : this vessel sits on an ordered serving saucer and may
+ *     only reach its completed state after all earlier orders are served.
+ *     Serving order is cross-vessel state: completion, locks and victory
+ *     derive from current tea contents + these static constraints (never
+ *     from mutable served flags). Only valid with `mode: 'normal'`,
+ *     standard capacity, no target, no must-end-empty (production
+ *     validation rejects every other combination).
  *
  * No Pixi/React types may ever appear in this module.
  */
@@ -686,6 +696,13 @@ export interface CupConstraint {
    * identical to omitted.
    */
   mustEndEmpty?: boolean;
+  /**
+   * Serving-saucer order (Gauntlet 14). Undefined = ordinary vessel.
+   * Production uses exactly one `1` and one `2` (no duplicates, no gaps,
+   * no other values). Static identity only — progress derives from tea
+   * contents, never from mutable state.
+   */
+  serveOrder?: number;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -813,31 +830,39 @@ export function normalizeCupConstraints(
   return out;
 }
 
-/** Defensive copy of one constraint (all four semantic fields). */
+/** Defensive copy of one constraint (all five semantic fields). */
 export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   const out: CupConstraint = { mode: c.mode };
   if (c.targetTeaId !== undefined) out.targetTeaId = c.targetTeaId;
   if (c.capacity !== undefined) out.capacity = c.capacity;
   if (c.mustEndEmpty !== undefined) out.mustEndEmpty = c.mustEndEmpty;
+  if (c.serveOrder !== undefined) out.serveOrder = c.serveOrder;
   return out;
 }
 
 /**
  * Stable signature for canonicalization grouping. Cups collapse ONLY
  * when their complete behavioral + end-state signature is identical:
- * mode, target, effective capacity and must-end-empty flag.
+ * mode, target, effective capacity, must-end-empty flag and serving order.
  *
  * Standard vessels keep their legacy signatures (`N:_`, `N:<tea>`,
  * `SRC:_`, `SNK:_`); any capacity/end-state deviation appends an
- * explicit suffix (`N:_:C2:E` for the tasting bowl). Explicit defaults
- * (`capacity: 4`, `mustEndEmpty: false`) canonicalize identically to
- * omitted fields — no state-key fragmentation.
+ * explicit suffix (`N:_:C2:E` for the tasting bowl); a serving saucer
+ * appends its order (`N:_:O1`, `N:_:O2`) so ①, ② and ordinary cups never
+ * canonicalize as interchangeable. Explicit defaults (`capacity: 4`,
+ * `mustEndEmpty: false`) canonicalize identically to omitted fields, and
+ * an absent `serveOrder` leaves legacy strings byte-identical (no `:O_`
+ * markers) — no state-key fragmentation.
  */
 export function cupConstraintSignature(c: CupConstraint): string {
   const modeSig = c.mode === 'source-only' ? 'SRC' : c.mode === 'sink-only' ? 'SNK' : 'N';
   const base = `${modeSig}:${c.targetTeaId ?? '_'}`;
   const cap = cupCapacity(c);
   const endEmpty = mustEndEmpty(c);
-  if (cap === STANDARD_CUP_CAPACITY && !endEmpty) return base;
-  return `${base}:C${cap}:${endEmpty ? 'E' : 'D'}`;
+  const capSuffix = cap === STANDARD_CUP_CAPACITY && !endEmpty ? '' : `:C${cap}:${endEmpty ? 'E' : 'D'}`;
+  // Any present serveOrder (valid or not) earns a distinct group so invalid
+  // orders can never collapse with ordinary vessels; production validation
+  // rejects non-{1,2} orders loudly.
+  const orderSuffix = c.serveOrder === undefined ? '' : `:O${String(c.serveOrder)}`;
+  return `${base}${capSuffix}${orderSuffix}`;
 }

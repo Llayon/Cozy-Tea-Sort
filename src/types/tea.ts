@@ -72,6 +72,8 @@ export interface LevelConfig {
   hasTeaBloom?: boolean;
   /** True when this level includes the milk-tea blend reaction (Gauntlet 13, authored 4,4,4,4,0,0 topology). */
   hasBlend?: boolean;
+  /** True when this level includes serving-order saucers (Gauntlet 14, authored 4,4,4,4,0,0 topology). */
+  hasServingOrder?: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

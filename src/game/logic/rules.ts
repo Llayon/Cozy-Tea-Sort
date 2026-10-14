@@ -100,6 +100,14 @@ import {
   isReactivePair,
   isValidBlendRecipe,
 } from './blendRecipe';
+import {
+  hasServeOrder,
+  isServedCupState,
+  isServeCupComplete,
+  orderedServeIndices,
+  serveOrderOf,
+  servedPrefixLength,
+} from './servingOrder';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
@@ -115,7 +123,8 @@ const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
  *
  * Conservative: ANY special anywhere blocks ALL reactions (not just the two
  * vessels involved). Phase A topology (6 standard normal vessels, no specials)
- * never triggers this.
+ * never triggers this. Serving-order saucers (Gauntlet 14) also block
+ * chemistry: ORDER + BLEND is an unsupported combination (fail-closed).
  */
 function isBlendCompositionBlocked(
   state: ReadonlyPuzzleState,
@@ -134,6 +143,7 @@ function isBlendCompositionBlocked(
   if (obstacles.some((s) => s != null)) return true;
   const buds = normalizeTeaBudSlots(state.teaBudSlots, n);
   if (buds.some((s) => s != null)) return true;
+  if (hasServeOrder(constraints)) return true;
   if (constraints) {
     for (const c of constraints) {
       if (!c) continue;
@@ -144,6 +154,50 @@ function isBlendCompositionBlocked(
     }
   }
   return false;
+}
+
+/**
+ * Serving-order early-completion gate, evaluated on otherwise-legal pours
+ * (G14 §§20-22, §36 steps 4–5): simulate the ordinary maximal transfer
+ * into the destination; if the candidate contents would COMPLETE an
+ * ordered cup whose turn has not come (order > servedPrefix + 1), reject
+ * the WHOLE action with `serve-order`. Never reduces m to dodge
+ * completion — maximal-transfer semantics stand. Cups without an order,
+ * and the next-expected serve (order === prefix + 1), pass through.
+ */
+function serveCompletionGateOrOk(
+  state: ReadonlyPuzzleState,
+  fromIdx: number,
+  toIdx: number,
+  constraints?: readonly CupConstraint[],
+): PourRejectCode {
+  if (!hasServeOrder(constraints)) return 'ok';
+  const order = serveOrderOf(constraints?.[toIdx]);
+  if (order === undefined) return 'ok';
+  const prePrefix = servedPrefixLength(state, constraints);
+  if (prePrefix >= order) return 'ok';
+  // Candidate destination under ordinary maximal transfer. Computed
+  // directly (top run bounded by free space) rather than via
+  // pourCountState — which re-enters legality and would recurse through
+  // this tail. Strained catch (m−1 arrival) is honored for exactness;
+  // honey/floating/ice change no tea counts. Reactions can never reach
+  // this tail with serving constraints present (fail-closed composition
+  // gate), so ordinary transfer semantics apply.
+  const source = state.cups[fromIdx] as TeaId[];
+  const target = state.cups[toIdx] as TeaId[];
+  const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+  const m = Math.min(
+    topCountOf(source),
+    effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
+  );
+  const received = (isStrainedCatchSource(state, fromIdx) ? m - 1 : m);
+  if (received <= 0) return 'ok';
+  const top = topLayerOf(source);
+  const candidate = [...target];
+  for (let i = 0; i < received; i++) candidate.push(top as TeaId);
+  if (candidate.length !== STANDARD_CUP_CAPACITY) return 'ok';
+  if (!candidate.every((l) => l === top)) return 'ok';
+  return order === prePrefix + 1 ? 'ok' : 'serve-order';
 }
 
 /**
@@ -193,6 +247,7 @@ export type PourRejectCode =
   | 'source-empty'
   | 'source-sink-only'
   | 'source-frozen'
+  | 'source-served'
   | 'target-full'
   | 'target-source-only'
   | 'target-floating-occupied'
@@ -200,6 +255,7 @@ export type PourRejectCode =
   | 'target-frozen-needs-hot'
   | 'complete-to-empty'
   | 'color-mismatch'
+  | 'serve-order'
   | 'strainer-needs-two-layers'
   | 'strainer-loaded';
 
@@ -602,6 +658,22 @@ export function pourRejectCodeState(
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
 ): PourRejectCode {
+  // G14 serving-order priority (§36 steps 1–2): addressing, vessel roles,
+  // source emptiness, then the served-source lock. A served cup (its order
+  // within the derived prefix) can never source again — `source-served`
+  // outranks color/capacity detail below. Ordinary future-cup use (source
+  // or receive while incomplete) flows through to the normal rules. When
+  // no serving order is present this block is a no-op (legacy identical).
+  if (hasServeOrder(constraints)) {
+    if (fromIdx === toIdx) return 'same-cup';
+    if (fromIdx < 0 || fromIdx >= state.cups.length) return 'out-of-range';
+    if (toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+    if ((constraints?.[fromIdx]?.mode ?? 'normal') === 'sink-only') return 'source-sink-only';
+    if ((constraints?.[toIdx]?.mode ?? 'normal') === 'source-only') return 'target-source-only';
+    const serveSrc = state.cups[fromIdx] as TeaId[] | undefined;
+    if (!serveSrc || serveSrc.length === 0) return 'source-empty';
+    if (isServedCupState(state, fromIdx, constraints)) return 'source-served';
+  }
   // G13 reaction priority (§35): same/out-of-range, source role, destination
   // role, source empty, then reactive-pair detection. A genuine reactive
   // contact is legal EVEN when the destination is full (no fifth layer is
@@ -676,7 +748,7 @@ export function pourRejectCodeState(
     if (m > 0 && src.length - m === 0) return 'target-sinking-occupied';
   }
   const s = normalizeStrainerState(state.strainer);
-  if (!s.present) return 'ok';
+  if (!s.present) return serveCompletionGateOrOk(state, fromIdx, toIdx, constraints);
   if (s.heldTea !== null && s.attachedCupIndex !== null) return 'strainer-loaded';
   if (s.heldTea === null && s.attachedCupIndex === fromIdx) {
     const m = Math.min(
@@ -686,7 +758,7 @@ export function pourRejectCodeState(
     );
     if (m < 2) return 'strainer-needs-two-layers';
   }
-  return 'ok';
+  return serveCompletionGateOrOk(state, fromIdx, toIdx, constraints);
 }
 
 /**
@@ -980,6 +1052,8 @@ export interface PourStateResult {
   teaBudBloomed?: TeaBudId | null;
   /** Blend reaction metadata, when this pour performed chemistry (presentation/trace only). */
   reaction?: BlendReactionMetadata;
+  /** Serving-order completion, when this pour served cup 1 or 2 (presentation/trace only). */
+  serveCompleted?: number | null;
 }
 
 /**
@@ -1019,6 +1093,10 @@ export function applyPourState(
   blendRecipe?: BlendRecipe | undefined | null,
 ): PourStateResult | null {
   if (!canPourState(state, fromIdx, toIdx, constraints, blendRecipe)) return null;
+  // Serving-order metadata (G14 §§32-33, UX only): derived prefix before
+  // vs after. Valid transitions grow it by at most 1 (only the destination
+  // changes); `serveCompleted` reports the resulting prefix or null.
+  const prePrefix = servedPrefixLength(state, constraints);
   // G13 reaction path (ONE authoritative transition truth — no second
   // applyReactionPour implementation). Exactly ONE pair reacts per move:
   // source.pop() once, destination top REPLACED by product, no push.
@@ -1046,6 +1124,10 @@ export function applyPourState(
       targetReactant,
       product: blendRecipe.product,
     };
+    const postPrefixReaction = servedPrefixLength(
+      { cups: nextCups, floatingIngredients: nextSlots },
+      constraints,
+    );
     return {
       state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
       transferred: 1,
@@ -1053,6 +1135,7 @@ export function applyPourState(
       layer: sourceReactant,
       strained: false,
       reaction,
+      serveCompleted: postPrefixReaction > prePrefix ? postPrefixReaction : null,
     };
   }
   const strained = isStrainedCatchSource(state, fromIdx);
@@ -1120,6 +1203,10 @@ export function applyPourState(
     nextBuds[fromIdx] = null;
     teaBudBloomed = 'tea_bud';
   }
+  const postPrefix = servedPrefixLength(
+    { cups: nextCups, floatingIngredients: nextSlots },
+    constraints,
+  );
   return {
     state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
     transferred: m,
@@ -1132,6 +1219,7 @@ export function applyPourState(
     iceMelted,
     capacityObstacleRemoved,
     teaBudBloomed,
+    serveCompleted: postPrefix > prePrefix ? postPrefix : null,
   };
 }
 
@@ -1358,6 +1446,7 @@ export interface ApplyPuzzleActionResult {
   capacityObstacleRemoved?: CapacityObstacleId;
   teaBudBloomed?: TeaBudId | null;
   reaction?: BlendReactionMetadata;
+  serveCompleted?: number | null;
 }
 
 export function applyPuzzleActionState(
@@ -1391,6 +1480,7 @@ export function applyPuzzleActionState(
     capacityObstacleRemoved: res.capacityObstacleRemoved,
     teaBudBloomed: res.teaBudBloomed,
     reaction: res.reaction,
+    serveCompleted: res.serveCompleted,
   };
 }
 
@@ -1568,6 +1658,12 @@ export function isPuzzleWonState(
       return false;
     }
   }
+  // G14 serving-order win (§29): ordinary end-state AND the full served
+  // prefix (every ordered saucer served). ①-empty/②-full and
+  // ①-full/②-empty boards satisfy local vessel rules but are NOT won.
+  // With no ordered cups the prefix is vacuously 0 === 0 (legacy identical).
+  const orderedCount = orderedServeIndices(constraints).length;
+  if (servedPrefixLength(state, constraints) !== orderedCount) return false;
   if (!floatingIngredientGoalsSatisfied(state, constraints)) return false;
   if (!sinkingIngredientGoalsSatisfied(state, constraints)) return false;
   const s = normalizeStrainerState(state.strainer);
