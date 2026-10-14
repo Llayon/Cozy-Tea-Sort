@@ -214,6 +214,29 @@ const batches = [
   },
   { name: 'serving-order stress A (seeds 0-99)', files: ['tests/serving-order-stress-a.test.ts'] },
   { name: 'serving-order stress B (seeds 100-199)', files: ['tests/serving-order-stress-b.test.ts'] },
+  {
+    name: 'composition compatibility (G15 gate)',
+    files: ['tests/composition-compatibility.test.ts'],
+  },
+  {
+    name: 'serving-order-tasting kernel + canonical + solver',
+    files: [
+      'tests/serving-order-tasting.test.ts',
+      'tests/serving-order-tasting-canonical.test.ts',
+      'tests/serving-order-tasting-solver.test.ts',
+    ],
+  },
+  {
+    name: 'serving-order-tasting templates + fast path + undo + view',
+    files: [
+      'tests/serving-order-tasting-templates.test.ts',
+      'tests/serving-order-tasting-fastpath.test.ts',
+      'tests/serving-order-tasting-undo.test.ts',
+      'tests/serving-order-tasting-view.test.ts',
+    ],
+  },
+  { name: 'serving-order-tasting rollout', files: ['tests/serving-order-tasting-rollout.test.ts'] },
+  { name: 'serving-order-tasting stress + fairness + perf', files: ['tests/serving-order-tasting-stress.test.ts'] },
 ];
 
 function runBatch(batch) {

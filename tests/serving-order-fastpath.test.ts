@@ -37,7 +37,11 @@ describe('request recognition (IO/IP/IQ–IZ)', () => {
     expect(() => validateServeOrderRequest({ ...REQ, serveOrderCount: 1 })).toThrow();
     expect(() => validateServeOrderRequest({ ...REQ, serveOrderCount: 3 })).toThrow();
     expect(() => validateServeOrderRequest({ ...REQ, teaBudCount: 1 })).toThrow();
-    expect(() => validateServeOrderRequest({ ...REQ, hasMysteryLayer: true })).toThrow();
+    // G15: serving + mystery is a Tier-A candidate (DEFERRED, not shipped) —
+    // no longer rejected at request validation (standalone template kind
+    // still returns null for mystery; see composition tests).
+    expect(() => validateServeOrderRequest({ ...REQ, hasMysteryLayer: true })).not.toThrow();
+    expect(servingOrderTemplateKindFor({ ...REQ, hasMysteryLayer: true })).toBe(null);
     expect(() => validateServeOrderRequest({ ...REQ, blendRecipeId: 'milk-tea' as never })).toThrow();
     expect(() => validateServeOrderRequest({
       ...REQ, colors: ['matcha', 'sea_buckthorn', 'karkade', 'milk'],

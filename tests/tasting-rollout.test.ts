@@ -110,13 +110,13 @@ describe('rollout invariants 1–300', () => {
   });
 
   it('post-32 rotation serves tasting without forbidden combos', () => {
-    // Window extended 120 → 124 by Gauntlet 14: the challenge rotation
-    // grew %18 → %19 (serving order appended as residue 18, all existing
-    // residues untouched), which moves teapot+tasting's next rotation slot
-    // from L118 to L122. Presence intent unchanged.
+    // Window extended 124 → 130 by Gauntlet 15: the challenge rotation
+    // grew %19 → %20 (serving-order+tasting composition appended as residue
+    // 19, all existing residues untouched), which moves teapot+tasting's next
+    // rotation slot from L122 to L126. Presence intent unchanged.
     const seenChallenge = new Set<string>();
     const seenPeak = new Set<string>();
-    for (let lvl = 33; lvl <= 124; lvl++) {
+    for (let lvl = 33; lvl <= 130; lvl++) {
       const cfg = getLevelConfig(lvl);
       const key = [
         cfg.hasSourceOnlyTeapot ? 'teapot' : '',

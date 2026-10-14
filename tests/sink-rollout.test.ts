@@ -114,11 +114,11 @@ describe('rollout invariants 1–200', () => {
 
   it('later-cycle rotation uses sink without targets', () => {
     // Challenge rotation must include pure sink and teapot+targets over a
-    // full cycle window (G11 lengthened the challenge cycle to 16 with the
-    // standalone cinnamon slot; teapot+targets recurs at level 122, so the
-    // window spans 25–140 to cover a full period).
+    // full cycle window (G15 lengthened the challenge cycle to 20 with the
+    // serving-order+tasting composition slot; teapot+targets recurs at level
+    // 142, so the window spans 25–144 to cover a full period).
     const seen = new Set<string>();
-    for (let lvl = 25; lvl <= 140; lvl++) {
+    for (let lvl = 25; lvl <= 144; lvl++) {
       const cfg = getLevelConfig(lvl);
       if (cfg.phase !== 'challenge') continue;
       seen.add(
