@@ -229,11 +229,18 @@ import {
   instantiateServingOrderTemplate,
 } from './servingOrderTemplates';
 import {
+  SERVING_ORDER_COMPOSITION_BANK,
+  SERVING_ORDER_TASTING_TEMPLATE_ATTEMPTS,
+  ServingOrderCompositionKind,
+  instantiateServingOrderCompositionTemplate,
+} from './servingOrderCompositionTemplates';
+import {
   hasServeOrder,
   orderedServeIndices,
   servedPrefixLength,
   validateServeOrderConstraints,
 } from './servingOrder';
+import { validateMechanicCombination } from './mechanicCompatibility';
 import {
   depthDistance,
   RhythmPhase,
@@ -895,6 +902,15 @@ export function validateBlendRequest(req: GenerateRequest): void {
  * Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen/thermos/
  * cinnamon/tea-bud/blend. Only 0 or 2 supported. The active palette must
  * carry 4 eligible legacy teas and no reaction IDs.
+ *
+ * Gauntlet 15 (composition): additionally allows exactly ONE partner
+ * mechanic on SEPARATE vessels — Mystery (hasMysteryLayer), tasting bowl
+ * (tastingCupCount 1), or honey (sinkingIngredient 'honey') — inside the
+ * same 4c/6v shape (tasting consumes one nominal empty as its cap2 bowl
+ * while keeping one ordinary empty buffer). Strainer stays research-only,
+ * blend stays forbidden. At most one partner; no teapot/targets/sink/
+ * lemon/frozen/thermos/cinnamon/tea-bud alongside. Palette rules unchanged
+ * (eligible legacy teas; honey additionally needs buckwheat).
  */
 export function validateServeOrderRequest(req: GenerateRequest): void {
   const want = requestedServeOrderCount(req);
@@ -902,10 +918,35 @@ export function validateServeOrderRequest(req: GenerateRequest): void {
   if (want !== 2) {
     throw new Error(`validateServeOrderRequest: serveOrderCount ${want} unsupported (production 0 or 2)`);
   }
-  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+  const hasMystery = req.hasMysteryLayer === true;
+  const tasting = requestedTastingCupCount(req);
+  const honey = requestedSinkingIngredient(req);
+  // G15 single compatibility source (§4): pair policy lives in
+  // mechanicCompatibility/validateMechanicCombination (pure, no RNG).
+  const comboReasons = validateMechanicCombination({
+    servingOrder: true,
+    mystery: hasMystery,
+    tastingCount: tasting,
+    honey: honey !== undefined,
+    strainer: requestedHasStrainer(req),
+    blend: requestedBlendRecipeId(req) !== undefined,
+  });
+  if (comboReasons.length > 0) {
+    throw new Error(`validateServeOrderRequest: ${comboReasons.join('; ')}`);
+  }
+  if (tasting > 1) {
+    throw new Error(`validateServeOrderRequest: serving order + tasting needs exactly 1 bowl (got ${tasting})`);
+  }
+  if (honey !== undefined && honey !== 'honey') {
+    throw new Error(`validateServeOrderRequest: serving order + ${honey} is out of scope for Gauntlet 15`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || requestedSourceOnlyCount(req) !== 0) {
     throw new Error(
-      'validateServeOrderRequest: serving order requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+      'validateServeOrderRequest: serving order requires 4 colors, 6 vessels, 2 nominal empties, no teapot',
     );
+  }
+  if (hasMystery && tasting > 0) {
+    throw new Error('validateServeOrderRequest: serving order + mystery + tasting is out of scope');
   }
   if (requestedTargetTeas(req).length > 0) {
     throw new Error('validateServeOrderRequest: serving order + targets is out of scope for Gauntlet 14');
@@ -913,21 +954,15 @@ export function validateServeOrderRequest(req: GenerateRequest): void {
   if (requestedSinkOnlyCount(req) > 0) {
     throw new Error('validateServeOrderRequest: serving order + sink-only is out of scope for Gauntlet 14');
   }
-  if (requestedTastingCupCount(req) > 0) {
-    throw new Error('validateServeOrderRequest: serving order + tasting bowl is out of scope for Gauntlet 14');
-  }
+  // G15: tasting 1 allowed as the single partner (separate cup); >1 rejected above.
   if (requestedFloatingIngredient(req) !== undefined) {
     throw new Error(
       `validateServeOrderRequest: serving order + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 14`,
     );
   }
-  if (requestedSinkingIngredient(req) !== undefined) {
-    throw new Error(
-      `validateServeOrderRequest: serving order + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 14`,
-    );
-  }
+  // G15: honey allowed as the single partner (separate cup); other ids rejected above.
   if (requestedHasStrainer(req)) {
-    throw new Error('validateServeOrderRequest: serving order + strainer is out of scope for Gauntlet 14');
+    throw new Error('validateServeOrderRequest: serving order + strainer is research-only (G15 §16)');
   }
   if (requestedFrozenCupCount(req) > 0) {
     throw new Error('validateServeOrderRequest: serving order + frozen cup is out of scope for Gauntlet 14');
@@ -942,7 +977,7 @@ export function validateServeOrderRequest(req: GenerateRequest): void {
     throw new Error('validateServeOrderRequest: serving order + tea bud is out of scope for Gauntlet 14');
   }
   if (requestedBlendRecipeId(req) !== undefined) {
-    throw new Error('validateServeOrderRequest: serving order + blend is out of scope for Gauntlet 14');
+    throw new Error('validateServeOrderRequest: serving order + blend is forbidden (G15 §17; chemistry stays standalone)');
   }
   const palette = req.colors.slice(0, req.numColors);
   if (palette.length !== req.numColors) {
@@ -952,6 +987,9 @@ export function validateServeOrderRequest(req: GenerateRequest): void {
     if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
       throw new Error(`validateServeOrderRequest: reaction ID ${t} not eligible for serving order`);
     }
+  }
+  if (honey !== undefined && !palette.includes('buckwheat')) {
+    throw new Error('validateServeOrderRequest: serving order + honey needs buckwheat in the active palette');
   }
 }
 
@@ -963,6 +1001,9 @@ export function validateServeOrderRequest(req: GenerateRequest): void {
  */
 export function validateStrainerRequest(req: GenerateRequest): void {
   if (!requestedHasStrainer(req)) return;
+  if (requestedServeOrderCount(req) > 0) {
+    throw new Error('validateStrainerRequest: strainer + serving order is research-only (G15 §16)');
+  }
   if (requestedFloatingIngredient(req) !== undefined) {
     throw new Error('validateStrainerRequest: strainer + lemon is out of scope for Gauntlet 6');
   }
@@ -1141,6 +1182,9 @@ export function isMixedFullCup(cup: TeaId[]): boolean {
  * must not visually compete, and tasting bowls start empty at capacity
  * 2. The tasting exclusion is an explicit semantic contract, not just a
  * consequence of the length >= 3 shape rule.
+ *
+ * G15: ordered serving saucers are never mystery candidates either
+ * (same-cup forbid — ordered cups stay readable on separate vessels).
  */
 export function selectMysteryCup(
   cups: TeaId[][],
@@ -1152,6 +1196,7 @@ export function selectMysteryCup(
     const c = cupConstraints?.[idx];
     if (c && (c.mode !== 'normal' || c.targetTeaId !== undefined)) return;
     if (c && isTastingCupConstraint(c)) return;
+    if (c?.serveOrder !== undefined) return;
     if (cup.length >= 3 && cup[0] !== cup[1]) candidates.push(idx);
   });
   if (candidates.length === 0) return null;
@@ -2627,26 +2672,34 @@ function finalizeCandidate(
       if (!hostCup.some((t) => t !== first)) return null;
       if ((hiddenCounts[host] ?? 0) !== 0) return null;
     }
-    // Global topology 4,4,4,4,0,0 with exactly two ordinary empties.
+    // Global topology 4,4,4,4,0,0 with exactly two empties (G14 standalone:
+    // both ordinary standard; G15 tasting composition: one ordinary standard
+    // empty buffer + one tasting-bowl empty at the stable last slot).
     const serveCounts = cups.map((c) => c.length).sort((a, b) => a - b);
     if (JSON.stringify(serveCounts) !== JSON.stringify([0, 0, 4, 4, 4, 4])) return null;
     const serveEmpties = cups.filter((c) => c.length === 0);
     if (serveEmpties.length !== 2) return null;
+    const wantTasteCombo = requestedTastingCupCount(req) === 1;
     for (let i = 0; i < cups.length; i++) {
       if ((cups[i] as TeaId[]).length === 0) {
         const ec = normalized[i] as CupConstraint;
         if (ec.mode !== 'normal' || ec.targetTeaId !== undefined) return null;
+        if (wantTasteCombo && isTastingCupConstraint(ec)) continue;
         if (cupCapacity(ec) !== STANDARD_CUP_CAPACITY || mustEndEmpty(ec)) return null;
         if (ec.serveOrder !== undefined) return null;
       }
     }
-    // No second special.
+    if (wantTasteCombo) {
+      if (countTastingCups(normalized) !== 1) return null;
+      if (!isTastingCupConstraint(normalized[normalized.length - 1])) return null;
+    }
+    // No second special (G15: tasting 1 allowed as the single partner).
     if (presentIds.length > 0) return null;
     if (sinkPresent.length > 0) return null;
     if (strainerState.present) return null;
     if (countSinkOnly(normalized) > 0) return null;
     if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
-    if (countTastingCups(normalized) > 0) return null;
+    if (countTastingCups(normalized) > 0 && !wantTasteCombo) return null;
     if (icePresent.length > 0) return null;
     if (countThermosCups(normalized) > 0) return null;
     if (obstacles.some((s) => s !== null)) return null;
@@ -2975,7 +3028,8 @@ function finalizeCandidate(
   // structural ordering, not rescue — no plain-control comparison at
   // runtime (L3 is offline curation truth). The optimal replay must hit
   // ORDER_PRESSURE before SERVE_1, then SERVE_2, prefix 2 and win (L2).
-  // Happy path is exactly 1 solve.
+  // G15 tasting composition additionally requires C2 (tasting bowl touched
+  // in the optimal trace). Happy path is exactly 1 solve.
   {
     const wantServeCount = requestedServeOrderCount(req);
     if (wantServeCount !== 0) {
@@ -3003,6 +3057,15 @@ function finalizeCandidate(
       if (spart.serve1Depth >= spart.serve2Depth) return null; // JF
       if (spart.servedPrefixFinal !== 2) return null; // JG
       if (!spart.win) return null; // JH
+      // G15 C2: tasting-combo requests must touch the tasting bowl.
+      if (requestedTastingCupCount(req) === 1) {
+        const tasteIdx = normalized.findIndex((c) => isTastingCupConstraint(c));
+        if (tasteIdx < 0) return null;
+        const touched = serveSolution.some(
+          (a) => a.kind === 'pour' && ((a as { from: number }).from === tasteIdx || (a as { to: number }).to === tasteIdx),
+        );
+        if (!touched) return null;
+      }
       const level: GeneratedLevel = {
         cups,
         hiddenCounts,
@@ -3812,6 +3875,36 @@ function servingOrderFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong C2 serving-order-tasting fallback (depth 11, pressure 0.45,
+ * serve gap 2, C3): identity role mapping, runtime re-validated. Preserves
+ * the requested combo (never falls back to single-mechanic). Backups cover
+ * the (near-impossible) miss.
+ */
+const SERVING_ORDER_TASTING_FALLBACK_ID = 'serve-taste-11-36016';
+const SERVING_ORDER_TASTING_FALLBACK_BACKUPS = ['serve-taste-11-114017', 'serve-taste-12-142014'];
+
+function servingOrderTastingFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> {
+  if (servingOrderCompositionKindFor(req) === null) return [];
+  const kind = servingOrderCompositionKindFor(req) as ServingOrderCompositionKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
+  for (const id of [SERVING_ORDER_TASTING_FALLBACK_ID, ...SERVING_ORDER_TASTING_FALLBACK_BACKUPS]) {
+    const tpl = SERVING_ORDER_COMPOSITION_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateServingOrderCompositionTemplate(tpl, [...palette]);
+    const constraints = defaultCupConstraints(inst.cups.length);
+    constraints[inst.serve1Index] = { mode: 'normal', serveOrder: 1 };
+    constraints[inst.serve2Index] = { mode: 'normal', serveOrder: 2 };
+    constraints[inst.tastingIndex] = { mode: 'normal', capacity: 2, mustEndEmpty: true };
+    out.push({ cups: inst.cups, constraints });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -3852,10 +3945,11 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
-  // Dedicated serving-order shapes go first for serving requests (identity
-  // role mapping — recorded depths hold modulo tie-breaking; finalize
-  // re-validates).
+  // Dedicated serving-order-tasting composition shapes go first for combo
+  // requests (identity role mapping; finalize re-validates; never drops a
+  // mechanic). Standalone serving shapes follow for non-combo requests.
   if (requestedServeOrderCount(req) !== 0) {
+    shapeEntries.push(...servingOrderTastingFallbackEntries(req));
     shapeEntries.push(...servingOrderFallbackEntries(req));
   }
   // Dedicated blend shapes go first for blend requests (palette fillers in
@@ -4235,6 +4329,8 @@ export function tastingTemplateKindFor(req: GenerateRequest): TastingTemplateKin
   if (requestedTastingCupCount(req) !== 1) return null;
   if (requestedTargetTeas(req).length > 0) return null;
   if (requestedSinkOnlyCount(req) > 0) return null;
+  // G15: serving-order compositions have their own bank (never the standalone tasting path).
+  if (requestedServeOrderCount(req) !== 0) return null;
   const teapot = requestedSourceOnlyCount(req);
   if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && teapot === 0) {
     return 'tasting-challenge';
@@ -5036,6 +5132,86 @@ function generateFromServingOrderTemplateBank(
 }
 
 /**
+ * Match a request against the serving-order-tasting composition bank
+ * (Gauntlet 15). Recognized ONLY for the exact production combination:
+ * serveOrderCount 2 + tastingCupCount 1, 4 colors, 6 vessels, 2 nominal
+ * empties (one ordinary empty + one tasting-bowl empty), no Mystery, no
+ * teapot, no other sibling special. Palette must carry 4 eligible legacy
+ * teas (no reaction IDs). Anything else keeps existing paths.
+ */
+export function servingOrderCompositionKindFor(req: GenerateRequest): ServingOrderCompositionKind | null {
+  if (requestedServeOrderCount(req) !== 2) return null;
+  if (requestedTastingCupCount(req) !== 1) return null;
+  if (requestedTeaBudCount(req) !== 0) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    const palette = req.colors.slice(0, req.numColors);
+    if (palette.length !== req.numColors) return null;
+    if (!palette.every((t) => (SERVING_ORDER_ELIGIBLE_TEAS as readonly string[]).includes(t))) return null;
+    return 'serving-order-tasting';
+  }
+  return null;
+}
+
+/**
+ * Bounded serving-order-tasting fast path (Gauntlet 15 §22): validate
+ * request → seeded template choice → seeded full role bijection over the
+ * request palette (full isomorphism) → O1/O2 + tasting static constraints
+ * → single `finalizeCandidate` validation (C2 trace inside). At most
+ * SERVING_ORDER_TASTING_TEMPLATE_ATTEMPTS validations, never a 150-scan.
+ * Happy path is exactly 1 solver call. Fallback preserves the combo.
+ */
+function generateFromServingOrderCompositionBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = servingOrderCompositionKindFor(req);
+  if (!kind) return null;
+  const bank = SERVING_ORDER_COMPOSITION_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < SERVING_ORDER_TASTING_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateServingOrderCompositionTemplate(tpl, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    constraints[inst.serve1Index] = { mode: 'normal', serveOrder: 1 };
+    constraints[inst.serve2Index] = { mode: 'normal', serveOrder: 2 };
+    constraints[inst.tastingIndex] = { mode: 'normal', capacity: 2, mustEndEmpty: true };
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#serving-order-tasting:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
+/**
  * Match a request against the thermos bank (Gauntlet 10). Recognized
  * ONLY for the exact production combination: thermosCupCount 1, 4 colors,
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
@@ -5327,6 +5503,16 @@ export function generateLevel(
   // or the validated fallback ladder.
   if (blendTemplateKindFor(req) !== null) {
     const fast = generateFromBlendTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical serving-order-tasting composition configs skip the random
+  // scan entirely (Gauntlet 15 §22): bounded attempts, never a 150-scan.
+  // Checked BEFORE standalone serving-order (composition requests carry
+  // serveOrderCount 2, but standalone matcher returns null when tasting>0).
+  if (servingOrderCompositionKindFor(req) !== null) {
+    const fast = generateFromServingOrderCompositionBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -6327,15 +6513,51 @@ export function validateLevelStructure(
         const first = cup[0] as TeaId;
         if (!cup.some((t) => t !== first)) reasons.push(`serving-order vessel ${i} must start mixed (IV)`);
       }
-      if ((level.hiddenCounts[i] ?? 0) !== 0) {
-        reasons.push(`serving-order vessel ${i} must not hide mystery`);
+      const hidden = level.hiddenCounts[i] ?? 0;
+      if (hidden !== 0) {
+        // G15: mystery allowed only as the single partner, on a separate
+        // ordinary vessel (never an ordered saucer, never a tasting bowl).
+        if (!req.hasMysteryLayer) {
+          reasons.push(`serving-order vessel ${i} must not hide mystery`);
+        } else {
+          const c = constraints[i] as CupConstraint | undefined;
+          if (c?.serveOrder !== undefined) {
+            reasons.push(`serving-order vessel ${i} must not hide mystery on an ordered saucer (G15 same-cup forbid)`);
+          }
+          if (c && isTastingCupConstraint(c)) {
+            reasons.push(`mystery vessel ${i} must not be a tasting bowl`);
+          }
+        }
       }
     }
-    // IZ: standalone — no second special.
+    // IZ: G14 standalone + G15 Tier-A composition (at most one partner:
+    // mystery / tasting 1 / honey 1, always on SEPARATE vessels).
+    // Same-cup order+tasting is already rejected by IT/IU (cap4 vs cap2);
+    // same-cup order+mystery and order+honey are rejected explicitly below.
     if (presentIds.length > 0) reasons.push('serving order + lemon is out of scope for Gauntlet 14 (IZ)');
-    if (sinkPresentForD.length > 0) reasons.push('serving order + honey is out of scope for Gauntlet 14 (IZ)');
+    const honeyAllowed = requestedSinkingIngredient(req) === 'honey';
+    if (sinkPresentForD.length > 0) {
+      if (!honeyAllowed) {
+        reasons.push('serving order + honey is out of scope for Gauntlet 14 (IZ)');
+      } else {
+        if (sinkPresentForD.length !== 1) {
+          reasons.push(`serving order + honey needs exactly one honey host (got ${sinkPresentForD.length})`);
+        }
+        const honeyIndices = sinkSlotsForD
+          .map((s, i) => (s != null ? i : -1))
+          .filter((i) => i >= 0);
+        for (const h of honeyIndices) {
+          const c = constraints[h as number] as CupConstraint | undefined;
+          if (c?.serveOrder !== undefined) {
+            reasons.push(`honey host ${h} must be ordinary, not an ordered saucer (G15 same-cup forbid)`);
+          }
+        }
+      }
+    } else if (honeyAllowed) {
+      reasons.push('serving order + honey requested but no honey host present');
+    }
     if (normalizeStrainerState(level.strainer).present) {
-      reasons.push('serving order + strainer is out of scope for Gauntlet 14 (IZ)');
+      reasons.push('serving order + strainer is research-only (G15 §16)');
     }
     if (constraints.some((c) => c?.mode === 'sink-only')) {
       reasons.push('serving order + sink is out of scope for Gauntlet 14 (IZ)');
@@ -6343,8 +6565,19 @@ export function validateLevelStructure(
     if (constraints.some((c) => c?.targetTeaId !== undefined)) {
       reasons.push('serving order + targets is out of scope for Gauntlet 14 (IZ)');
     }
-    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
-      reasons.push('serving order + tasting is out of scope for Gauntlet 14 (IZ)');
+    const tastingAllowed = requestedTastingCupCount(req) === 1;
+    const tastingPresent = constraints.some((c) => c && isTastingCupConstraint(c));
+    if (tastingPresent) {
+      if (!tastingAllowed) {
+        reasons.push('serving order + tasting is out of scope for Gauntlet 14 (IZ)');
+      } else {
+        const tastingCount = constraints.filter((c) => c && isTastingCupConstraint(c)).length;
+        if (tastingCount !== 1) {
+          reasons.push(`serving order + tasting needs exactly one bowl (got ${tastingCount})`);
+        }
+      }
+    } else if (tastingAllowed) {
+      reasons.push('serving order + tasting requested but no tasting bowl present');
     }
     if (icePresentForD.length > 0) reasons.push('serving order + frozen cup is out of scope for Gauntlet 14 (IZ)');
     if (constraints.some((c) => isThermosCupConstraint(c))) {
@@ -6357,13 +6590,20 @@ export function validateLevelStructure(
       reasons.push('serving order + tea bud is out of scope for Gauntlet 14 (IZ)');
     }
     if (requestedBlendRecipeId(req) !== undefined) {
-      reasons.push('serving order + blend is out of scope for Gauntlet 14 (IZ)');
+      reasons.push('serving order + blend is forbidden (G15 §17; chemistry stays standalone)');
     }
     if (requestedSourceOnlyCount(req) > 0) {
       reasons.push('serving order + teapot is out of scope for Gauntlet 14 (IZ)');
     }
+    // G15: mystery allowed only as the single partner (exactly one hidden cup
+    // on a separate ordinary vessel; per-vessel same-cup checks above).
+    const hiddenTotal = level.hiddenCounts.filter((h) => (h ?? 0) > 0).length;
     if (req.hasMysteryLayer) {
-      reasons.push('serving order + Mystery is out of scope for Gauntlet 14 (IZ)');
+      if (hiddenTotal !== 1) {
+        reasons.push(`serving order + mystery needs exactly one hidden cup (got ${hiddenTotal})`);
+      }
+    } else if (hiddenTotal > 0) {
+      reasons.push('unexpected mystery without request');
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.

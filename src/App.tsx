@@ -728,6 +728,19 @@ export default function App() {
         </div>
       )}
 
+      {/* G15 composition first-encounter (Level 154 only): both mechanics are
+           already known (tasting L26, serving L106), so one concise contextual
+           hint. Never blocking. NOT shown on later mixed levels (234, …). */}
+      {currentConfig.hasServingOrder && currentConfig.hasTastingBowl && currentLevel === 154 && moves === 0 && !isWon && (
+        <div
+          id="serving-order-tasting-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#232A1E]/95 border-b border-[#5A6B4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#DCE8C8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#B8C898] shrink-0" />
+          <span>Порядок подачи действует и здесь: сначала ①, потом ②.</span>
+        </div>
+      )}
+
       {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
            compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
       {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (

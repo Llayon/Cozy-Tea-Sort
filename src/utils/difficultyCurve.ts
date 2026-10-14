@@ -339,13 +339,15 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
     // challenge (no mystery): tea bloom → cinnamon → thermos → frozen cup →
     // lemon+honey → honey → teapot+honey → strainer → teapot+strainer →
     // lemon → teapot+lemon → tasting → teapot+tasting → sink → teapot+sink →
-    // targets → teapot+targets → milk-tea blend → serving order (all
-    // standalone except the established ≤2-special combos; NO bloom, blend
-    // or serving combinations).
+    // targets → teapot+targets → milk-tea blend → serving order →
+    // serving-order+tasting composition (all standalone except the
+    // established ≤2-special combos plus the single G15 Tier-A composition;
+    // NO bloom/blend/serving-other combinations).
     // (Levels 1–112 are pinned, so this rotation only affects 113+; the
-    // pre-G14 18-cycle order is preserved exactly, with serving order
-    // appended as the new 19th residue so no existing mechanic shifts.)
-    switch (cycleNumber % 19) {
+    // pre-G14 18-cycle order is preserved exactly, with serving order as the
+    // 19th residue (G14) and serving-order+tasting as the 20th (G15) so no
+    // existing mechanic shifts within its residue class.)
+    switch (cycleNumber % 20) {
       case 0: return { ...CLEAN, teaBloom: true };
       case 1: return { ...CLEAN, cinnamon: true };
       case 2: return { ...CLEAN, thermos: true };
@@ -364,6 +366,7 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
       case 15: return { ...CLEAN, targets: true };
       case 17: return { ...CLEAN, blend: true };
       case 18: return { ...CLEAN, servingOrder: true };
+      case 19: return { ...CLEAN, servingOrder: true, tasting: true };
       default: return { ...CLEAN, teapot: true, targets: true };
     }
   }
@@ -528,6 +531,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if (plan.servingOrder && plan.tasting) {
+    phaseSubtitle = 'Порядок подачи и пиала • 6 сосудов';
   } else if (plan.servingOrder) {
     phaseSubtitle = 'Порядок подачи • 6 сосудов';
   } else if (plan.blend) {
@@ -647,12 +652,18 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   // the canonical 4c/6v layout (4 teas, 2 nominal empties → 6 vessels), no
   // Mystery, no teapot. Palette is four eligible legacy teas (never
   // reaction IDs).
+  //
+  // Gauntlet 15 composition: serving-order+tasting uses the SAME 4c/6v
+  // shape (tasting bowl consumes one nominal empty as its cap2 bowl while
+  // keeping one ordinary empty buffer). Both flags stay true so App.tsx
+  // maps to serveOrderCount 2 + tastingCupCount 1 (separate vessels).
   if (hasServingOrder) {
     numColors = 4;
     emptyCups = 2;
     hasMysteryLayer = false;
     hasSourceOnlyTeapot = false;
-    phaseSubtitle = 'Порядок подачи • 6 сосудов';
+    const isCombo = hasTastingBowl === true;
+    phaseSubtitle = isCombo ? 'Порядок подачи и пиала • 6 сосудов' : 'Порядок подачи • 6 сосудов';
     // L106 tutorial: classic readable palette; L110: contrasting palette;
     // post-112 rotation alternates deterministically among eligible teas.
     if (levelNum === 106) {
