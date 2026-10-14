@@ -65,8 +65,8 @@ describe('rollout 25–32 (Gauntlet 4 tasting-bowl introduction)', () => {
       if (lvl === 31) expect(cfg.targetTeaIds.length).toBe(2);
       else expect(cfg.targetTeaIds).toEqual([]);
     }
-    expect(mechanicPlanForLevel(26)).toEqual({ teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false });
-    expect(mechanicPlanForLevel(30)).toEqual({ teapot: true, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false });
+    expect(mechanicPlanForLevel(26)).toEqual({ teapot: false, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false });
+    expect(mechanicPlanForLevel(30)).toEqual({ teapot: true, targets: false, sink: false, tasting: true, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false });
   });
 
   it('level 26/27/30 subtitles match the specified product copy', () => {
@@ -110,9 +110,13 @@ describe('rollout invariants 1–300', () => {
   });
 
   it('post-32 rotation serves tasting without forbidden combos', () => {
+    // Window extended 120 → 124 by Gauntlet 14: the challenge rotation
+    // grew %18 → %19 (serving order appended as residue 18, all existing
+    // residues untouched), which moves teapot+tasting's next rotation slot
+    // from L118 to L122. Presence intent unchanged.
     const seenChallenge = new Set<string>();
     const seenPeak = new Set<string>();
-    for (let lvl = 33; lvl <= 120; lvl++) {
+    for (let lvl = 33; lvl <= 124; lvl++) {
       const cfg = getLevelConfig(lvl);
       const key = [
         cfg.hasSourceOnlyTeapot ? 'teapot' : '',

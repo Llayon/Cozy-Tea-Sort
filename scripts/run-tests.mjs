@@ -195,6 +195,25 @@ const batches = [
   },
   { name: 'blend stress A (seeds 0-99)', files: ['tests/blend-reaction-stress-a.test.ts'] },
   { name: 'blend stress B (seeds 100-199)', files: ['tests/blend-reaction-stress-b.test.ts'] },
+  {
+    name: 'serving-order kernel Phase A (G14 feasibility)',
+    files: [
+      'tests/serving-order.test.ts',
+      'tests/serving-order-solver.test.ts',
+      'tests/serving-order-undo.test.ts',
+    ],
+  },
+  {
+    name: 'serving-order templates + fast path + rollout + view',
+    files: [
+      'tests/serving-order-templates.test.ts',
+      'tests/serving-order-fastpath.test.ts',
+      'tests/serving-order-rollout.test.ts',
+      'tests/serving-order-view.test.ts',
+    ],
+  },
+  { name: 'serving-order stress A (seeds 0-99)', files: ['tests/serving-order-stress-a.test.ts'] },
+  { name: 'serving-order stress B (seeds 100-199)', files: ['tests/serving-order-stress-b.test.ts'] },
 ];
 
 function runBatch(batch) {
