@@ -35,6 +35,7 @@ import {
 } from '../types';
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
 import type { BlendReactionMetadata } from '../logic/blendRecipe';
+import { isServedCupState, serveOrderOf, servedPrefixLength } from '../logic/servingOrder';
 import {
   canActAsSource,
   floatingIngredientHostSatisfied,
@@ -123,6 +124,10 @@ export const STRAINER_WRONG_COLOR_HINT =
   'Этот чай можно вернуть только на такой же слой или в пустой сосуд.';
 /** Release into the source-only teapot (never a destination). */
 export const STRAINER_TEAPOT_HINT = 'В чайник нельзя наливать — он только раздаёт настой.';
+/** Premature completion of serving cup ② (order enforced, no mutation). */
+export const SERVE_ORDER_HINT = 'Сначала подай чашку ①';
+/** Sourcing from an already-served cup (locked, no mutation). */
+export const SERVED_CUP_HINT = 'Эта чашка уже подана';
 /** Attached source would pour a single layer (tool stays attached). */
 export const STRAINER_NEEDS_TWO_HINT = 'Ситечку нужен перелив хотя бы из 2 слоёв.';
 /** No tool in this puzzle (defensive; production always has one when shown). */
@@ -218,7 +223,25 @@ export function strainedPourHint(code: PourRejectCode): string {
   }
 }
 
+/**
+ * Serving-order UX copy (pure, no Pixi): maps `pourRejectCodeState`
+ * serving gates to Russian hints. `ok` and unrelated codes yield empty
+ * string (no hint). Soft by design — no alarm copy here.
+ */
+export function servingOrderPourHint(code: PourRejectCode): string {
+  switch (code) {
+    case 'serve-order':
+      return SERVE_ORDER_HINT;
+    case 'source-served':
+      return SERVED_CUP_HINT;
+    default:
+      return '';
+  }
+}
+
 /** Alias set for forward-compat with alternate test import names. */
+export const getServingOrderPourHint = servingOrderPourHint;
+export const servingOrderRejectHint = servingOrderPourHint;
 export const strainerPlaceRejectHint = strainerPlaceHint;
 export const getStrainerPlaceHint = strainerPlaceHint;
 export const placeStrainerHint = strainerPlaceHint;
@@ -719,6 +742,81 @@ export function teaBloomVisualPlan(teaBudBloomed: TeaBudSlot): TeaBloomVisualPla
 export const getTeaBloomVisualPlan = teaBloomVisualPlan;
 export const teaBloomTransitPlan = teaBloomVisualPlan;
 
+/** Serve-settle flourish duration after the tea lands (spec: ~250-400ms). */
+export const SERVE_FLOURISH_MS = 320;
+
+/**
+ * Serve plan (pure, Gauntlet 14): whether the completing pour must run the
+ * settle-onto-saucer flourish. The ONLY signal is the rules metadata
+ * `serveCompleted` — never a view-owned wasServed flag.
+ * - `1` / `2` → animate once for SERVE_FLOURISH_MS.
+ * - null/undefined → no flourish, ordinary pour visuals only.
+ */
+export interface ServeVisualPlan {
+  shouldAnimate: boolean;
+  durMs: number;
+}
+
+export function serveVisualPlan(serveCompleted: number | null | undefined): ServeVisualPlan {
+  if (serveCompleted === 1 || serveCompleted === 2) {
+    return { shouldAnimate: true, durMs: SERVE_FLOURISH_MS };
+  }
+  return { shouldAnimate: false, durMs: 0 };
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getServeVisualPlan = serveVisualPlan;
+export const serveFlourishPlan = serveVisualPlan;
+
+/**
+ * Serving-saucer order medallion (Gauntlet 14, pure and headless-testable):
+ * porcelain disc + vector numeral ①/② drawn from filled/stroked shapes
+ * (distinct glyph geometry carries the order — never color alone, no text
+ * baked in canvas, no emoji). `served` warms the ring to gold; `quiet`
+ * (pending ② before ① is served) softens the whole mark while the vessel
+ * itself stays fully interactive and normal-looking.
+ */
+export function drawServeMedallion(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  order: number,
+  served: boolean,
+  quiet: boolean,
+): void {
+  const baseAlpha = quiet ? 0.62 : 0.95;
+  // Porcelain disc.
+  g.circle(cx, cy, 7.5).fill({ color: 0xf3ead6, alpha: baseAlpha });
+  // Ring: warm gold once served, soft porcelain-dark while pending.
+  const ringColor = served ? 0xd4af37 : 0x8a7a5f;
+  g.circle(cx, cy, 7.5).stroke({ width: served ? 2.2 : 1.6, color: ringColor, alpha: served ? 1 : baseAlpha });
+  if (served) {
+    // Faint warm halo behind served medallions (gold confirmation language
+    // shared with target 'correct', no badges, no locks).
+    g.circle(cx, cy, 10.5).fill({ color: 0xffe9a8, alpha: 0.28 });
+  }
+  const ink = 0x4a2f1d;
+  const inkAlpha = quiet ? 0.75 : 1;
+  if (order === 1) {
+    // ①: stem with top/bottom serifs (filled shapes stay crisp at 7px).
+    g.roundRect(cx - 1, cy - 3.4, 2, 6.8, 1).fill({ color: ink, alpha: inkAlpha });
+    g.roundRect(cx - 2.3, cy - 3.4, 4.6, 1.5, 0.7).fill({ color: ink, alpha: inkAlpha });
+    g.roundRect(cx - 2.3, cy + 1.9, 4.6, 1.5, 0.7).fill({ color: ink, alpha: inkAlpha });
+  } else {
+    // ②: top bar sweeping through a right curve into a diagonal and base.
+    g.beginPath();
+    g.moveTo(cx - 2.3, cy - 2.7);
+    g.lineTo(cx + 1.9, cy - 2.7);
+    g.quadraticCurveTo(cx + 2.9, cy - 2.5, cx + 2.3, cy - 0.4);
+    g.quadraticCurveTo(cx + 1.4, cy + 1.2, cx - 2.3, cy + 2.9);
+    g.lineTo(cx + 2.3, cy + 2.9);
+    g.stroke({ width: 1.8, color: ink, alpha: inkAlpha });
+  }
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getDrawServeMedallion = drawServeMedallion;
+
 /**
  * Cozy tied-tea bud (Gauntlet 12): small organic botanical bundle — a
  * brown-green tied tea knot with two tiny closed sepals + a tied-thread
@@ -1044,6 +1142,14 @@ export class CupView {
    * object so skin redraws (glassOverlay) never erase it.
    */
   targetGraphics: Graphics;
+  /**
+   * Serving-saucer motif layer (Gauntlet 14): porcelain saucer accent +
+   * order medallion (①/②), above liquid so the order stays readable on any
+   * tea. Derived from the static constraint order + served status passed by
+   * the view (never view-owned served booleans). Separate graphics object
+   * so skin redraws never erase it.
+   */
+  serveGraphics: Graphics;
   /**
    * Attached-tool marker (Gauntlet 6 §35): small brass mesh drawn over the
    * host rim when `logic.strainerState` says the EMPTY tool is attached
@@ -1439,6 +1545,14 @@ export class CupView {
 
     this.targetGraphics = new Graphics();
     this.cupBodyContainer.addChild(this.targetGraphics);
+
+    // Serving-saucer motif (Gauntlet 14): porcelain saucer accent + order
+    // medallion. Above the liquid so it stays readable on any tea, below
+    // the strainer marker. Never intercepts pointer (eventMode none).
+    // Standard hitbox unchanged.
+    this.serveGraphics = new Graphics();
+    this.serveGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.serveGraphics);
 
     this.strainerGraphics = new Graphics();
     this.strainerGraphics.eventMode = 'none';
@@ -1979,6 +2093,27 @@ export class CupView {
     // tea's own color, readable at mobile size, no text baked in canvas.
     g.circle(cx, cy, 4.2).fill({ color: tea.colorNum, alpha: 1 });
     g.circle(cx - 1.2, cy - 1.2, 1.4).fill({ color: 0xffffff, alpha: 0.55 });
+  }
+
+  /**
+   * Serving-saucer motif (Gauntlet 14): porcelain saucer accent beneath the
+   * base + order medallion (①/②) at the front. Derived from the static
+   * constraint order plus the served status the view passes in (never
+   * view-owned served booleans). No order → layer cleared (ordinary levels
+   * render byte-identical to before).
+   */
+  renderServeMotif(order: number | undefined, served: boolean, quiet: boolean) {
+    const g = this.serveGraphics;
+    g.clear();
+    if (order === undefined) return;
+    const w = this.width;
+    const h = this.height;
+    const cx = w / 2;
+    // Saucer accent (fits cell padding like the existing saucer overflow;
+    // hitbox comes from the padded container, never this decoration).
+    g.ellipse(cx, h + 2, w / 2 + 6, 4.5).fill({ color: 0xf5efe0, alpha: served ? 0.55 : 0.42 });
+    g.ellipse(cx, h + 2, w / 2 + 6, 4.5).stroke({ width: 1.2, color: served ? 0xd4af37 : 0xcfc3ab, alpha: served ? 0.8 : 0.5 });
+    drawServeMedallion(g, cx, h - 18, order, served, quiet);
   }
 
   /**
@@ -3252,6 +3387,29 @@ export class TeaSortView {
         return;
       }
 
+      // Served cup as SOURCE (Gauntlet 14 §155): a served saucer can never
+      // pour out — gentle settle-resistance feedback (soft tap sound +
+      // light haptic, never an alarm), no state mutation. Legality itself
+      // stays in rules.ts (`source-served`); this duplicates nothing.
+      try {
+        const serveState = this.logic.toState();
+        if (
+          isServedCupState(
+            { cups: serveState.cups, floatingIngredients: serveState.floatingIngredients },
+            clickedIdx,
+            serveState.cupConstraints,
+          )
+        ) {
+          clickedView.triggerShake();
+          audioSynth.playSelect();
+          telegram.hapticSelection();
+          this.callbacks.onInvalidMove?.(SERVED_CUP_HINT);
+          return;
+        }
+      } catch {
+        // fall through to normal selection on state-read failure
+      }
+
       this.selectedCupIndex = clickedIdx;
       clickedView.setSelection(true);
       audioSynth.playSelect();
@@ -3315,6 +3473,7 @@ export class TeaSortView {
           res.capacityObstacleRemoved ?? null,
           res.teaBudBloomed ?? null,
           res.reaction ?? null,
+          res.serveCompleted ?? null,
         );
       }
     } else {
@@ -3353,6 +3512,19 @@ export class TeaSortView {
           audioSynth.playInvalid();
           telegram.hapticError();
           this.callbacks.onInvalidMove?.(frozenPourHint(code));
+          return;
+        }
+        // Serving-order gate (Gauntlet 14 §§155-156): premature ②
+        // completion and served-source pours refuse softly — small saucer
+        // shake on both cups, light tap sound + haptic (never an alarm),
+        // no state mutation, no source switch.
+        if (code === 'serve-order' || code === 'source-served') {
+          this.lastInvalidTargetIndex = clickedIdx;
+          clickedView.triggerShake();
+          sourceView.triggerShake();
+          audioSynth.playSelect();
+          telegram.hapticSelection();
+          this.callbacks.onInvalidMove?.(servingOrderPourHint(code));
           return;
         }
       } catch {
@@ -3404,6 +3576,19 @@ export class TeaSortView {
   }
 
   private getInvalidPourReason(sourceCup: Cup, targetCup: Cup): string {
+    // Serving-order gates first (defensive: the tap handler already maps
+    // the authoritative rejections; this keeps the fallback reason accurate
+    // too). Rules truth stays in rules.ts — recomputed here, never stored.
+    try {
+      const lst = this.logic.toState();
+      const sstate = { cups: lst.cups, floatingIngredients: lst.floatingIngredients };
+      if (isServedCupState(sstate, sourceCup.id, lst.cupConstraints)) return SERVED_CUP_HINT;
+      if (pourRejectCodeState(sstate, sourceCup.id, targetCup.id, lst.cupConstraints) === 'serve-order') {
+        return SERVE_ORDER_HINT;
+      }
+    } catch {
+      // fall through to generic reasons on state-read failure
+    }
     // Guest cup can never pour out (defensive: selection UX already
     // refuses to select it as a source) — Undo is the way back.
     if (sourceCup.isSinkOnly) {
@@ -3454,10 +3639,28 @@ export class TeaSortView {
   }
 
   renderAllCups() {
+    // Serving-order prefix is derived once per redraw from the
+    // authoritative logic state (never view-owned served booleans).
+    let servePrefix = -1;
+    try {
+      const lst = this.logic.toState();
+      servePrefix = servedPrefixLength(
+        { cups: lst.cups, floatingIngredients: lst.floatingIngredients },
+        lst.cupConstraints,
+      );
+    } catch {
+      servePrefix = -1;
+    }
     this.logic.cups.forEach((cup, idx) => {
       const view = this.cupViews[idx];
       if (view) {
         view.renderLiquid(cup);
+        const order = serveOrderOf(view.constraint);
+        if (servePrefix >= 0 && order !== undefined) {
+          view.renderServeMotif(order, servePrefix >= order, order === 2 && servePrefix === 0);
+        } else {
+          view.renderServeMotif(undefined, false, false);
+        }
       }
     });
     // Strainer markers always follow the authoritative strainerState.
@@ -3785,6 +3988,7 @@ export class TeaSortView {
     capacityObstacleRemoved: CapacityObstacleSlot = null,
     teaBudBloomed: TeaBudSlot = null,
     reaction: BlendReactionMetadata | null = null,
+    serveCompleted: number | null = null,
   ) {
     this.isAnimating = true;
     const sourceView = this.cupViews[fromIdx] as CupView;
@@ -4097,6 +4301,27 @@ export class TeaSortView {
         // Failure path: refresh from logic state (bud already null).
       } finally {
         this.clearTeaBloom();
+        this.renderAllCups();
+      }
+    }
+
+    // Serving-settle flourish (Gauntlet 14): the completing pour has landed
+    // and the cup is served in logic, so it settles onto its saucer with a
+    // soft steam flourish (~320ms). Part of THIS pour — same single ticker,
+    // same isAnimating lock, never a second onMoveComplete (exactly one).
+    // Signal is rules metadata only (`serveCompleted`), never a view-owned
+    // served flag. The persistent served rim comes from `renderAllCups`.
+    if (serveVisualPlan(serveCompleted).shouldAnimate) {
+      try {
+        const toCup = this.logic.cups[toIdx];
+        const p = this.iceStagePoint(targetView, toCup?.layers.length ?? 0);
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        this.triggerRevealSparkles(p.x, p.y);
+        await this.wait(serveVisualPlan(serveCompleted).durMs);
+      } catch {
+        // Failure path: refresh from logic state (already served there).
+      } finally {
         this.renderAllCups();
       }
     }

@@ -64,9 +64,10 @@ interface MechanicPlan {
   cinnamon: boolean;
   teaBloom: boolean;
   blend: boolean;
+  servingOrder: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -293,14 +294,33 @@ const PINNED_ROLLOUT_97_104: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–96, then a deterministic
+ * Pinned rollout 105–112 (Gauntlet 14 — serving order «Порядок подачи»):
+ * 105 warmup clean · 106 challenge SERVING ORDER (tutorial) · 107 peak
+ * TASTING+mystery (already-valid familiar peak; preserves tasting-peak
+ * coverage in the post-32 rotation window) · 108 relax clean ·
+ * 109 warmup clean · 110 challenge SERVING ORDER (no tutorial repeat) ·
+ * 111 peak HONEY+mystery (already-valid familiar peak) · 112 relax clean.
+ */
+const PINNED_ROLLOUT_105_112: Record<number, MechanicPlan> = {
+  105: { ...CLEAN },
+  106: { ...CLEAN, servingOrder: true },
+  107: { ...CLEAN, tasting: true },
+  108: { ...CLEAN },
+  109: { ...CLEAN },
+  110: { ...CLEAN, servingOrder: true },
+  111: { ...CLEAN, honey: true },
+  112: { ...CLEAN },
+};
+
+/**
+ * Mechanic plan for any level: pinned table for 1–112, then a deterministic
  * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
  * combos, never honey + lemon / strainer / sink / tasting / targets except
  * the dedicated lemon+honey interaction, never strainer + lemon / sink /
  * tasting / targets, never lemon + sink / lemon + tasting / lemon +
  * targets / sink + targets / tasting + sink / tasting + targets, never
- * three specials together; frozen cup, thermos, cinnamon and tea bloom stay
- * standalone; no bloom combinations yet).
+ * three specials together; frozen cup, thermos, cinnamon, tea bloom, blend
+ * and serving order stay standalone; no serving combinations yet).
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
@@ -309,7 +329,8 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
     PINNED_ROLLOUT_41_48[levelNum] ?? PINNED_ROLLOUT_49_56[levelNum] ??
     PINNED_ROLLOUT_57_64[levelNum] ?? PINNED_ROLLOUT_65_72[levelNum] ??
     PINNED_ROLLOUT_73_80[levelNum] ?? PINNED_ROLLOUT_81_88[levelNum] ??
-    PINNED_ROLLOUT_89_96[levelNum] ?? PINNED_ROLLOUT_97_104[levelNum];
+    PINNED_ROLLOUT_89_96[levelNum] ?? PINNED_ROLLOUT_97_104[levelNum] ??
+    PINNED_ROLLOUT_105_112[levelNum];
   if (pinned) return { ...pinned };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
@@ -318,12 +339,13 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
     // challenge (no mystery): tea bloom → cinnamon → thermos → frozen cup →
     // lemon+honey → honey → teapot+honey → strainer → teapot+strainer →
     // lemon → teapot+lemon → tasting → teapot+tasting → sink → teapot+sink →
-    // targets → teapot+targets → milk-tea blend (all standalone except the
-    // established ≤2-special combos; NO bloom or blend combinations).
-    // (Levels 1–104 are pinned, so this rotation only affects 105+; the
-    // pre-G13 17-cycle order is preserved exactly, with blend appended as
-    // the new 18th residue so no existing mechanic shifts.)
-    switch (cycleNumber % 18) {
+    // targets → teapot+targets → milk-tea blend → serving order (all
+    // standalone except the established ≤2-special combos; NO bloom, blend
+    // or serving combinations).
+    // (Levels 1–112 are pinned, so this rotation only affects 113+; the
+    // pre-G14 18-cycle order is preserved exactly, with serving order
+    // appended as the new 19th residue so no existing mechanic shifts.)
+    switch (cycleNumber % 19) {
       case 0: return { ...CLEAN, teaBloom: true };
       case 1: return { ...CLEAN, cinnamon: true };
       case 2: return { ...CLEAN, thermos: true };
@@ -341,6 +363,7 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
       case 14: return { ...CLEAN, teapot: true, sink: true };
       case 15: return { ...CLEAN, targets: true };
       case 17: return { ...CLEAN, blend: true };
+      case 18: return { ...CLEAN, servingOrder: true };
       default: return { ...CLEAN, teapot: true, targets: true };
     }
   }
@@ -461,6 +484,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasCinnamon = plan.cinnamon;
   const hasTeaBloom = plan.teaBloom;
   const hasBlend = plan.blend;
+  const hasServingOrder = plan.servingOrder;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -504,6 +528,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if (plan.servingOrder) {
+    phaseSubtitle = 'Порядок подачи • 6 сосудов';
   } else if (plan.blend) {
     phaseSubtitle = 'Молочный купаж • 6 сосудов';
   } else if (plan.teaBloom) {
@@ -617,6 +643,33 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
   }
 
+  // Gauntlet 14 standalone enforcement: serving-order challenge is always
+  // the canonical 4c/6v layout (4 teas, 2 nominal empties → 6 vessels), no
+  // Mystery, no teapot. Palette is four eligible legacy teas (never
+  // reaction IDs).
+  if (hasServingOrder) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Порядок подачи • 6 сосудов';
+    // L106 tutorial: classic readable palette; L110: contrasting palette;
+    // post-112 rotation alternates deterministically among eligible teas.
+    if (levelNum === 106) {
+      colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
+    } else if (levelNum === 110) {
+      colors = ['lavender', 'saffron', 'buckwheat', 'matcha'];
+    } else {
+      const quads: Array<[TeaId, TeaId, TeaId, TeaId]> = [
+        ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'],
+        ['lavender', 'saffron', 'buckwheat', 'matcha'],
+        ['karkade', 'milk_oolong', 'lavender', 'sea_buckthorn'],
+        ['saffron', 'buckwheat', 'matcha', 'karkade'],
+      ];
+      colors = [...(quads[Math.floor(levelNum / 4) % quads.length] as [TeaId, TeaId, TeaId, TeaId])];
+    }
+  }
+
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
   if (levelNum === 1) rewardRecipeId = 'matcha';
@@ -651,6 +704,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasCinnamon,
     hasTeaBloom,
     hasBlend,
+    hasServingOrder,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

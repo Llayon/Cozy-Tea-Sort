@@ -119,11 +119,14 @@ import {
 import {
   applyPourState,
   applyPuzzleActionState,
+  canPourState,
   floatingIngredientHostSatisfied,
   isHomogeneous,
   isInFinalState,
   isPuzzleWonState,
   isWonState,
+  pourCountState,
+  pourRejectCodeState,
   sinkingIngredientHostSatisfied,
 } from './rules';
 import { createRng, Rng, SeedInput, shuffleInPlace } from './rng';
@@ -218,6 +221,19 @@ import {
   BlendRecipeId,
   resolveBlendRecipe,
 } from './blendRecipe';
+import {
+  SERVING_ORDER_DEPTH_ACCEPT,
+  SERVING_ORDER_TEMPLATE_ATTEMPTS,
+  SERVING_ORDER_TEMPLATE_BANK,
+  ServingOrderTemplateKind,
+  instantiateServingOrderTemplate,
+} from './servingOrderTemplates';
+import {
+  hasServeOrder,
+  orderedServeIndices,
+  servedPrefixLength,
+  validateServeOrderConstraints,
+} from './servingOrder';
 import {
   depthDistance,
   RhythmPhase,
@@ -329,6 +345,15 @@ export interface GenerateRequest {
    * Only the milk-tea recipe is supported; anything else is rejected loudly.
    */
   blendRecipeId?: BlendRecipeId;
+  /**
+   * Number of serving-order saucers requested (Gauntlet 14 — «Порядок
+   * подачи»). 0 = classic level without ordering; 2 = exactly one order-1
+   * and one order-2 saucer on two standard normal cap4 vessels inside the
+   * authored 4,4,4,4,0,0 topology. Only 0 or 2 supported (1, >2, negative
+   * and non-integer rejected loudly). Ordering lives entirely in
+   * CupConstraint[] — no dynamic serving state is generated.
+   */
+  serveOrderCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -496,6 +521,13 @@ export function requestedTeaBudCount(req: GenerateRequest): number {
 /** Requested blend recipe (`undefined` = classic level without chemistry). */
 export function requestedBlendRecipeId(req: GenerateRequest): BlendRecipeId | undefined {
   return req.blendRecipeId ?? undefined;
+}
+
+/** Requested serving-order saucer count, normalized (default 0). */
+export function requestedServeOrderCount(req: GenerateRequest): number {
+  const v = req.serveOrderCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
 }
 
 /**
@@ -849,6 +881,77 @@ export function validateBlendRequest(req: GenerateRequest): void {
   }
   if (requestedTeaBudCount(req) > 0) {
     throw new Error('validateBlendRequest: blend + tea bud is out of scope for Gauntlet 13');
+  }
+  if (requestedServeOrderCount(req) > 0) {
+    throw new Error('validateBlendRequest: blend + serving order is out of scope for Gauntlet 13');
+  }
+}
+
+/**
+ * Fail-fast request validation for serving order (programming errors, not
+ * generation luck). Gauntlet 14 supports exactly the standalone
+ * interaction: serveOrderCount 2 inside the authored 4c/6v 4,4,4,4,0,0
+ * topology (numColors 4, nominal emptyCups 2 → 6 vessels), no
+ * Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen/thermos/
+ * cinnamon/tea-bud/blend. Only 0 or 2 supported. The active palette must
+ * carry 4 eligible legacy teas and no reaction IDs.
+ */
+export function validateServeOrderRequest(req: GenerateRequest): void {
+  const want = requestedServeOrderCount(req);
+  if (want === 0) return;
+  if (want !== 2) {
+    throw new Error(`validateServeOrderRequest: serveOrderCount ${want} unsupported (production 0 or 2)`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateServeOrderRequest: serving order requires 4 colors, 6 vessels, 2 nominal empties, no Mystery, no teapot',
+    );
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateServeOrderRequest: serving order + targets is out of scope for Gauntlet 14');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateServeOrderRequest: serving order + sink-only is out of scope for Gauntlet 14');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateServeOrderRequest: serving order + tasting bowl is out of scope for Gauntlet 14');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateServeOrderRequest: serving order + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 14`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateServeOrderRequest: serving order + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 14`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateServeOrderRequest: serving order + strainer is out of scope for Gauntlet 14');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateServeOrderRequest: serving order + frozen cup is out of scope for Gauntlet 14');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateServeOrderRequest: serving order + thermos is out of scope for Gauntlet 14');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateServeOrderRequest: serving order + cinnamon is out of scope for Gauntlet 14');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateServeOrderRequest: serving order + tea bud is out of scope for Gauntlet 14');
+  }
+  if (requestedBlendRecipeId(req) !== undefined) {
+    throw new Error('validateServeOrderRequest: serving order + blend is out of scope for Gauntlet 14');
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) {
+    throw new Error('validateServeOrderRequest: palette must carry exactly 4 teas');
+  }
+  for (const t of palette) {
+    if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
+      throw new Error(`validateServeOrderRequest: reaction ID ${t} not eligible for serving order`);
+    }
   }
 }
 
@@ -1617,6 +1720,108 @@ export function analyzeBlendParticipation(
     cupConstraints,
     recipe,
   );
+  return out;
+}
+
+export interface ServingOrderParticipation {
+  pressureStates: number;
+  blockedCompletionCandidates: number;
+  firstPressureDepth: number | null;
+  serve1Depth: number | null;
+  serve2Depth: number | null;
+  pressureToServe1Gap: number | null;
+  serve1ToServe2Gap: number | null;
+  servedPrefixFinal: number;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal serving-order solution and count ORDER_PRESSURE states
+ * (a serve-order rejection blocks an otherwise-valid completion of ②),
+ * SERVE_1 / SERVE_2 events (prefix transitions from re-derived
+ * `serveCompleted` metadata) and final prefix/win verdicts. Production
+ * gates require pressure AND pressure-before-serve1 AND serve1-before-serve2
+ * AND prefix 2 AND win (JD–JH). Analysis only — never PuzzleState.
+ */
+export function analyzeServingOrderParticipation(
+  startCups: TeaId[][],
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): ServingOrderParticipation {
+  const out: ServingOrderParticipation = {
+    pressureStates: 0,
+    blockedCompletionCandidates: 0,
+    firstPressureDepth: null,
+    serve1Depth: null,
+    serve2Depth: null,
+    pressureToServe1Gap: null,
+    serve1ToServe2Gap: null,
+    servedPrefixFinal: 0,
+    win: false,
+  };
+  const ordered = orderedServeIndices(cupConstraints);
+  const h2 = ordered.length >= 2 ? (ordered[1] as number) : -1;
+  const emptyRow = (n: number): null[] => Array.from({ length: n }, () => null);
+  const st = (cups: TeaId[][]) => ({ cups, floatingIngredients: emptyRow(cups.length) });
+  // Control constraints: serving orders stripped (same vessels/tea).
+  const ctrl = cupConstraints.map((c) => {
+    const n = cloneCupConstraint(c);
+    delete (n as { serveOrder?: number }).serveOrder;
+    return n;
+  });
+  let cups = startCups.map((c) => [...c]);
+  const probePressure = (board: TeaId[][]): number => {
+    if (h2 < 0) return 0;
+    const cur = st(board);
+    if (servedPrefixLength(cur, cupConstraints) !== 0) return 0;
+    const dest = board[h2] as TeaId[];
+    if (dest.length === 4) return 0;
+    let n = 0;
+    for (let s = 0; s < board.length; s++) {
+      if (s === h2) continue;
+      if (!canPourState(cur, s, h2, ctrl)) continue;
+      const m = pourCountState(cur, s, h2, ctrl);
+      if (m <= 0) continue;
+      const src = board[s] as TeaId[];
+      const top = src[src.length - 1] as TeaId;
+      const candidate = [...dest];
+      for (let i = 0; i < m; i++) candidate.push(top);
+      if (candidate.length !== 4 || !candidate.every((l) => l === top)) continue;
+      if (pourRejectCodeState(cur, s, h2, cupConstraints) === 'serve-order') n++;
+    }
+    return n;
+  };
+  // Depth 0 = initial state, then after each move.
+  for (let d = 0; d <= solution.length; d++) {
+    if (d > 0) {
+      const a = solution[d - 1] as SolverAction;
+      if (a.kind === 'pour') {
+        const res = applyPourState(st(cups), (a as { from: number }).from, (a as { to: number }).to, cupConstraints);
+        if (!res) return out;
+        cups = res.state.cups as TeaId[][];
+        if (res.serveCompleted === 1 && out.serve1Depth === null) out.serve1Depth = d - 1;
+        if (res.serveCompleted === 2 && out.serve2Depth === null) out.serve2Depth = d - 1;
+      } else {
+        const res = applyPuzzleActionState(st(cups), a, cupConstraints);
+        if (!res) return out;
+        cups = res.state.cups as TeaId[][];
+      }
+    }
+    const cands = probePressure(cups);
+    if (cands > 0) {
+      out.pressureStates++;
+      out.blockedCompletionCandidates += cands;
+      if (out.firstPressureDepth === null) out.firstPressureDepth = d;
+    }
+  }
+  out.servedPrefixFinal = servedPrefixLength(st(cups), cupConstraints);
+  out.win = isPuzzleWonState(st(cups), cupConstraints);
+  if (out.firstPressureDepth !== null && out.serve1Depth !== null) {
+    out.pressureToServe1Gap = out.serve1Depth - out.firstPressureDepth;
+  }
+  if (out.serve1Depth !== null && out.serve2Depth !== null) {
+    out.serve1ToServe2Gap = out.serve2Depth - out.serve1Depth;
+  }
   return out;
 }
 
@@ -2406,9 +2611,51 @@ function finalizeCandidate(
     if (countThermosCups(normalized) > 0) return null;
     if (obstacles.some((s) => s !== null)) return null;
   }
+  // Serving-order initial-state invariant (Gauntlet 14 standalone dependency).
+  const wantServe = requestedServeOrderCount(req);
+  const serveReasons = validateServeOrderConstraints(normalized);
+  if (wantServe === 0) {
+    if (hasServeOrder(normalized)) return null;
+  } else {
+    if (serveReasons.length > 0) return null;
+    const ordered = orderedServeIndices(normalized);
+    if (ordered.length !== 2) return null;
+    for (const host of ordered) {
+      const hostCup = cups[host] as TeaId[];
+      if (!hostCup || hostCup.length !== 4) return null;
+      const first = hostCup[0] as TeaId;
+      if (!hostCup.some((t) => t !== first)) return null;
+      if ((hiddenCounts[host] ?? 0) !== 0) return null;
+    }
+    // Global topology 4,4,4,4,0,0 with exactly two ordinary empties.
+    const serveCounts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(serveCounts) !== JSON.stringify([0, 0, 4, 4, 4, 4])) return null;
+    const serveEmpties = cups.filter((c) => c.length === 0);
+    if (serveEmpties.length !== 2) return null;
+    for (let i = 0; i < cups.length; i++) {
+      if ((cups[i] as TeaId[]).length === 0) {
+        const ec = normalized[i] as CupConstraint;
+        if (ec.mode !== 'normal' || ec.targetTeaId !== undefined) return null;
+        if (cupCapacity(ec) !== STANDARD_CUP_CAPACITY || mustEndEmpty(ec)) return null;
+        if (ec.serveOrder !== undefined) return null;
+      }
+    }
+    // No second special.
+    if (presentIds.length > 0) return null;
+    if (sinkPresent.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+    if (icePresent.length > 0) return null;
+    if (countThermosCups(normalized) > 0) return null;
+    if (obstacles.some((s) => s !== null)) return null;
+    if (buds.some((s) => s !== null)) return null;
+    if (requestedBlendRecipeId(req) !== undefined) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
   if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles, teaBudSlots: buds }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon/bud-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined) {
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -2719,6 +2966,56 @@ function finalizeCandidate(
         seed,
         minMoves: blendSolved.minMoves,
         visitedStates: blendSolved.visitedStates,
+      };
+      if (!validateLevelStructure(level, req).ok) return null;
+      return level;
+    }
+  }
+  // IO–JH: serving-order production gate (Gauntlet 14). Dependency is
+  // structural ordering, not rescue — no plain-control comparison at
+  // runtime (L3 is offline curation truth). The optimal replay must hit
+  // ORDER_PRESSURE before SERVE_1, then SERVE_2, prefix 2 and win (L2).
+  // Happy path is exactly 1 solve.
+  {
+    const wantServeCount = requestedServeOrderCount(req);
+    if (wantServeCount !== 0) {
+      if (wantServeCount !== 2) return null; // IP: only 0 or 2 supported
+      if (stats) stats.solverCalls++;
+      const serveSolved = solvePuzzle(cups, {
+        maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+      });
+      if (!serveSolved.solvable || serveSolved.truncated) return null; // JA, JB
+      if (serveSolved.minMoves === undefined) return null;
+      if (
+        serveSolved.minMoves < SERVING_ORDER_DEPTH_ACCEPT.min ||
+        serveSolved.minMoves > SERVING_ORDER_DEPTH_ACCEPT.max
+      ) {
+        return null; // JC
+      }
+      const serveSolution = (serveSolved.solution ?? []) as SolverAction[];
+      const spart = analyzeServingOrderParticipation(cups, serveSolution, normalized);
+      if (spart.blockedCompletionCandidates < 1) return null; // JD
+      if (spart.firstPressureDepth === null) return null; // JD
+      if (spart.serve1Depth === null || spart.serve2Depth === null) return null; // JF
+      if (spart.firstPressureDepth >= spart.serve1Depth) return null; // JE
+      if (spart.serve1Depth >= spart.serve2Depth) return null; // JF
+      if (spart.servedPrefixFinal !== 2) return null; // JG
+      if (!spart.win) return null; // JH
+      const level: GeneratedLevel = {
+        cups,
+        hiddenCounts,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+        sinkingIngredients: sinkSlots,
+        strainer: strainerState,
+        iceSlots: ice,
+        capacityObstacles: obstacles,
+        teaBudSlots: buds,
+        seed,
+        minMoves: serveSolved.minMoves,
+        visitedStates: serveSolved.visitedStates,
       };
       if (!validateLevelStructure(level, req).ok) return null;
       return level;
@@ -3484,6 +3781,37 @@ function blendFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong L2 serving-order fallback topology (depth 11, early/mid
+ * pressure gap 2, L3): instantiated with the identity role mapping
+ * (palette order — a full isomorphism modulo tie-breaking), so the
+ * recorded depth holds subject to runtime re-validation. Passes through
+ * `finalizeCandidate` — never trusted blindly. Backup pins cover the
+ * (near-impossible) miss.
+ */
+const SERVING_ORDER_FALLBACK_TEMPLATE_ID = 'serving-11-4003';
+const SERVING_ORDER_FALLBACK_BACKUP_IDS = ['serving-11-18000', 'serving-12-115005'];
+
+function servingOrderFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> {
+  if (servingOrderTemplateKindFor(req) === null) return [];
+  const kind = servingOrderTemplateKindFor(req) as ServingOrderTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
+  for (const id of [SERVING_ORDER_FALLBACK_TEMPLATE_ID, ...SERVING_ORDER_FALLBACK_BACKUP_IDS]) {
+    const tpl = SERVING_ORDER_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateServingOrderTemplate(tpl, [...palette]);
+    const constraints = defaultCupConstraints(inst.cups.length);
+    constraints[inst.serve1Index] = { mode: 'normal', serveOrder: 1 };
+    constraints[inst.serve2Index] = { mode: 'normal', serveOrder: 2 };
+    out.push({ cups: inst.cups, constraints });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -3496,6 +3824,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateCinnamonRequest(req);
   validateTeaBudRequest(req);
   validateBlendRequest(req);
+  validateServeOrderRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -3519,9 +3848,16 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantThermos > 0 ? ':thermos' : ''}` +
     `${wantCinnamon > 0 ? ':cinnamon' : ''}` +
     `${wantBud > 0 ? ':tea-bloom' : ''}` +
-    `${requestedBlendRecipeId(req) !== undefined ? ':blend' : ''}`;
+    `${requestedBlendRecipeId(req) !== undefined ? ':blend' : ''}` +
+    `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
+  // Dedicated serving-order shapes go first for serving requests (identity
+  // role mapping — recorded depths hold modulo tie-breaking; finalize
+  // re-validates).
+  if (requestedServeOrderCount(req) !== 0) {
+    shapeEntries.push(...servingOrderFallbackEntries(req));
+  }
   // Dedicated blend shapes go first for blend requests (palette fillers in
   // order — recorded depths hold modulo tie-breaking; finalize re-validates).
   if (requestedBlendRecipeId(req) !== undefined) {
@@ -4607,6 +4943,98 @@ function generateFromBlendTemplateBank(
   return null;
 }
 
+/** Eligible legacy teas for serving-order roles (never reaction IDs). */
+export const SERVING_ORDER_ELIGIBLE_TEAS: readonly TeaId[] = [
+  'matcha',
+  'sea_buckthorn',
+  'karkade',
+  'milk_oolong',
+  'lavender',
+  'saffron',
+  'buckwheat',
+];
+
+/**
+ * Match a request against the serving-order bank (Gauntlet 14). Recognized
+ * ONLY for the exact production combination: serveOrderCount 2, 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * The palette must carry 4 eligible legacy teas (no reaction IDs).
+ * Anything else keeps the existing paths (validation throws for bad combos).
+ */
+export function servingOrderTemplateKindFor(req: GenerateRequest): ServingOrderTemplateKind | null {
+  if (requestedServeOrderCount(req) !== 2) return null;
+  if (requestedTeaBudCount(req) !== 0) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    const palette = req.colors.slice(0, req.numColors);
+    if (palette.length !== req.numColors) return null;
+    if (!palette.every((t) => (SERVING_ORDER_ELIGIBLE_TEAS as readonly string[]).includes(t))) return null;
+    return 'serving-order';
+  }
+  return null;
+}
+
+/**
+ * Bounded serving-order fast path (Gauntlet 14 §129/§132): validate
+ * request → seeded template choice → seeded full role bijection over the
+ * request palette (a full isomorphism, so bank depth is preserved modulo
+ * tie-breaking) → O1/O2 static constraints on the template hosts → single
+ * `finalizeCandidate` validation (L2 trace inside). At most
+ * SERVING_ORDER_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses fallback ladder).
+ * Happy path is exactly 1 solver call (§131).
+ */
+function generateFromServingOrderTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = servingOrderTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = SERVING_ORDER_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < SERVING_ORDER_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    // Seeded topology variation: full permutation of all four roles.
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateServingOrderTemplate(tpl, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    constraints[inst.serve1Index] = { mode: 'normal', serveOrder: 1 };
+    constraints[inst.serve2Index] = { mode: 'normal', serveOrder: 2 };
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#serving-order:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 /**
  * Match a request against the thermos bank (Gauntlet 10). Recognized
  * ONLY for the exact production combination: thermosCupCount 1, 4 colors,
@@ -4769,6 +5197,7 @@ export function generateLevel(
   validateCinnamonRequest(req);
   validateTeaBudRequest(req);
   validateBlendRequest(req);
+  validateServeOrderRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -4898,6 +5327,16 @@ export function generateLevel(
   // or the validated fallback ladder.
   if (blendTemplateKindFor(req) !== null) {
     const fast = generateFromBlendTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical serving-order configs skip the random scan entirely
+  // (Gauntlet 14 §129): bounded SERVING_ORDER_TEMPLATE_ATTEMPTS
+  // validations, never a 150-deal scan. maxRetries: 0 still yields a valid
+  // level through the fast path or the validated fallback ladder.
+  if (servingOrderTemplateKindFor(req) !== null) {
+    const fast = generateFromServingOrderTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -5824,6 +6263,107 @@ export function validateLevelStructure(
       if ((level.hiddenCounts[i] ?? 0) !== 0) {
         reasons.push(`blend vessel ${i} must not hide mystery (IN)`);
       }
+    }
+  }
+  // IO–JH: serving-order structural invariant (solver L2 items JA–JH live
+  // in finalizeCandidate, not here).
+  const wantServe = requestedServeOrderCount(req);
+  if (wantServe === 0) {
+    if (hasServeOrder(constraints)) {
+      reasons.push('unexpected serving order without request (IO)');
+    }
+  } else {
+    if (wantServe !== 2) {
+      reasons.push(`only serveOrderCount 0 or 2 supported (IP), got ${wantServe}`);
+    }
+    const ordered = orderedServeIndices(constraints);
+    if (ordered.length !== 2) {
+      reasons.push(`expected exactly two ordered cups (IQ), got ${ordered.length}`);
+    }
+    const serveOrders = ordered.map((i) => constraints[i]?.serveOrder);
+    if (JSON.stringify([...serveOrders].sort()) !== JSON.stringify([1, 2])) {
+      reasons.push(`orders must be unique and contiguous 1,2 (IS), got [${serveOrders.join(',')}]`);
+    }
+    for (const i of ordered) {
+      const c = constraints[i] as CupConstraint | undefined;
+      if (!c || c.mode !== 'normal' || c.targetTeaId !== undefined) {
+        reasons.push(`ordered vessel ${i} must be untargeted plain normal (IT/IU)`);
+      }
+      if (c && cupCapacity(c) !== STANDARD_CUP_CAPACITY) {
+        reasons.push(`ordered vessel ${i} must keep base capacity 4 (IT)`);
+      }
+      if (c && mustEndEmpty(c)) {
+        reasons.push(`ordered vessel ${i} must be a standard vessel (IT/IU)`);
+      }
+    }
+    // IW/IX/IY: shape, counts, empties.
+    const serveLens = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(serveLens) !== JSON.stringify([0, 0, 4, 4, 4, 4])) {
+      reasons.push(`serving-order levels must start 4,4,4,4,0,0 (IW), got [${serveLens.join(',')}]`);
+    }
+    if (level.cups.filter((c) => c.length === 0).length !== 2) {
+      reasons.push('serving-order levels must keep exactly two empties (IY)');
+    }
+    const servePalette = req.colors.slice(0, req.numColors);
+    const serveUnits = new Map<TeaId, number>();
+    for (const cup of level.cups) for (const t of cup as TeaId[]) serveUnits.set(t, (serveUnits.get(t) ?? 0) + 1);
+    for (const t of servePalette) {
+      if ((serveUnits.get(t) ?? 0) !== TEA_UNITS_PER_COLOR) {
+        reasons.push(`serving-order tea ${t} must start ×4 (IX), got ${serveUnits.get(t) ?? 0}`);
+      }
+    }
+    for (const [t, n] of serveUnits) {
+      if (!servePalette.includes(t)) {
+        reasons.push(`serving-order unexpected tea ${t} ×${n} outside palette`);
+      }
+      if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
+        reasons.push(`reaction ID ${t} must not appear on serving-order levels`);
+      }
+    }
+    // IV: all four initial filled cups mixed.
+    for (let i = 0; i < level.cups.length; i++) {
+      const cup = level.cups[i] as TeaId[];
+      if (cup.length === 4) {
+        const first = cup[0] as TeaId;
+        if (!cup.some((t) => t !== first)) reasons.push(`serving-order vessel ${i} must start mixed (IV)`);
+      }
+      if ((level.hiddenCounts[i] ?? 0) !== 0) {
+        reasons.push(`serving-order vessel ${i} must not hide mystery`);
+      }
+    }
+    // IZ: standalone — no second special.
+    if (presentIds.length > 0) reasons.push('serving order + lemon is out of scope for Gauntlet 14 (IZ)');
+    if (sinkPresentForD.length > 0) reasons.push('serving order + honey is out of scope for Gauntlet 14 (IZ)');
+    if (normalizeStrainerState(level.strainer).present) {
+      reasons.push('serving order + strainer is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (constraints.some((c) => c?.mode === 'sink-only')) {
+      reasons.push('serving order + sink is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (constraints.some((c) => c?.targetTeaId !== undefined)) {
+      reasons.push('serving order + targets is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (constraints.some((c) => c && isTastingCupConstraint(c))) {
+      reasons.push('serving order + tasting is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (icePresentForD.length > 0) reasons.push('serving order + frozen cup is out of scope for Gauntlet 14 (IZ)');
+    if (constraints.some((c) => isThermosCupConstraint(c))) {
+      reasons.push('serving order + thermos is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (obstacleSlots.some((s) => s !== null)) {
+      reasons.push('serving order + cinnamon is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (budSlots.some((s) => s !== null)) {
+      reasons.push('serving order + tea bud is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (requestedBlendRecipeId(req) !== undefined) {
+      reasons.push('serving order + blend is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (requestedSourceOnlyCount(req) > 0) {
+      reasons.push('serving order + teapot is out of scope for Gauntlet 14 (IZ)');
+    }
+    if (req.hasMysteryLayer) {
+      reasons.push('serving order + Mystery is out of scope for Gauntlet 14 (IZ)');
     }
   }
   // Homogeneity helper stays referenced for future mixed-block checks.

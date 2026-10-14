@@ -150,6 +150,7 @@ export default function App() {
         cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
+        serveOrderCount: cfg.hasServingOrder ? 2 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -251,6 +252,7 @@ export default function App() {
         cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
+        serveOrderCount: cfg.hasServingOrder ? 2 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -714,6 +716,18 @@ export default function App() {
         </div>
       )}
 
+      {/* Serving-order first-encounter onboarding (Level 106 only): compact,
+           never blocking. NOT shown on 110 (no tutorial repeat). */}
+      {currentConfig.hasServingOrder && currentLevel === 106 && moves === 0 && !isWon && (
+        <div
+          id="serving-order-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#232A1E]/95 border-b border-[#5A6B4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#DCE8C8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#B8C898] shrink-0" />
+          <span>Сначала собери чашку ①, потом ②. Поданную чашку больше не переливают.</span>
+        </div>
+      )}
+
       {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
            compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
       {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
@@ -962,6 +976,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#D8A05E] font-bold">🥛</span>
                 <span>Если чёрный чай и молоко соприкасаются, они соединяются в один слой молочного чая. Реакция работает в обе стороны.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#B8C898] font-bold">①</span>
+                <span>Чашками ① и ② можно пользоваться во время сортировки как обычными. Но полностью собрать их нужно по порядку: сначала ①, затем ②. Поданную чашку больше нельзя переливать.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>
