@@ -151,6 +151,7 @@ export default function App() {
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
         serveOrderCount: cfg.hasServingOrder ? 2 : 0,
+        sharedTrayCount: (cfg as { hasSharedTray?: boolean }).hasSharedTray ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -253,6 +254,7 @@ export default function App() {
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
         serveOrderCount: cfg.hasServingOrder ? 2 : 0,
+        sharedTrayCount: (cfg as { hasSharedTray?: boolean }).hasSharedTray ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -731,6 +733,16 @@ export default function App() {
       {/* G15 composition first-encounter (Level 154 only): both mechanics are
            already known (tasting L26, serving L106), so one concise contextual
            hint. Never blocking. NOT shown on later mixed levels (234, …). */}
+      {(currentConfig as { hasSharedTray?: boolean }).hasSharedTray && currentLevel === 162 && moves === 0 && !isWon && (
+        <div
+          id="shared-tray-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#232A1E]/95 border-b border-[#5A6B4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#DCE8C8] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#B8C898] shrink-0" />
+          <span>На подносе всего 6 мест для чая. Освободи место в одной чашке — оно появится для другой.</span>
+        </div>
+      )}
+
       {currentConfig.hasServingOrder && currentConfig.hasTastingBowl && currentLevel === 154 && moves === 0 && !isWon && (
         <div
           id="serving-order-tasting-tutorial-hint"
@@ -993,6 +1005,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#B8C898] font-bold">①</span>
                 <span>Чашками ① и ② можно пользоваться во время сортировки как обычными. Но полностью собрать их нужно по порядку: сначала ①, затем ②. Поданную чашку больше нельзя переливать.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#C8A878] font-bold">🍽️</span>
+                <span>Две чашки на общем подносе делят вместимость: вместе в них может быть не больше 6 слоёв чая. Переливая чай с подноса наружу, ты освобождаешь место для любой из этих двух чашек.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

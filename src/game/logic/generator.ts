@@ -240,7 +240,19 @@ import {
   servedPrefixLength,
   validateServeOrderConstraints,
 } from './servingOrder';
-import { validateMechanicCombination } from './mechanicCompatibility';
+import {
+  SHARED_TRAY_DEPTH_ACCEPT,
+  SHARED_TRAY_TEMPLATE_ATTEMPTS,
+  SHARED_TRAY_TEMPLATE_BANK,
+  SharedTrayTemplateKind,
+  instantiateSharedTrayTemplate,
+} from './sharedTrayTemplates';
+import {
+  hasSharedCapacity,
+  sharedCapacityOccupancy,
+  validateSharedCapacityConstraints,
+} from './sharedCapacity';
+import { validateMechanicCombination, validateSharedTrayCombination } from './mechanicCompatibility';
 import {
   depthDistance,
   RhythmPhase,
@@ -361,6 +373,15 @@ export interface GenerateRequest {
    * CupConstraint[] — no dynamic serving state is generated.
    */
   serveOrderCount?: number;
+  /**
+   * Number of shared-tray groups requested (Gauntlet 16 — «Общий поднос»).
+   * 0 = classic level without shared capacity; 1 = exactly one tea-tray
+   * group (two members, limit 6) on two standard normal cap4 vessels inside
+   * the authored 4c/6v 3,3,4,4,2,0 topology. Only 0 or 1 supported (>1,
+   * negative and non-integer rejected loudly). Membership lives entirely in
+   * CupConstraint[] — no dynamic shared state is generated.
+   */
+  sharedTrayCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -533,6 +554,13 @@ export function requestedBlendRecipeId(req: GenerateRequest): BlendRecipeId | un
 /** Requested serving-order saucer count, normalized (default 0). */
 export function requestedServeOrderCount(req: GenerateRequest): number {
   const v = req.serveOrderCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested shared-tray group count, normalized (default 0). */
+export function requestedSharedTrayCount(req: GenerateRequest): number {
+  const v = (req as GenerateRequest).sharedTrayCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -990,6 +1018,97 @@ export function validateServeOrderRequest(req: GenerateRequest): void {
   }
   if (honey !== undefined && !palette.includes('buckwheat')) {
     throw new Error('validateServeOrderRequest: serving order + honey needs buckwheat in the active palette');
+  }
+}
+
+/**
+ * Fail-fast request validation for shared trays (programming errors, not
+ * generation luck). Gauntlet 16 supports exactly the standalone
+ * interaction: sharedTrayCount 1 inside the authored 4c/6v 3,3,4,4,2,0
+ * topology (numColors 4, nominal emptyCups 2 → 6 vessels), no
+ * Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen/thermos/
+ * cinnamon/tea-bud/blend/serving-order. Only 0 or 1 supported. The active
+ * palette must carry 4 eligible legacy teas and no reaction IDs.
+ */
+export function validateSharedTrayRequest(req: GenerateRequest): void {
+  const raw = (req as GenerateRequest).sharedTrayCount ?? 0;
+  if (raw === 0) return;
+  if (!Number.isInteger(raw) || (raw as number) !== 1) {
+    throw new Error(`validateSharedTrayRequest: sharedTrayCount ${String(raw)} unsupported (production 0 or 1)`);
+  }
+  const want = 1;
+  void want;
+  const hasMystery = req.hasMysteryLayer === true;
+  const tasting = requestedTastingCupCount(req);
+  const honey = requestedSinkingIngredient(req);
+  const comboReasons = validateSharedTrayCombination({
+    sharedTray: true,
+    servingOrder: requestedServeOrderCount(req) > 0,
+    mystery: hasMystery,
+    tastingCount: tasting,
+    honey: honey !== undefined,
+    strainer: requestedHasStrainer(req),
+    blend: requestedBlendRecipeId(req) !== undefined,
+  });
+  if (comboReasons.length > 0) {
+    throw new Error(`validateSharedTrayRequest: ${comboReasons.join('; ')}`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateSharedTrayRequest: shared tray requires 4 colors, 6 vessels, 2 nominal empties, no teapot',
+    );
+  }
+  if (hasMystery) {
+    throw new Error('validateSharedTrayRequest: shared tray + mystery is out of scope for Gauntlet 16');
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + targets is out of scope for Gauntlet 16');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + sink-only is out of scope for Gauntlet 16');
+  }
+  if (tasting > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + tasting bowl is out of scope for Gauntlet 16');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateSharedTrayRequest: shared tray + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 16`,
+    );
+  }
+  if (honey !== undefined) {
+    throw new Error(
+      `validateSharedTrayRequest: shared tray + ${honey} is out of scope for Gauntlet 16`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateSharedTrayRequest: shared tray + strainer is out of scope for Gauntlet 16');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + frozen cup is out of scope for Gauntlet 16');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + thermos is out of scope for Gauntlet 16');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + cinnamon is out of scope for Gauntlet 16');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + tea bud is out of scope for Gauntlet 16');
+  }
+  if (requestedBlendRecipeId(req) !== undefined) {
+    throw new Error('validateSharedTrayRequest: shared tray + blend is forbidden (G16 §50; chemistry stays standalone)');
+  }
+  if (requestedServeOrderCount(req) > 0) {
+    throw new Error('validateSharedTrayRequest: shared tray + serving order is out of scope for Gauntlet 16');
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) {
+    throw new Error('validateSharedTrayRequest: palette must carry exactly 4 teas');
+  }
+  for (const t of palette) {
+    if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
+      throw new Error(`validateSharedTrayRequest: reaction ID ${t} not eligible for shared tray`);
+    }
   }
 }
 
@@ -1870,6 +1989,113 @@ export function analyzeServingOrderParticipation(
   return out;
 }
 
+export interface SharedTrayParticipation {
+  pressureStates: number;
+  firstPressureDepth: number | null;
+  firstReleaseDepth: number | null;
+  firstRefillDepth: number | null;
+  win: boolean;
+}
+
+/**
+ * Replay an optimal shared-tray solution and count SHARED_PRESSURE states
+ * (outside→tray blocked or bounded vs control), GROUP_RELEASE (tray→outside
+ * decreasing occupancy) and GROUP_REFILL (outside→tray increasing occupancy
+ * after a release), plus win. Production gates require pressure AND
+ * pressure-before-release AND release-before-refill AND win (JI–JD, L2).
+ * Analysis only — never PuzzleState.
+ */
+export function analyzeSharedTrayParticipation(
+  startCups: TeaId[][],
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): SharedTrayParticipation {
+  const out: SharedTrayParticipation = {
+    pressureStates: 0,
+    firstPressureDepth: null,
+    firstReleaseDepth: null,
+    firstRefillDepth: null,
+    win: false,
+  };
+  const emptyRow = (n: number): null[] => Array.from({ length: n }, () => null);
+  const st = (cups: TeaId[][]) => ({ cups, floatingIngredients: emptyRow(cups.length) });
+  const trayMembers = cupConstraints
+    .map((c, i) => (c?.sharedCapacityGroup === 'tea-tray' ? i : -1))
+    .filter((i) => i >= 0);
+  const traySet = new Set(trayMembers);
+  const ctrl = cupConstraints.map((c) => {
+    const n = cloneCupConstraint(c);
+    delete (n as { sharedCapacityGroup?: unknown }).sharedCapacityGroup;
+    return n;
+  });
+  let cups = startCups.map((c) => [...c]);
+  const occOf = (board: TeaId[][]): number => {
+    let s = 0;
+    for (const m of trayMembers) s += (board[m] as TeaId[]).length;
+    return s;
+  };
+  const probePressure = (board: TeaId[][]): boolean => {
+    const cur = st(board);
+    for (const t of trayMembers) {
+      const dest = board[t] as TeaId[];
+      if (dest.length >= 4) continue;
+      for (let s = 0; s < board.length; s++) {
+        if (traySet.has(s)) continue;
+        if (!canPourState(cur, s, t, ctrl)) continue;
+        const mControl = pourCountState(cur, s, t, ctrl);
+        if (mControl <= 0) continue;
+        const mShared = pourCountState(cur, s, t, cupConstraints);
+        if (!canPourState(cur, s, t, cupConstraints) || mShared < mControl) return true;
+      }
+    }
+    return false;
+  };
+  let seenReleaseAfterPressure = false;
+  for (let d = 0; d <= solution.length; d++) {
+    if (d > 0) {
+      const a = solution[d - 1] as SolverAction;
+      if (a.kind === 'pour') {
+        const from = (a as { from: number }).from;
+        const to = (a as { to: number }).to;
+        const before = occOf(cups);
+        const res = applyPourState(st(cups), from, to, cupConstraints);
+        if (!res) return out;
+        cups = res.state.cups as TeaId[][];
+        const after = occOf(cups);
+        const fromTray = traySet.has(from);
+        const toTray = traySet.has(to);
+        if (fromTray && !toTray && after < before && out.firstPressureDepth !== null && out.firstReleaseDepth === null && d - 1 >= out.firstPressureDepth) {
+          out.firstReleaseDepth = d;
+          seenReleaseAfterPressure = true;
+        } else if (fromTray && !toTray && after < before && out.firstPressureDepth !== null && out.firstReleaseDepth === null) {
+          out.firstReleaseDepth = d;
+          seenReleaseAfterPressure = true;
+        }
+        if (!fromTray && toTray && after > before && seenReleaseAfterPressure && out.firstRefillDepth === null && out.firstReleaseDepth !== null && d > out.firstReleaseDepth) {
+          out.firstRefillDepth = d;
+        }
+      } else {
+        const res = applyPuzzleActionState(st(cups), a, cupConstraints);
+        if (!res) return out;
+        cups = res.state.cups as TeaId[][];
+      }
+    }
+    if (probePressure(cups)) {
+      out.pressureStates++;
+      if (out.firstPressureDepth === null) out.firstPressureDepth = d;
+    }
+  }
+  out.win = isPuzzleWonState(st(cups), cupConstraints);
+  if (out.firstPressureDepth !== null && out.firstReleaseDepth !== null && !(out.firstPressureDepth < out.firstReleaseDepth)) {
+    out.firstReleaseDepth = null;
+    out.firstRefillDepth = null;
+  }
+  if (out.firstReleaseDepth !== null && out.firstRefillDepth !== null && !(out.firstReleaseDepth < out.firstRefillDepth)) {
+    out.firstRefillDepth = null;
+  }
+  return out;
+}
+
 /**
  * Multi-ingredient interaction trace (Gauntlet 8 §38, ANALYSIS ONLY —
  * never gameplay state). Replays a solution and counts, at deterministic
@@ -2706,9 +2932,65 @@ function finalizeCandidate(
     if (buds.some((s) => s !== null)) return null;
     if (requestedBlendRecipeId(req) !== undefined) return null;
   }
+  // Shared-tray initial-state invariant (Gauntlet 16 standalone group budget).
+  const wantShared = requestedSharedTrayCount(req);
+  const sharedReasons = validateSharedCapacityConstraints(normalized);
+  if (wantShared === 0) {
+    if (hasSharedCapacity(normalized)) return null;
+  } else {
+    if (sharedReasons.length > 0) return null;
+    const members = normalized
+      .map((c, i) => (c?.sharedCapacityGroup === 'tea-tray' ? i : -1))
+      .filter((i) => i >= 0);
+    if (members.length !== 2) return null;
+    for (const host of members) {
+      const hostCup = cups[host] as TeaId[];
+      if (!hostCup || hostCup.length === 0) return null;
+      const first = hostCup[0] as TeaId;
+      if (!hostCup.some((t) => t !== first)) return null;
+      if ((hiddenCounts[host] ?? 0) !== 0) return null;
+    }
+    // Global topology 3,3,4,4,2,0 with exactly one empty (production P33).
+    const sharedCounts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(sharedCounts) !== JSON.stringify([0, 2, 3, 3, 4, 4])) return null;
+    // Tray occupancy starts full 6/6 and valid.
+    {
+      const occ = (cups[members[0] as number] as TeaId[]).length + (cups[members[1] as number] as TeaId[]).length;
+      if (occ !== 6) return null;
+      if (occ > 6) return null;
+    }
+    // Every non-empty start mixed (no pre-solved homogeneous stacks).
+    for (const cup of cups) {
+      const arr = cup as TeaId[];
+      if (arr.length > 0 && !arr.some((t) => t !== arr[0])) return null;
+    }
+    // Exactly 4 tea units per color, no reaction IDs.
+    {
+      const counts = new Map<TeaId, number>();
+      for (const cup of cups) for (const t of cup as TeaId[]) counts.set(t, (counts.get(t) ?? 0) + 1);
+      for (const [, n] of counts) if (n !== 4) return null;
+      for (const t of counts.keys()) {
+        if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') return null;
+      }
+    }
+    // No second mechanic.
+    if (presentIds.length > 0) return null;
+    if (sinkPresent.length > 0) return null;
+    if (strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+    if (icePresent.length > 0) return null;
+    if (countThermosCups(normalized) > 0) return null;
+    if (obstacles.some((s) => s !== null)) return null;
+    if (buds.some((s) => s !== null)) return null;
+    if (requestedBlendRecipeId(req) !== undefined) return null;
+    if (requestedServeOrderCount(req) !== 0) return null;
+    if (hasServeOrder(normalized)) return null;
+  }
   if (isWonState(cups, normalized)) return null; // D
   if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles, teaBudSlots: buds }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon/bud-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0) {
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0 && requestedSharedTrayCount(req) === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -3079,6 +3361,54 @@ function finalizeCandidate(
         seed,
         minMoves: serveSolved.minMoves,
         visitedStates: serveSolved.visitedStates,
+      };
+      if (!validateLevelStructure(level, req).ok) return null;
+      return level;
+    }
+  }
+  // JI–JD: shared-tray production gate (Gauntlet 16). Group budget is
+  // structural capacity, not rescue — no plain-control comparison at runtime
+  // (L3 is offline curation truth). The optimal replay must hit
+  // SHARED_PRESSURE before GROUP_RELEASE, then GROUP_REFILL, and win (L2).
+  // Happy path is exactly 1 solve.
+  {
+    const wantSharedCount = requestedSharedTrayCount(req);
+    if (wantSharedCount !== 0) {
+      if (wantSharedCount !== 1) return null; // JJ: only 0 or 1 supported
+      if (stats) stats.solverCalls++;
+      const sharedSolved = solvePuzzle(cups, {
+        maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+      });
+      if (!sharedSolved.solvable || sharedSolved.truncated) return null;
+      if (sharedSolved.minMoves === undefined) return null;
+      if (
+        sharedSolved.minMoves < SHARED_TRAY_DEPTH_ACCEPT.min ||
+        sharedSolved.minMoves > SHARED_TRAY_DEPTH_ACCEPT.max
+      ) {
+        return null;
+      }
+      const sharedSolution = (sharedSolved.solution ?? []) as SolverAction[];
+      const tpart = analyzeSharedTrayParticipation(cups, sharedSolution, normalized);
+      if (tpart.firstPressureDepth === null) return null;
+      if (tpart.firstReleaseDepth === null || tpart.firstRefillDepth === null) return null;
+      if (!(tpart.firstPressureDepth < tpart.firstReleaseDepth)) return null;
+      if (!(tpart.firstReleaseDepth < tpart.firstRefillDepth)) return null;
+      if (!tpart.win) return null;
+      const level: GeneratedLevel = {
+        cups,
+        hiddenCounts,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+        sinkingIngredients: sinkSlots,
+        strainer: strainerState,
+        iceSlots: ice,
+        capacityObstacles: obstacles,
+        teaBudSlots: buds,
+        seed,
+        minMoves: sharedSolved.minMoves,
+        visitedStates: sharedSolved.visitedStates,
       };
       if (!validateLevelStructure(level, req).ok) return null;
       return level;
@@ -3905,6 +4235,36 @@ function servingOrderTastingFallbackEntries(
   return out;
 }
 
+/**
+ * Pinned strong L2 shared-tray fallback (depth 10, pressure 0, cross-member):
+ * identity role mapping, runtime re-validated. Preserves the requested
+ * standalone tray (never falls back to ordinary). Backups cover the
+ * (near-impossible) miss.
+ */
+const SHARED_TRAY_FALLBACK_TEMPLATE_ID = 'tray-10-0';
+const SHARED_TRAY_FALLBACK_BACKUP_IDS = ['tray-11-2', 'tray-11-7'];
+
+function sharedTrayFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> {
+  if (sharedTrayTemplateKindFor(req) === null) return [];
+  const kind = sharedTrayTemplateKindFor(req) as SharedTrayTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
+  for (const id of [SHARED_TRAY_FALLBACK_TEMPLATE_ID, ...SHARED_TRAY_FALLBACK_BACKUP_IDS]) {
+    const tpl = SHARED_TRAY_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateSharedTrayTemplate(tpl, [...palette]);
+    const constraints = defaultCupConstraints(inst.cups.length);
+    for (const m of inst.trayMembers) {
+      constraints[m] = { mode: 'normal', sharedCapacityGroup: 'tea-tray' };
+    }
+    out.push({ cups: inst.cups, constraints });
+  }
+  return out;
+}
+
 export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}): GeneratedLevel {
   validateTargetRequest(req);
   validateSinkRequest(req);
@@ -3942,7 +4302,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantCinnamon > 0 ? ':cinnamon' : ''}` +
     `${wantBud > 0 ? ':tea-bloom' : ''}` +
     `${requestedBlendRecipeId(req) !== undefined ? ':blend' : ''}` +
-    `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}`;
+    `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}${requestedSharedTrayCount(req) !== 0 ? ':shared-tray' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
   // Dedicated serving-order-tasting composition shapes go first for combo
@@ -3951,6 +4311,9 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   if (requestedServeOrderCount(req) !== 0) {
     shapeEntries.push(...servingOrderTastingFallbackEntries(req));
     shapeEntries.push(...servingOrderFallbackEntries(req));
+  }
+  if (requestedSharedTrayCount(req) !== 0) {
+    shapeEntries.push(...sharedTrayFallbackEntries(req));
   }
   // Dedicated blend shapes go first for blend requests (palette fillers in
   // order — recorded depths hold modulo tie-breaking; finalize re-validates).
@@ -5050,6 +5413,99 @@ export const SERVING_ORDER_ELIGIBLE_TEAS: readonly TeaId[] = [
   'buckwheat',
 ];
 
+/** Eligible legacy teas for shared-tray roles (never reaction IDs). */
+export const SHARED_TRAY_ELIGIBLE_TEAS: readonly TeaId[] = [
+  'matcha',
+  'sea_buckthorn',
+  'karkade',
+  'milk_oolong',
+  'lavender',
+  'saffron',
+  'buckwheat',
+];
+
+/**
+ * Match a request against the shared-tray bank (Gauntlet 16). Recognized
+ * ONLY for the exact production combination: sharedTrayCount 1, 4 colors,
+ * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * The palette must carry 4 eligible legacy teas (no reaction IDs).
+ * Anything else keeps the existing paths (validation throws for bad combos).
+ */
+export function sharedTrayTemplateKindFor(req: GenerateRequest): SharedTrayTemplateKind | null {
+  if (requestedSharedTrayCount(req) !== 1) return null;
+  if (requestedServeOrderCount(req) !== 0) return null;
+  if (requestedTeaBudCount(req) !== 0) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    const palette = req.colors.slice(0, req.numColors);
+    if (palette.length !== req.numColors) return null;
+    if (!palette.every((t) => (SHARED_TRAY_ELIGIBLE_TEAS as readonly string[]).includes(t))) return null;
+    return 'shared-tray';
+  }
+  return null;
+}
+
+/**
+ * Bounded shared-tray fast path (Gauntlet 16 §§133-136): validate request →
+ * seeded template choice → seeded full role bijection over the request
+ * palette (a full isomorphism, so bank depth is preserved modulo
+ * tie-breaking) → tray static constraints on the template hosts → single
+ * `finalizeCandidate` validation (L2 trace inside). At most
+ * SHARED_TRAY_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses fallback ladder).
+ * Happy path is exactly 1 solver call (§135).
+ */
+function generateFromSharedTrayTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = sharedTrayTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = SHARED_TRAY_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < SHARED_TRAY_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateSharedTrayTemplate(tpl, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    for (const m of inst.trayMembers) {
+      constraints[m] = { mode: 'normal', sharedCapacityGroup: 'tea-tray' };
+    }
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#shared-tray:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 /**
  * Match a request against the serving-order bank (Gauntlet 14). Recognized
  * ONLY for the exact production combination: serveOrderCount 2, 4 colors,
@@ -5523,6 +5979,16 @@ export function generateLevel(
   // level through the fast path or the validated fallback ladder.
   if (servingOrderTemplateKindFor(req) !== null) {
     const fast = generateFromServingOrderTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical shared-tray configs skip the random scan entirely (Gauntlet 16
+  // §§133-136): bounded SHARED_TRAY_TEMPLATE_ATTEMPTS validations, never a
+  // 150-deal scan. maxRetries: 0 still yields a valid level through the fast
+  // path or the validated fallback ladder.
+  if (sharedTrayTemplateKindFor(req) !== null) {
+    const fast = generateFromSharedTrayTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
