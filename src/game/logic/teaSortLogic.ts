@@ -259,6 +259,16 @@ export class Cup {
     // Delegate to the shared state-aware rule table via a lightweight
     // board view. Slots travel alongside so ingredient collision (and ice
     // legality) is honored here too.
+    // Shared-capacity note (G16): a 2-cup slice cannot derive group
+    // occupancy when exactly one side is a tray member (the partner's tea
+    // is missing). That case fails closed here — callers must use the
+    // full-board state-aware rules (TeaSortLogic/canPourState). Both sides
+    // in the SAME group are exempt from the group budget, so the 2-cup
+    // view stays exact there; neither side grouped is legacy identical.
+    const a = this.constraint.sharedCapacityGroup;
+    const b = target.constraint.sharedCapacityGroup;
+    if ((a === undefined) !== (b === undefined)) return false;
+    if (a !== undefined && b !== undefined && a !== b) return false;
     return canPourState(
       {
         cups: [this.layers, target.layers],
@@ -276,6 +286,13 @@ export class Cup {
   }
 
   pourInto(target: Cup, blendRecipe?: BlendRecipe | undefined | null): { transferred: number; layer: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata } | null {
+    // Same shared-capacity 2-cup limitation as canPourInto above: exactly
+    // one grouped side (or two different groups) cannot be decided from a
+    // slice — fail closed and require the full-board transition.
+    const a = this.constraint.sharedCapacityGroup;
+    const b = target.constraint.sharedCapacityGroup;
+    if ((a === undefined) !== (b === undefined)) return null;
+    if (a !== undefined && b !== undefined && a !== b) return null;
     const res = applyPourState(
       {
         cups: [this.layers, target.layers],
@@ -527,7 +544,7 @@ export class TeaSortLogic {
   makeMove(
     fromIdx: number,
     toIdx: number,
-  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata; serveCompleted?: number | null } | null {
+  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata; serveCompleted?: number | null; sharedCapacityLimited?: boolean } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
@@ -568,6 +585,7 @@ export class TeaSortLogic {
       teaBudBloomed: res.teaBudBloomed,
       reaction: res.reaction,
       serveCompleted: res.serveCompleted ?? null,
+      sharedCapacityLimited: res.sharedCapacityLimited,
     };
   }
 

@@ -36,6 +36,7 @@ import {
 import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
 import type { BlendReactionMetadata } from '../logic/blendRecipe';
 import { isServedCupState, serveOrderOf, servedPrefixLength } from '../logic/servingOrder';
+import { sharedCapacityLimit } from '../logic/sharedCapacity';
 import {
   canActAsSource,
   floatingIngredientHostSatisfied,
@@ -126,6 +127,8 @@ export const STRAINER_WRONG_COLOR_HINT =
 export const STRAINER_TEAPOT_HINT = 'В чайник нельзя наливать — он только раздаёт настой.';
 /** Premature completion of serving cup ② (order enforced, no mutation). */
 export const SERVE_ORDER_HINT = 'Сначала подай чашку ①';
+/** Shared tray is full (group budget enforced, no mutation). */
+export const SHARED_TRAY_FULL_HINT = 'На подносе больше нет места';
 /** Sourcing from an already-served cup (locked, no mutation). */
 export const SERVED_CUP_HINT = 'Эта чашка уже подана';
 /** Attached source would pour a single layer (tool stays attached). */
@@ -242,6 +245,24 @@ export function servingOrderPourHint(code: PourRejectCode): string {
 /** Alias set for forward-compat with alternate test import names. */
 export const getServingOrderPourHint = servingOrderPourHint;
 export const servingOrderRejectHint = servingOrderPourHint;
+
+/**
+ * Shared-tray UX copy (pure, no Pixi): maps `pourRejectCodeState`
+ * shared-capacity gate to a Russian hint. `ok` and unrelated codes yield
+ * empty string (no hint). Soft by design — no alarm copy here.
+ */
+export function sharedTrayPourHint(code: PourRejectCode): string {
+  switch (code) {
+    case 'shared-capacity-full':
+      return SHARED_TRAY_FULL_HINT;
+    default:
+      return '';
+  }
+}
+
+/** Alias set for forward-compat with alternate test import names. */
+export const getSharedTrayPourHint = sharedTrayPourHint;
+export const sharedTrayRejectHint = sharedTrayPourHint;
 export const strainerPlaceRejectHint = strainerPlaceHint;
 export const getStrainerPlaceHint = strainerPlaceHint;
 export const placeStrainerHint = strainerPlaceHint;
@@ -1151,6 +1172,17 @@ export class CupView {
    */
   serveGraphics: Graphics;
   /**
+   * Shared-tray motif layer (Gauntlet 16): low-profile wooden plank accent
+   * beneath the base + six capacity markers along its front edge showing
+   * the GROUP total (same state on both members — that shared identical
+   * readout is what communicates the pair budget). Derived from the static
+   * group constraint + the group occupancy the view passes in (never
+   * view-owned counters). Separate graphics object so skin redraws never
+   * erase it. No group → layer cleared (ordinary levels render
+   * byte-identical to before).
+   */
+  trayGraphics: Graphics;
+  /**
    * Attached-tool marker (Gauntlet 6 §35): small brass mesh drawn over the
    * host rim when `logic.strainerState` says the EMPTY tool is attached
    * here. Owned by the strainer flow, never a parallel attached flag —
@@ -1553,6 +1585,14 @@ export class CupView {
     this.serveGraphics = new Graphics();
     this.serveGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.serveGraphics);
+
+    // Shared-tray motif (Gauntlet 16): wooden plank + six group markers.
+    // Above the liquid so it stays readable on any tea, below the strainer
+    // marker. Never intercepts pointer (eventMode none). Standard hitbox
+    // and cup geometry unchanged (tray members keep normal cap-4 bodies).
+    this.trayGraphics = new Graphics();
+    this.trayGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.trayGraphics);
 
     this.strainerGraphics = new Graphics();
     this.strainerGraphics.eventMode = 'none';
@@ -2114,6 +2154,43 @@ export class CupView {
     g.ellipse(cx, h + 2, w / 2 + 6, 4.5).fill({ color: 0xf5efe0, alpha: served ? 0.55 : 0.42 });
     g.ellipse(cx, h + 2, w / 2 + 6, 4.5).stroke({ width: 1.2, color: served ? 0xd4af37 : 0xcfc3ab, alpha: served ? 0.8 : 0.5 });
     drawServeMedallion(g, cx, h - 18, order, served, quiet);
+  }
+
+  /**
+   * Shared-tray motif (Gauntlet 16): low-profile wooden plank beneath the
+   * base + six small capacity markers along its front edge. Filled marker
+   * count = group occupancy (combined tea layers of BOTH members), derived
+   * by the caller from current cup lengths + static constraints — never a
+   * view-owned counter. Filled = solid leaf-green dot; unfilled = hollow
+   * ring (shape-coded, never color-only). No group → layer cleared.
+   * No lock icons, no red borders: capacity, not locking.
+   */
+  renderTrayMotif(group: string | undefined, occupancy: number) {
+    const g = this.trayGraphics;
+    g.clear();
+    if (group === undefined) return;
+    const limit = sharedCapacityLimit('tea-tray');
+    const filled = Math.max(0, Math.min(limit, Math.floor(occupancy)));
+    const w = this.width;
+    const h = this.height;
+    const cx = w / 2;
+    // Wooden plank: restrained, fits the existing saucer/shadow language.
+    const plankW = w / 2 + 10;
+    g.roundRect(cx - plankW, h - 1, plankW * 2, 11, 5).fill({ color: 0x8a6844, alpha: 0.85 });
+    g.roundRect(cx - plankW, h - 1, plankW * 2, 11, 5).stroke({ width: 1.2, color: 0x5a4028, alpha: 0.9 });
+    // Six markers in fixed positions along the plank front edge.
+    const dotY = h + 4.5;
+    const span = plankW * 2 - 12;
+    for (let i = 0; i < limit; i++) {
+      const dx = limit === 1 ? cx : cx - span / 2 + (span * i) / (limit - 1);
+      if (i < filled) {
+        g.circle(dx, dotY, 2.6).fill({ color: 0x9fc46a, alpha: 1 });
+        g.circle(dx, dotY, 2.6).stroke({ width: 1, color: 0x3d5229, alpha: 0.9 });
+      } else {
+        g.circle(dx, dotY, 2.6).fill({ color: 0x2a1d12, alpha: 0.45 });
+        g.circle(dx, dotY, 2.6).stroke({ width: 1, color: 0xd8c9a8, alpha: 0.75 });
+      }
+    }
   }
 
   /**
@@ -3586,6 +3663,9 @@ export class TeaSortView {
       if (pourRejectCodeState(sstate, sourceCup.id, targetCup.id, lst.cupConstraints) === 'serve-order') {
         return SERVE_ORDER_HINT;
       }
+      if (pourRejectCodeState(sstate, sourceCup.id, targetCup.id, lst.cupConstraints) === 'shared-capacity-full') {
+        return SHARED_TRAY_FULL_HINT;
+      }
     } catch {
       // fall through to generic reasons on state-read failure
     }
@@ -3642,14 +3722,24 @@ export class TeaSortView {
     // Serving-order prefix is derived once per redraw from the
     // authoritative logic state (never view-owned served booleans).
     let servePrefix = -1;
+    // Shared-tray group occupancy is derived once per redraw from current
+    // cup lengths + static constraints (never a view-owned counter).
+    let trayOccupancy = -1;
     try {
       const lst = this.logic.toState();
       servePrefix = servedPrefixLength(
         { cups: lst.cups, floatingIngredients: lst.floatingIngredients },
         lst.cupConstraints,
       );
+      trayOccupancy = 0;
+      for (let i = 0; i < lst.cups.length; i++) {
+        if (lst.cupConstraints[i]?.sharedCapacityGroup === 'tea-tray') {
+          trayOccupancy += (lst.cups[i] as unknown[]).length;
+        }
+      }
     } catch {
       servePrefix = -1;
+      trayOccupancy = -1;
     }
     this.logic.cups.forEach((cup, idx) => {
       const view = this.cupViews[idx];
@@ -3660,6 +3750,12 @@ export class TeaSortView {
           view.renderServeMotif(order, servePrefix >= order, order === 2 && servePrefix === 0);
         } else {
           view.renderServeMotif(undefined, false, false);
+        }
+        const group = view.constraint.sharedCapacityGroup;
+        if (trayOccupancy >= 0 && group !== undefined) {
+          view.renderTrayMotif(group, trayOccupancy);
+        } else {
+          view.renderTrayMotif(undefined, 0);
         }
       }
     });

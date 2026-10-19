@@ -108,6 +108,11 @@ import {
   serveOrderOf,
   servedPrefixLength,
 } from './servingOrder';
+import {
+  hasSharedCapacity,
+  isSharedCapacityOvercap,
+  sharedCapacityTransferLimit,
+} from './sharedCapacity';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
@@ -144,6 +149,7 @@ function isBlendCompositionBlocked(
   const buds = normalizeTeaBudSlots(state.teaBudSlots, n);
   if (buds.some((s) => s != null)) return true;
   if (hasServeOrder(constraints)) return true;
+  if (hasSharedCapacity(constraints)) return true;
   if (constraints) {
     for (const c of constraints) {
       if (!c) continue;
@@ -256,6 +262,7 @@ export type PourRejectCode =
   | 'complete-to-empty'
   | 'color-mismatch'
   | 'serve-order'
+  | 'shared-capacity-full'
   | 'strainer-needs-two-layers'
   | 'strainer-loaded';
 
@@ -582,11 +589,19 @@ export function unstrainedPourCountState(
   if (slots[fromIdx] != null && slots[toIdx] != null) return 0;
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
-  const m = Math.min(
+  let m = Math.min(
     topCountOf(source),
     effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
   );
   if (m <= 0) return 0;
+  // Shared-capacity bound (G16 §§15-18): outside → tray member inflow is
+  // additionally bounded by group free space. Inside-group moves preserve
+  // the total and are exempt (null). Outside → outside has no group rule.
+  const sharedBound = sharedCapacityTransferLimit(state, fromIdx, toIdx, constraints);
+  if (sharedBound !== null) {
+    m = Math.min(m, sharedBound);
+    if (m <= 0) return 0;
+  }
   // Fail-closed like the state-aware truth: a honey move into an
   // already honey-occupied destination is not a legal ordinary transfer.
   const sink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
@@ -748,7 +763,15 @@ export function pourRejectCodeState(
     if (m > 0 && src.length - m === 0) return 'target-sinking-occupied';
   }
   const s = normalizeStrainerState(state.strainer);
-  if (!s.present) return serveCompletionGateOrOk(state, fromIdx, toIdx, constraints);
+  if (!s.present) {
+    // Shared-capacity gate (G16 §§20-24): outside → tray with zero group
+    // free rejects `shared-capacity-full`. Individual-full (`target-full`)
+    // and color mismatch already returned above, so precedence holds.
+    // Inside-group moves are exempt (null) and pass through.
+    const sharedBound = sharedCapacityTransferLimit(state, fromIdx, toIdx, constraints);
+    if (sharedBound !== null && sharedBound <= 0) return 'shared-capacity-full';
+    return serveCompletionGateOrOk(state, fromIdx, toIdx, constraints);
+  }
   if (s.heldTea !== null && s.attachedCupIndex !== null) return 'strainer-loaded';
   if (s.heldTea === null && s.attachedCupIndex === fromIdx) {
     const m = Math.min(
@@ -757,6 +780,10 @@ export function pourRejectCodeState(
         (state.cups[toIdx] as TeaId[]).length,
     );
     if (m < 2) return 'strainer-needs-two-layers';
+  }
+  {
+    const sharedBound = sharedCapacityTransferLimit(state, fromIdx, toIdx, constraints);
+    if (sharedBound !== null && sharedBound <= 0) return 'shared-capacity-full';
   }
   return serveCompletionGateOrOk(state, fromIdx, toIdx, constraints);
 }
@@ -828,10 +855,19 @@ export function pourCountState(
   // into an empty tasting bowl moves exactly 2 layers, never 4; only one
   // layer fits into a cinnamon cup holding one layer.
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
-  return Math.min(
+  let m = Math.min(
     topCountOf(source),
     effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
   );
+  // Shared-capacity bound (G16 §§18-19): outside → tray inflow is
+  // additionally bounded by group free space (partial m=1 legal, never
+  // reject the whole pour when mShared>0). Inside-group exempt.
+  const sharedBound = sharedCapacityTransferLimit(state, fromIdx, toIdx, constraints);
+  if (sharedBound !== null) {
+    m = Math.min(m, sharedBound);
+    if (m <= 0) return 0;
+  }
+  return m;
 }
 
 /** Number of layers that would transfer (0 when illegal). */
@@ -1054,6 +1090,13 @@ export interface PourStateResult {
   reaction?: BlendReactionMetadata;
   /** Serving-order completion, when this pour served cup 1 or 2 (presentation/trace only). */
   serveCompleted?: number | null;
+  /**
+   * Shared-capacity presentation metadata (G16 §177, optional): true when an
+   * outside → tray inflow transferred fewer layers than the ordinary
+   * no-shared count because group free space bound m. Gameplay truth stays
+   * derivable (cup lengths + static group); never authoritative.
+   */
+  sharedCapacityLimited?: boolean;
 }
 
 /**
@@ -1207,6 +1250,23 @@ export function applyPourState(
     { cups: nextCups, floatingIngredients: nextSlots },
     constraints,
   );
+  // Shared-capacity presentation metadata (G16 §177): true when the group
+  // budget strictly bound this outside → tray inflow below its ordinary
+  // no-shared count. Derivable, never authoritative.
+  let sharedCapacityLimited = false;
+  {
+    const bound = sharedCapacityTransferLimit(state, fromIdx, toIdx, constraints);
+    if (bound !== null) {
+      const srcMeta = state.cups[fromIdx] as TeaId[];
+      const dstMeta = state.cups[toIdx] as TeaId[];
+      const obsMeta = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+      const ordinaryM = Math.min(
+        topCountOf(srcMeta),
+        effectiveCupCapacity(constraints?.[toIdx], obsMeta[toIdx]) - dstMeta.length,
+      );
+      if (m < ordinaryM) sharedCapacityLimited = true;
+    }
+  }
   return {
     state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
     transferred: m,
@@ -1220,6 +1280,7 @@ export function applyPourState(
     capacityObstacleRemoved,
     teaBudBloomed,
     serveCompleted: postPrefix > prePrefix ? postPrefix : null,
+    ...(sharedCapacityLimited ? { sharedCapacityLimited: true as const } : {}),
   };
 }
 
@@ -1447,6 +1508,7 @@ export interface ApplyPuzzleActionResult {
   teaBudBloomed?: TeaBudId | null;
   reaction?: BlendReactionMetadata;
   serveCompleted?: number | null;
+  sharedCapacityLimited?: boolean;
 }
 
 export function applyPuzzleActionState(
@@ -1481,6 +1543,7 @@ export function applyPuzzleActionState(
     teaBudBloomed: res.teaBudBloomed,
     reaction: res.reaction,
     serveCompleted: res.serveCompleted,
+    sharedCapacityLimited: res.sharedCapacityLimited,
   };
 }
 
@@ -1637,8 +1700,9 @@ export function sinkingIngredientGoalsSatisfied(
  * vessel is never a finished vessel, §38–39) AND no active capacity
  * obstacle (a blocked vessel is never finished — the player must unlock
  * it, Gauntlet 11) AND no dormant tea bud (the route objective must have
- * bloomed — a dormant bud blocks victory, Gauntlet 12). An
- * attached-but-empty tool may be anywhere at victory.
+ * bloomed — a dormant bud blocks victory, Gauntlet 12) AND no
+ * shared-capacity overcap (a tray holding >6 is malformed and never won,
+ * G16 §34/§48). An attached-but-empty tool may be anywhere at victory.
  */
 export function isPuzzleWonState(
   state: ReadonlyPuzzleState,
@@ -1646,6 +1710,9 @@ export function isPuzzleWonState(
   blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
   if (!teaWonState(state.cups, constraints)) return false;
+  // G16 shared-capacity validity (§34): any group occupancy exceeding its
+  // limit fails closed (malformed/manual states that bypass legal moves).
+  if (isSharedCapacityOvercap(state, constraints)) return false;
   // G13 recipe win (§28): ordinary vessel end-state AND recipe complete
   // (A==0, B==0, P==target). An ordinarily-sorted A4/B4/C4/D4 board with an
   // active recipe is NOT won — A and B must still be crafted.

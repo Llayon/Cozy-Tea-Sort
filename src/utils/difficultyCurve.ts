@@ -65,9 +65,10 @@ interface MechanicPlan {
   teaBloom: boolean;
   blend: boolean;
   servingOrder: boolean;
+  sharedTray: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false, sharedTray: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -332,6 +333,10 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
     PINNED_ROLLOUT_89_96[levelNum] ?? PINNED_ROLLOUT_97_104[levelNum] ??
     PINNED_ROLLOUT_105_112[levelNum];
   if (pinned) return { ...pinned };
+  // G16 first exposures (pinned, challenge-phase, standalone; prefix <=154 unchanged).
+  // L162/L242 are challenge slots under the current rotation (both cinnamon today);
+  // pinning them as shared-tray preserves all <=154 levels byte-identically.
+  if (levelNum === 162 || levelNum === 242) return { ...CLEAN, sharedTray: true };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
@@ -488,6 +493,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasTeaBloom = plan.teaBloom;
   const hasBlend = plan.blend;
   const hasServingOrder = plan.servingOrder;
+  const hasSharedTray = (plan as { sharedTray?: boolean }).sharedTray === true;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -531,6 +537,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
+  } else if ((plan as { sharedTray?: boolean }).sharedTray) {
+    phaseSubtitle = 'Общий поднос • 6 сосудов';
   } else if (plan.servingOrder && plan.tasting) {
     phaseSubtitle = 'Порядок подачи и пиала • 6 сосудов';
   } else if (plan.servingOrder) {
@@ -681,6 +689,30 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
   }
 
+  // Gauntlet 16 standalone enforcement: shared-tray challenge is always
+  // the canonical 4c/6v layout (3,3,4,4,2,0, tray 3+3 at [0,1]), no Mystery,
+  // no teapot. Palette is four eligible legacy teas (never reaction IDs).
+  if (hasSharedTray) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Общий поднос • 6 сосудов';
+    if (levelNum === 162) {
+      colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
+    } else if (levelNum === 242) {
+      colors = ['lavender', 'saffron', 'buckwheat', 'matcha'];
+    } else {
+      const quads = [
+        ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'],
+        ['lavender', 'saffron', 'buckwheat', 'matcha'],
+        ['karkade', 'milk_oolong', 'lavender', 'sea_buckthorn'],
+        ['saffron', 'buckwheat', 'matcha', 'karkade'],
+      ];
+      colors = [...(quads[Math.floor(levelNum / 4) % quads.length] as [TeaId, TeaId, TeaId, TeaId])];
+    }
+  }
+
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
   if (levelNum === 1) rewardRecipeId = 'matcha';
@@ -716,6 +748,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasTeaBloom,
     hasBlend,
     hasServingOrder,
+    hasSharedTray,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,
