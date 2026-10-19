@@ -237,6 +237,25 @@ const batches = [
   },
   { name: 'serving-order-tasting rollout', files: ['tests/serving-order-tasting-rollout.test.ts'] },
   { name: 'serving-order-tasting stress + fairness + perf', files: ['tests/serving-order-tasting-stress.test.ts'] },
+  {
+    name: 'shared-tray kernel (G16 Phase A)',
+    files: [
+      'tests/shared-tray.test.ts',
+      'tests/shared-tray-compatibility.test.ts',
+      'tests/shared-tray-solver.test.ts',
+      'tests/shared-tray-undo.test.ts',
+    ],
+  },
+  {
+    name: 'shared-tray templates + fast path + rollout + view',
+    files: [
+      'tests/shared-tray-templates.test.ts',
+      'tests/shared-tray-fastpath.test.ts',
+      'tests/shared-tray-rollout.test.ts',
+      'tests/shared-tray-view.test.ts',
+    ],
+  },
+  { name: 'shared-tray stress (200 production seeds)', files: ['tests/shared-tray-stress.test.ts'] },
 ];
 
 function runBatch(batch) {
