@@ -248,11 +248,26 @@ import {
   instantiateSharedTrayTemplate,
 } from './sharedTrayTemplates';
 import {
+  TEA_PAIR_DEPTH_ACCEPT,
+  TEA_PAIR_TEMPLATE_ATTEMPTS,
+  TEA_PAIR_TEMPLATE_BANK,
+  TeaPairTemplateKind,
+  instantiateTeaPairTemplate,
+} from './teaPairTemplates';
+import {
+  TEA_PAIR_GROUP,
+  hasPairedTea,
+  pairedTeaMembers,
+  pairedTeaStatus,
+  validatePairedTeaConstraints,
+  type PairedTeaStatus,
+} from './teaPair';
+import {
   hasSharedCapacity,
   sharedCapacityOccupancy,
   validateSharedCapacityConstraints,
 } from './sharedCapacity';
-import { validateMechanicCombination, validateSharedTrayCombination } from './mechanicCompatibility';
+import { validateMechanicCombination, validateSharedTrayCombination, validateTeaPairCombination } from './mechanicCompatibility';
 import {
   depthDistance,
   RhythmPhase,
@@ -382,6 +397,16 @@ export interface GenerateRequest {
    * CupConstraint[] — no dynamic shared state is generated.
    */
   sharedTrayCount?: number;
+  /**
+   * Number of paired-tea groups requested (Gauntlet 17 — «Чайная пара»).
+   * 0 = classic level without relational pair goal; 1 = exactly one
+   * `tea-pair` group on two standard normal capacity-2 vessels inside the
+   * winning V6 topology (4c/6v, lengths 2,2,4,4,4,0, one empty). Only 0 or 1
+   * supported (>1, negative and non-integer rejected loudly). Membership
+   * lives entirely in CupConstraint[] — no chosen tea, status or pair state
+   * is generated or stored.
+   */
+  teaPairCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -561,6 +586,13 @@ export function requestedServeOrderCount(req: GenerateRequest): number {
 /** Requested shared-tray group count, normalized (default 0). */
 export function requestedSharedTrayCount(req: GenerateRequest): number {
   const v = (req as GenerateRequest).sharedTrayCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested paired-tea group count, normalized (default 0). */
+export function requestedTeaPairCount(req: GenerateRequest): number {
+  const v = (req as GenerateRequest).teaPairCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -1108,6 +1140,99 @@ export function validateSharedTrayRequest(req: GenerateRequest): void {
   for (const t of palette) {
     if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
       throw new Error(`validateSharedTrayRequest: reaction ID ${t} not eligible for shared tray`);
+    }
+  }
+}
+
+/**
+ * Fail-fast request validation for paired-tea groups (programming errors,
+ * not generation luck). Gauntlet 17 supports exactly the standalone
+ * interaction: teaPairCount 1 inside the winning V6 topology (numColors 4,
+ * emptyCups 2 → 6 vessels, lengths 2,2,4,4,4,0, exactly one empty), no
+ * Mystery/teapot/targets/sink/tasting/lemon/honey/strainer/frozen/thermos/
+ * cinnamon/tea-bud/blend/serving-order/shared-tray. Only 0 or 1 supported.
+ * The active palette must carry 4 eligible legacy teas and no reaction IDs.
+ */
+export function validateTeaPairRequest(req: GenerateRequest): void {
+  const raw = req.teaPairCount ?? 0;
+  if (raw === 0) return;
+  if (!Number.isInteger(raw) || raw !== 1) {
+    throw new Error(`validateTeaPairRequest: teaPairCount ${String(raw)} unsupported (production 0 or 1)`);
+  }
+  const comboReasons = validateTeaPairCombination({
+    teaPair: true,
+    servingOrder: requestedServeOrderCount(req) > 0,
+    mystery: req.hasMysteryLayer === true,
+    tastingCount: requestedTastingCupCount(req),
+    honey: requestedSinkingIngredient(req) !== undefined,
+    strainer: requestedHasStrainer(req),
+    blend: requestedBlendRecipeId(req) !== undefined,
+    sharedTray: requestedSharedTrayCount(req) > 0,
+  });
+  if (comboReasons.length > 0) {
+    throw new Error(`validateTeaPairRequest: ${comboReasons.join('; ')}`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateTeaPairRequest: tea pair requires 4 colors, 6 vessels, 2 nominal empties, no teapot',
+    );
+  }
+  if (req.hasMysteryLayer) {
+    throw new Error('validateTeaPairRequest: tea pair + mystery is out of scope for Gauntlet 17');
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + targets is out of scope for Gauntlet 17');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + sink-only is out of scope for Gauntlet 17');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + tasting bowl is out of scope for Gauntlet 17');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateTeaPairRequest: tea pair + ${requestedFloatingIngredient(req)} is out of scope for Gauntlet 17`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateTeaPairRequest: tea pair + ${requestedSinkingIngredient(req)} is out of scope for Gauntlet 17`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateTeaPairRequest: tea pair + strainer is out of scope for Gauntlet 17');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + frozen cup is out of scope for Gauntlet 17');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + thermos is out of scope for Gauntlet 17');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + cinnamon is out of scope for Gauntlet 17');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + tea bud is out of scope for Gauntlet 17');
+  }
+  if (requestedBlendRecipeId(req) !== undefined) {
+    throw new Error('validateTeaPairRequest: tea pair + blend is forbidden (G17; chemistry stays standalone)');
+  }
+  if (requestedServeOrderCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + serving order is out of scope for Gauntlet 17');
+  }
+  if (requestedSharedTrayCount(req) > 0) {
+    throw new Error('validateTeaPairRequest: tea pair + shared tray is out of scope for Gauntlet 17');
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) {
+    throw new Error('validateTeaPairRequest: palette must carry exactly 4 teas');
+  }
+  for (const t of palette) {
+    if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
+      throw new Error(`validateTeaPairRequest: reaction ID ${t} not eligible for tea pair`);
+    }
+    if (!(TEA_PAIR_ELIGIBLE_TEAS as readonly string[]).includes(t)) {
+      throw new Error(`validateTeaPairRequest: tea ${t} not eligible for tea pair`);
     }
   }
 }
@@ -2485,6 +2610,98 @@ function dealCandidate(
 }
 
 /**
+ * Gauntlet 17 optimal-replay pair trace. Pure: reuses the SAME pour rules
+ * and derived status; no stored chosen tea, no second solver, no second pour
+ * implementation. A "stable" L2 segment is committed(X) whose partner
+ * carries wrong tea (PAIR_PRESSURE) at/after commit and which then reaches
+ * matched(X) strictly later, with the commitment never broken before match.
+ */
+export interface TeaPairReplayTrace {
+  win: boolean;
+  moveCount: number;
+  finalStatus: PairedTeaStatus;
+  commitDepth: number | null;
+  pressureDepth: number | null;
+  matchDepth: number | null;
+  stableCommitDepth: number | null;
+  stableGap: number | null;
+  /** Curation/L3 diagnostic only: first committed tea differs from final match. */
+  anchorSwitch: boolean;
+}
+
+export function analyzeTeaPairReplay(
+  startCups: TeaId[][],
+  solution: readonly SolverAction[],
+  constraints: readonly CupConstraint[],
+): TeaPairReplayTrace {
+  let cups = startCups.map((c) => [...c]);
+  const boards: TeaId[][][] = [cups.map((c) => [...c])];
+  const statuses: PairedTeaStatus[] = [pairedTeaStatus({ cups }, constraints)];
+  const noFloat: FloatingIngredientSlot[] = emptyFloatingIngredients(cups.length);
+  for (const a of solution) {
+    if (a.kind !== 'pour') continue;
+    const res = applyPourState({ cups, floatingIngredients: noFloat }, a.from, a.to, constraints);
+    if (!res) break;
+    cups = res.state.cups as TeaId[][];
+    boards.push(cups.map((c) => [...c]));
+    statuses.push(pairedTeaStatus({ cups }, constraints));
+  }
+  const moveCount = statuses.length - 1;
+  const finalStatus = statuses[statuses.length - 1] as PairedTeaStatus;
+  const win = isPuzzleWonState({ cups, floatingIngredients: noFloat }, constraints);
+
+  let commitDepth: number | null = null;
+  let pressureDepth: number | null = null;
+  let matchDepth: number | null = null;
+  let firstCommitTea: TeaId | null = null;
+  for (let d = 0; d <= moveCount; d++) {
+    const s = statuses[d] as PairedTeaStatus;
+    if (s.kind === 'matched' && matchDepth === null) matchDepth = d;
+    if (s.kind === 'committed') {
+      if (commitDepth === null) {
+        commitDepth = d;
+        firstCommitTea = s.tea;
+      }
+      const partner = boards[d]?.[s.partnerIndex] as TeaId[] | undefined;
+      if (pressureDepth === null && partner?.some((layer) => layer !== s.tea)) pressureDepth = d;
+    }
+  }
+
+  // Earliest stable committed(X) segment: pressure at/after commit, match later.
+  let stableCommitDepth: number | null = null;
+  let stableGap: number | null = null;
+  for (let d = 0; d <= moveCount && stableCommitDepth === null; d++) {
+    const s = statuses[d] as PairedTeaStatus;
+    const prev = d === 0 ? ({ kind: 'uncommitted' } as PairedTeaStatus) : (statuses[d - 1] as PairedTeaStatus);
+    if (s.kind !== 'committed') continue;
+    if (prev.kind === 'committed' && prev.tea === s.tea) continue;
+    const tea = s.tea;
+    let pressureAt: number | null = null;
+    let matchAt: number | null = null;
+    for (let e = d; e <= moveCount; e++) {
+      const es = statuses[e] as PairedTeaStatus;
+      if (e > d && !(es.kind === 'committed' && es.tea === tea)) {
+        if (es.kind === 'matched' && es.tea === tea) matchAt = e;
+        break;
+      }
+      if (es.kind === 'committed') {
+        const partner = boards[e]?.[es.partnerIndex] as TeaId[] | undefined;
+        if (pressureAt === null && partner?.some((layer) => layer !== tea)) pressureAt = e;
+      }
+    }
+    if (pressureAt !== null && matchAt !== null && matchAt > d) {
+      stableCommitDepth = d;
+      stableGap = matchAt - d;
+    }
+  }
+
+  const finalTea = finalStatus.kind === 'matched' ? finalStatus.tea : null;
+  const anchorSwitch =
+    firstCommitTea !== null && finalTea !== null && firstCommitTea !== finalTea;
+  return { win, moveCount, finalStatus, commitDepth, pressureDepth, matchDepth, stableCommitDepth, stableGap, anchorSwitch };
+}
+
+/**
  * Single production gate shared by EVERY return path (normal candidates,
  * retry fallback, safety-net scan). Returns the level only when the full
  * contract A–BE holds, otherwise null (caller rejects / moves on).
@@ -2990,7 +3207,7 @@ function finalizeCandidate(
   }
   if (isWonState(cups, normalized)) return null; // D
   if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles, teaBudSlots: buds }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon/bud-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0 && requestedSharedTrayCount(req) === 0) {
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0 && requestedSharedTrayCount(req) === 0 && requestedTeaPairCount(req) === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -3409,6 +3626,108 @@ function finalizeCandidate(
         seed,
         minMoves: sharedSolved.minMoves,
         visitedStates: sharedSolved.visitedStates,
+      };
+      if (!validateLevelStructure(level, req).ok) return null;
+      return level;
+    }
+  }
+  // Tea-pair production gate (Gauntlet 17). Relational finality is
+  // integrated sorting, not rescue — no plain-control or L3 solve at
+  // runtime. The optimal replay must form a stable COMMIT(X), show
+  // PAIR_PRESSURE(X) in the same segment, MATCH(X) strictly later and win,
+  // with the pair matched at the end. Happy path is exactly 1 solve.
+  {
+    const wantPair = requestedTeaPairCount(req);
+    if (wantPair !== 0) {
+      if (wantPair !== 1) return null; // KF: only 0 or 1 supported
+      const pairReasons = validatePairedTeaConstraints(normalized);
+      if (pairReasons.length > 0) return null; // KG–KJ
+      const members = pairedTeaMembers(normalized);
+      if (members.length !== 2) return null; // KG
+      if (normalized.some((c) => c?.pairedTeaGroup !== undefined && c.pairedTeaGroup !== TEA_PAIR_GROUP)) {
+        return null; // KH
+      }
+      for (const m of members) {
+        const c = normalized[m] as CupConstraint | undefined;
+        if (cupCapacity(c) !== 2) return null; // KI
+        if (c?.mode !== 'normal') return null; // KJ
+        if (c?.targetTeaId !== undefined || c?.serveOrder !== undefined || c?.sharedCapacityGroup !== undefined) {
+          return null; // KK
+        }
+        if (mustEndEmpty(c)) return null; // KK
+        const cup = cups[m] as TeaId[];
+        if (!cup || cup.length !== 2) return null; // KM: both pair starts full 2/2
+        if (!cup.some((t) => t !== cup[0])) return null; // KM: both pair starts mixed
+      }
+      // KL: exact winning V6 topology lengths 2,2,4,4,4,0 and one empty.
+      const pairCounts = cups.map((c) => c.length).sort((a, b) => a - b);
+      if (JSON.stringify(pairCounts) !== JSON.stringify([0, 2, 2, 4, 4, 4])) return null;
+      if (cups.filter((c) => c.length === 0).length !== 1) return null;
+      // KN: every non-empty start mixed (no pre-solved homogeneous stacks).
+      for (const cup of cups) {
+        const arr = cup as TeaId[];
+        if (arr.length > 0 && !arr.some((t) => t !== arr[0])) return null;
+      }
+      // KO–KQ: exactly 4 colors, 4 units each, no reaction IDs.
+      {
+        const counts = new Map<TeaId, number>();
+        for (const cup of cups) for (const t of cup as TeaId[]) counts.set(t, (counts.get(t) ?? 0) + 1);
+        if (counts.size !== 4) return null;
+        for (const [t, n] of counts) {
+          if (n !== 4) return null;
+          if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') return null;
+        }
+      }
+      // KR: no second mechanic.
+      if (presentIds.length > 0) return null;
+      if (sinkPresent.length > 0) return null;
+      if (strainerState.present) return null;
+      if (countSinkOnly(normalized) > 0) return null;
+      if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+      if (countTastingCups(normalized) > 0) return null;
+      if (icePresent.length > 0) return null;
+      if (countThermosCups(normalized) > 0) return null;
+      if (obstacles.some((s) => s !== null)) return null;
+      if (buds.some((s) => s !== null)) return null;
+      if (requestedBlendRecipeId(req) !== undefined) return null;
+      if (requestedServeOrderCount(req) !== 0) return null;
+      if (hasServeOrder(normalized)) return null;
+      if (hasSharedCapacity(normalized)) return null;
+
+      if (stats) stats.solverCalls++;
+      const pairSolved = solvePuzzle(cups, {
+        maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+      });
+      if (!pairSolved.solvable || pairSolved.truncated) return null; // KS, KT
+      if (pairSolved.minMoves === undefined) return null;
+      if (
+        pairSolved.minMoves < TEA_PAIR_DEPTH_ACCEPT.min ||
+        pairSolved.minMoves > TEA_PAIR_DEPTH_ACCEPT.max
+      ) {
+        return null; // KU
+      }
+      const pairSolution = (pairSolved.solution ?? []) as SolverAction[];
+      const pairTrace = analyzeTeaPairReplay(cups, pairSolution, normalized);
+      if (!pairTrace.win) return null; // KZ
+      if (pairTrace.finalStatus.kind !== 'matched') return null; // KY
+      if (pairTrace.stableCommitDepth === null) return null; // KV
+      if (pairTrace.stableGap === null || pairTrace.stableGap < 2) return null; // KX
+      if (pairTrace.stableCommitDepth / Math.max(1, pairSolved.minMoves) > 0.8) return null; // L2 timing
+      const level: GeneratedLevel = {
+        cups,
+        hiddenCounts,
+        cupConstraints: normalized,
+        floatingIngredients: slots,
+        sinkingIngredients: sinkSlots,
+        strainer: strainerState,
+        iceSlots: ice,
+        capacityObstacles: obstacles,
+        teaBudSlots: buds,
+        seed,
+        minMoves: pairSolved.minMoves,
+        visitedStates: pairSolved.visitedStates,
       };
       if (!validateLevelStructure(level, req).ok) return null;
       return level;
@@ -4236,6 +4555,36 @@ function servingOrderTastingFallbackEntries(
 }
 
 /**
+ * Pinned strong L2 tea-pair fallback (depth 11, commit/minMoves 0.18, gap 9,
+ * final role c2): identity role mapping, runtime re-validated. Preserves
+ * the requested standalone pair (never falls back to ordinary). Backups
+ * cover the (near-impossible) miss.
+ */
+const TEA_PAIR_FALLBACK_TEMPLATE_ID = 'pair-11-118';
+const TEA_PAIR_FALLBACK_BACKUP_IDS = ['pair-10-259', 'pair-12-60'];
+
+function teaPairFallbackEntries(
+  req: GenerateRequest,
+): Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> {
+  if (teaPairTemplateKindFor(req) === null) return [];
+  const kind = teaPairTemplateKindFor(req) as TeaPairTemplateKind;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return [];
+  const out: Array<{ cups: TeaId[][]; constraints: CupConstraint[] }> = [];
+  for (const id of [TEA_PAIR_FALLBACK_TEMPLATE_ID, ...TEA_PAIR_FALLBACK_BACKUP_IDS]) {
+    const tpl = TEA_PAIR_TEMPLATE_BANK[kind].find((t) => t.id === id);
+    if (!tpl) continue;
+    const inst = instantiateTeaPairTemplate(tpl, [...palette]);
+    const constraints = defaultCupConstraints(inst.cups.length);
+    for (const m of inst.pairMembers) {
+      constraints[m] = { mode: 'normal', capacity: 2, pairedTeaGroup: TEA_PAIR_GROUP };
+    }
+    out.push({ cups: inst.cups, constraints });
+  }
+  return out;
+}
+
+/**
  * Pinned strong L2 shared-tray fallback (depth 10, pressure 0, cross-member):
  * identity role mapping, runtime re-validated. Preserves the requested
  * standalone tray (never falls back to ordinary). Backups cover the
@@ -4278,6 +4627,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateTeaBudRequest(req);
   validateBlendRequest(req);
   validateServeOrderRequest(req);
+  validateTeaPairRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -4302,9 +4652,13 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantCinnamon > 0 ? ':cinnamon' : ''}` +
     `${wantBud > 0 ? ':tea-bloom' : ''}` +
     `${requestedBlendRecipeId(req) !== undefined ? ':blend' : ''}` +
-    `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}${requestedSharedTrayCount(req) !== 0 ? ':shared-tray' : ''}`;
+    `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}${requestedSharedTrayCount(req) !== 0 ? ':shared-tray' : ''}` +
+    `${requestedTeaPairCount(req) !== 0 ? ':tea-pair' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
+  if (requestedTeaPairCount(req) !== 0) {
+    shapeEntries.push(...teaPairFallbackEntries(req));
+  }
   // Dedicated serving-order-tasting composition shapes go first for combo
   // requests (identity role mapping; finalize re-validates; never drops a
   // mechanic). Standalone serving shapes follow for non-combo requests.
@@ -5424,6 +5778,17 @@ export const SHARED_TRAY_ELIGIBLE_TEAS: readonly TeaId[] = [
   'buckwheat',
 ];
 
+/** Eligible legacy teas for paired-tea roles (never reaction IDs). */
+export const TEA_PAIR_ELIGIBLE_TEAS: readonly TeaId[] = [
+  'matcha',
+  'sea_buckthorn',
+  'karkade',
+  'milk_oolong',
+  'lavender',
+  'saffron',
+  'buckwheat',
+];
+
 /**
  * Match a request against the shared-tray bank (Gauntlet 16). Recognized
  * ONLY for the exact production combination: sharedTrayCount 1, 4 colors,
@@ -5450,6 +5815,88 @@ export function sharedTrayTemplateKindFor(req: GenerateRequest): SharedTrayTempl
     if (palette.length !== req.numColors) return null;
     if (!palette.every((t) => (SHARED_TRAY_ELIGIBLE_TEAS as readonly string[]).includes(t))) return null;
     return 'shared-tray';
+  }
+  return null;
+}
+
+/**
+ * Match a request against the tea-pair bank (Gauntlet 17). Recognized ONLY
+ * for the exact production combination: teaPairCount 1, 4 colors, 6
+ * vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
+ * The palette must carry 4 eligible legacy teas (no reaction IDs). Anything
+ * else keeps the existing paths (validation throws for bad combos).
+ */
+export function teaPairTemplateKindFor(req: GenerateRequest): TeaPairTemplateKind | null {
+  if (requestedTeaPairCount(req) !== 1) return null;
+  if (requestedSharedTrayCount(req) !== 0) return null;
+  if (requestedServeOrderCount(req) !== 0) return null;
+  if (requestedTeaBudCount(req) !== 0) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    const palette = req.colors.slice(0, req.numColors);
+    if (palette.length !== req.numColors) return null;
+    if (!palette.every((t) => (TEA_PAIR_ELIGIBLE_TEAS as readonly string[]).includes(t))) return null;
+    return 'tea-pair';
+  }
+  return null;
+}
+
+/**
+ * Bounded tea-pair fast path (Gauntlet 17 §158): validate request → seeded
+ * template choice → seeded full role bijection over the request palette →
+ * static pair constraints on the template hosts → single
+ * `finalizeCandidate` validation (stable L2 trace + relational win inside).
+ * At most TEA_PAIR_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
+ * Returns null when no template validates (caller uses fallback ladder).
+ * Happy path is exactly 1 solver call.
+ */
+function generateFromTeaPairTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = teaPairTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = TEA_PAIR_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < TEA_PAIR_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateTeaPairTemplate(tpl, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    for (const m of inst.pairMembers) {
+      constraints[m] = { mode: 'normal', capacity: 2, pairedTeaGroup: TEA_PAIR_GROUP };
+    }
+    const hiddenCounts = inst.cups.map(() => 0);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      hiddenCounts,
+      `${seedStr}#tea-pair:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
   }
   return null;
 }
@@ -5830,6 +6277,7 @@ export function generateLevel(
   validateTeaBudRequest(req);
   validateBlendRequest(req);
   validateServeOrderRequest(req);
+  validateTeaPairRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -5979,6 +6427,16 @@ export function generateLevel(
   // level through the fast path or the validated fallback ladder.
   if (servingOrderTemplateKindFor(req) !== null) {
     const fast = generateFromServingOrderTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical tea-pair configs skip the random scan entirely (Gauntlet 17):
+  // bounded TEA_PAIR_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
+  // maxRetries: 0 still yields a valid level through the fast path or the
+  // validated fallback ladder.
+  if (teaPairTemplateKindFor(req) !== null) {
+    const fast = generateFromTeaPairTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -6338,6 +6796,41 @@ export function validateLevelStructure(
     }
     if (wantTargets.length > 0) {
       reasons.push('sink-only + targets is out of scope for Gauntlet 3');
+    }
+  }
+  // Tea-pair structural invariant (Gauntlet 17): exact group/count/shape.
+  const wantPair = requestedTeaPairCount(req);
+  const pairReasons = validatePairedTeaConstraints(constraints);
+  if (wantPair === 0) {
+    if (hasPairedTea(constraints)) {
+      reasons.push('unexpected paired-tea constraints without a tea-pair request (KF)');
+    }
+  } else {
+    if (wantPair !== 1) {
+      reasons.push(`expected 0 or 1 tea-pair groups, got ${wantPair} (KF)`);
+    }
+    for (const r of pairReasons) reasons.push(r);
+    const pairMembers = pairedTeaMembers(constraints);
+    if (pairMembers.length !== 2) {
+      reasons.push(`expected exactly 2 tea-pair vessels, got ${pairMembers.length} (KG)`);
+    }
+    for (const m of pairMembers) {
+      if (cupCapacity(constraints[m]) !== 2) reasons.push(`tea-pair vessel ${m} must have capacity 2 (KI)`);
+      if (constraints[m]?.mode !== 'normal') reasons.push(`tea-pair vessel ${m} must be normal (KJ)`);
+      if (constraints[m]?.targetTeaId !== undefined) reasons.push(`tea-pair vessel ${m} must not carry a target (KK)`);
+      if (mustEndEmpty(constraints[m])) reasons.push(`tea-pair vessel ${m} must not end empty (KK)`);
+      if (constraints[m]?.serveOrder !== undefined) reasons.push(`tea-pair vessel ${m} must not carry serving order (KK)`);
+      if (constraints[m]?.sharedCapacityGroup !== undefined) {
+        reasons.push(`tea-pair vessel ${m} must not belong to a shared group (KK)`);
+      }
+      const memberCup = level.cups[m] as TeaId[] | undefined;
+      if (!memberCup || memberCup.length !== 2 || !memberCup.some((t) => t !== memberCup[0])) {
+        reasons.push(`tea-pair vessel ${m} must start full 2/2 mixed (KM)`);
+      }
+    }
+    const pairCounts = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(pairCounts) !== JSON.stringify([0, 2, 2, 4, 4, 4])) {
+      reasons.push(`tea-pair topology must be lengths 2,2,4,4,4,0 (KL), got ${pairCounts.join(',')}`);
     }
   }
   // AO–BB: floating-ingredient structural invariant.

@@ -37,6 +37,7 @@ import { Cup, TeaSortLogic } from '../logic/teaSortLogic';
 import type { BlendReactionMetadata } from '../logic/blendRecipe';
 import { isServedCupState, serveOrderOf, servedPrefixLength } from '../logic/servingOrder';
 import { sharedCapacityLimit } from '../logic/sharedCapacity';
+import { pairedTeaMembers, pairedTeaStatus, type PairedTeaStatus } from '../logic/teaPair';
 import {
   canActAsSource,
   floatingIngredientHostSatisfied,
@@ -57,6 +58,17 @@ import type {
  * animation layout never churns. Rim top = height - body height.
  */
 export const TASTING_BOWL_BODY_H = 66;
+
+/**
+ * Paired-tea bowl body height (Gauntlet 17): two deliberately matching
+ * small porcelain bowls, bottom-aligned in the standard cell like the
+ * tasting bowl but visibly different (taller body, rose-porcelain trim,
+ * paired floral halves). Capacity is authoritative 2 — never fake cap-4.
+ */
+export const PAIR_BOWL_BODY_H = 84;
+
+/** Synchronized matched-pair steam flourish (~300–450ms, one ticker). */
+export const PAIR_MATCH_FLOURISH_MS = 360;
 
 /** Standard liquid slot height for tall vessels (4 slots fill the body). */
 const STANDARD_SLOT_H = 29;
@@ -101,6 +113,9 @@ export const THERMOS_SLOT_H = 26;
 export function fullVesselHint(constraint: CupConstraint): string {
   if (isTastingCupConstraint(constraint)) {
     return 'Пиала заполнена (2/2)! Выберите другой сосуд или пустой стакан.';
+  }
+  if (constraint.pairedTeaGroup !== undefined) {
+    return 'Парная пиала заполнена (2/2)! Выберите другой сосуд или пустой стакан.';
   }
   if (isThermosCupConstraint(constraint)) {
     return 'Термос заполнен (5/5)! Выберите другой сосуд или пустой стакан.';
@@ -790,6 +805,22 @@ export const getServeVisualPlan = serveVisualPlan;
 export const serveFlourishPlan = serveVisualPlan;
 
 /**
+ * Pair-match flourish plan (pure, Gauntlet 17): the ONLY signal is the
+ * derived status transition captured around one existing pour — never a
+ * view-owned matched flag and never a stored chosen tea. Returns the matched
+ * TeaId when the pair BECOMES matched (or re-matches a different tea), so the
+ * caller can run one synchronized steam flourish for both bowls.
+ */
+export function pairMatchFlourishTea(
+  before: PairedTeaStatus,
+  after: PairedTeaStatus,
+): TeaId | null {
+  if (after.kind !== 'matched') return null;
+  if (before.kind === 'matched' && before.tea === after.tea) return null;
+  return after.tea;
+}
+
+/**
  * Serving-saucer order medallion (Gauntlet 14, pure and headless-testable):
  * porcelain disc + vector numeral ①/② drawn from filled/stroked shapes
  * (distinct glyph geometry carries the order — never color alone, no text
@@ -1183,6 +1214,15 @@ export class CupView {
    */
   trayGraphics: Graphics;
   /**
+   * Paired-tea ornament layer (Gauntlet 17): two halves of one floral
+   * porcelain medallion, accent derived from the current
+   * `pairedTeaStatus` passed by the view (never cached history). Above the
+   * liquid so it stays readable on any tea, never intercepts pointer
+   * (eventMode none). No group → layer cleared (ordinary levels render
+   * byte-identical to before).
+   */
+  pairGraphics: Graphics;
+  /**
    * Attached-tool marker (Gauntlet 6 §35): small brass mesh drawn over the
    * host rim when `logic.strainerState` says the EMPTY tool is attached
    * here. Owned by the strainer flow, never a parallel attached flag —
@@ -1235,6 +1275,15 @@ export class CupView {
   }
 
   /**
+   * Paired-tea bowl (чайная пара, Gauntlet 17): normal flow, authoritative
+   * capacity 2, no target and no must-end-empty. Derived solely from the
+   * static group marker; symmetry is the point (both members identical).
+   */
+  get isPairBowl(): boolean {
+    return this.constraint.pairedTeaGroup !== undefined;
+  }
+
+  /**
    * High thermos (высокий термос, Gauntlet 10): normal flow, capacity 5,
    * must end empty, no named target. Derived from the authoritative
    * constraint via `isThermosCupConstraint` — no parallel view state.
@@ -1250,7 +1299,11 @@ export class CupView {
    * empty air where a tall rim would have been.
    */
   get rimLocalY(): number {
-    return this.isTastingBowl ? this.height - TASTING_BOWL_BODY_H : 4;
+    return this.isTastingBowl
+      ? this.height - TASTING_BOWL_BODY_H
+      : this.isPairBowl
+        ? this.height - PAIR_BOWL_BODY_H
+        : 4;
   }
 
   /**
@@ -1270,6 +1323,12 @@ export class CupView {
    */
   slotHeightFor(c: CupConstraint): number {
     if (isTastingCupConstraint(c)) {
+      const bottomY = this.height - 6;
+      return (bottomY - (this.rimLocalY + 4)) / cupCapacity(c);
+    }
+    if (c.pairedTeaGroup !== undefined) {
+      // Pair bowls are authoritative capacity 2: exactly two readable slots
+      // inside their own shallow body, never a fake cap-4 column.
       const bottomY = this.height - 6;
       return (bottomY - (this.rimLocalY + 4)) / cupCapacity(c);
     }
@@ -1594,6 +1653,13 @@ export class CupView {
     this.trayGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.trayGraphics);
 
+    // Paired-tea ornament (Gauntlet 17): matching floral halves, derived
+    // only from the current pair status passed by the view. Never intercepts
+    // pointer (eventMode none); normal cap-2 bowl hitbox unchanged.
+    this.pairGraphics = new Graphics();
+    this.pairGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.pairGraphics);
+
     this.strainerGraphics = new Graphics();
     this.strainerGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.strainerGraphics);
@@ -1652,6 +1718,19 @@ export class CupView {
     // language. Same liquid box so layers stay readable; no text, no icons.
     if (this.isSinkOnly) {
       this.drawGuestCupFrame(w, h, r);
+      return;
+    }
+
+    // Paired-tea bowls (Gauntlet 17): two deliberately matching small
+    // porcelain bowls, bottom-aligned like the tasting bowl but with a
+    // taller rose-trimmed body and paired floral halves. Authoritative
+    // capacity 2; the mask covers exactly the bowl interior.
+    if (this.isPairBowl) {
+      this.liquidMask.clear();
+      this.liquidMask
+        .roundRect(3, this.rimLocalY + 4, w - 6, h - 6 - (this.rimLocalY + 4), 11)
+        .fill({ color: 0xffffff });
+      this.drawPairBowlFrame(w, h);
       return;
     }
 
@@ -1959,6 +2038,79 @@ export class CupView {
   }
 
   /**
+   * Paired-tea bowl (Gauntlet 17): a small porcelain bowl matching its twin
+   * — taller than the tasting bowl, rose-trimmed, with two restrained side
+   * ears and a foot ring. Bottom-aligned in the standard cell so layout never
+   * churns. The pair ornament (floral halves) lives on its own layer and is
+   * driven only by derived pair status. No lock, no error, no target mark.
+   */
+  private drawPairBowlFrame(w: number, h: number) {
+    const g = this.glassOverlay;
+    const rimY = this.rimLocalY;
+    let bodyFill = 0xfff8f2;
+    let bodyFillAlpha = 0.16;
+    let edgeColor = 0xfff4f6;
+    let edgeAlpha = 0.9;
+    let roseColor = 0xc98fa0;
+    let footColor = 0xffffff;
+    let footAlpha = 0.24;
+    if (this.skinId === 'ceramic') {
+      bodyFill = 0x6a4a3c;
+      bodyFillAlpha = 0.32;
+      edgeColor = 0xd8b7a3;
+      edgeAlpha = 0.95;
+      roseColor = 0xd8a0ac;
+      footColor = 0x5a3d2b;
+      footAlpha = 0.55;
+    } else if (this.skinId === 'porcelain') {
+      bodyFill = 0xfffaea;
+      bodyFillAlpha = 0.3;
+      edgeColor = 0xffffff;
+      edgeAlpha = 0.94;
+      roseColor = 0xc98fa0;
+      footColor = 0xfffaea;
+      footAlpha = 0.44;
+    }
+
+    // Foot ring (distinct from the tasting foot saucer).
+    g.roundRect(w / 2 - 10, h - 8, 20, 8, 3).fill({ color: footColor, alpha: footAlpha });
+    g.ellipse(w / 2, h + 1, w / 2 - 12, 3.5).stroke({ width: 1.4, color: roseColor, alpha: 0.7 });
+
+    // Bowl body: wide rim tapering to a rounded base.
+    const rimOver = 5;
+    const baseHalf = w / 2 - 12;
+    g.beginPath();
+    g.moveTo(-rimOver, rimY);
+    g.quadraticCurveTo(-rimOver + 2, h - 12, w / 2 - baseHalf, h - 5);
+    g.quadraticCurveTo(w / 2, h - 2, w / 2 + baseHalf, h - 5);
+    g.quadraticCurveTo(w + rimOver - 2, h - 12, w + rimOver, rimY);
+    g.closePath();
+    g.fill({ color: bodyFill, alpha: bodyFillAlpha });
+    g.beginPath();
+    g.moveTo(-rimOver, rimY);
+    g.quadraticCurveTo(-rimOver + 2, h - 12, w / 2 - baseHalf, h - 5);
+    g.quadraticCurveTo(w / 2, h - 2, w / 2 + baseHalf, h - 5);
+    g.quadraticCurveTo(w + rimOver - 2, h - 12, w + rimOver, rimY);
+    g.stroke({ width: 2.4, color: edgeColor, alpha: edgeAlpha });
+
+    // Rose porcelain rim band + opening highlight.
+    g.roundRect(-rimOver - 1, rimY - 3, w + (rimOver + 1) * 2, 6, 3).fill({
+      color: roseColor,
+      alpha: 0.86,
+    });
+    g.ellipse(w / 2, rimY, w / 2 - 2, 2.6).stroke({ width: 1.3, color: 0xfff0f3, alpha: 0.9 });
+
+    // Two small side ears: the matching SET silhouette (not a lock/chain).
+    g.circle(-2, rimY + 9, 3.2).fill({ color: bodyFill, alpha: 0.9 });
+    g.circle(-2, rimY + 9, 3.2).stroke({ width: 1.2, color: roseColor, alpha: 0.75 });
+    g.circle(w + 2, rimY + 9, 3.2).fill({ color: bodyFill, alpha: 0.9 });
+    g.circle(w + 2, rimY + 9, 3.2).stroke({ width: 1.2, color: roseColor, alpha: 0.75 });
+
+    // Soft wall highlight keeps two tea layers readable.
+    g.roundRect(7, rimY + 11, 3.5, h - rimY - 25, 2).fill({ color: 0xffffff, alpha: 0.26 });
+  }
+
+  /**
    * Tasting bowl (Gauntlet 4): a shallow ceremonial пиала — wider rim
    * relative to height, foot saucer, restrained gold rim/detail in the
    * active skin language. Bottom-aligned in the standard cell; clearly
@@ -2191,6 +2343,48 @@ export class CupView {
         g.circle(dx, dotY, 2.6).stroke({ width: 1, color: 0xd8c9a8, alpha: 0.75 });
       }
     }
+  }
+
+  /**
+   * Paired-tea floral ornament (Gauntlet 17): each bowl draws ONE HALF of the
+   * same flower; together they read as a set. Accent is derived every call
+   * from the status the view computed from current cups + static constraints
+   * — never cached history, never a stored chosen tea. Uncommitted → neutral;
+   * committed(X)/matched(X) → X's tea color on BOTH bowls; conflict(X,Y) →
+   * each bowl keeps its own local tea accent (ornament does not synchronize).
+   * No red/alarm/check/lock language. `eventMode='none'` layer owned by the
+   * cup view; normal bowl hitboxes stay authoritative.
+   */
+  renderPairMotif(status: PairedTeaStatus, side: -1 | 1, localTea: TeaId | null) {
+    const g = this.pairGraphics;
+    g.clear();
+    if (!this.isPairBowl) return;
+    const sharedTea = status.kind === 'committed' || status.kind === 'matched' ? status.tea : null;
+    const accentTea = sharedTea ?? (status.kind === 'conflict' ? localTea : null);
+    const accent = accentTea ? TEA_TYPES[accentTea].colorNum : 0xc98fa0;
+    const cx = this.width / 2;
+    const cy = this.height - 17;
+
+    // Matched gets a very soft warm halo; still no check/badge.
+    if (status.kind === 'matched') {
+      g.circle(cx, cy, 12.5).fill({ color: 0xffe9a8, alpha: 0.22 });
+    }
+
+    // Porcelain backing disc.
+    g.circle(cx, cy, 7).fill({ color: 0xfff6f2, alpha: 0.74 });
+    g.circle(cx, cy, 7).stroke({ width: 1.4, color: 0xc98fa0, alpha: 0.72 });
+
+    // Three petals on this bowl's half of the shared flower.
+    for (let i = 0; i < 3; i++) {
+      const angle = (Math.PI / 4) * (i - 1) + (side < 0 ? Math.PI : 0);
+      const px = cx + Math.cos(angle) * 6.4 * side;
+      const py = cy + Math.sin(angle) * 6.4;
+      g.ellipse(px, py, 3.1, 2.2).fill({ color: accent, alpha: status.kind === 'conflict' ? 0.66 : 0.82 });
+      g.ellipse(px, py, 3.1, 2.2).stroke({ width: 0.9, color: 0x8a5a68, alpha: 0.45 });
+    }
+    // Center bead: the shared axis both halves meet on.
+    g.circle(cx, cy, 2.1).fill({ color: accent, alpha: 0.9 });
+    g.circle(cx, cy, 2.1).stroke({ width: 0.8, color: 0xfff6f2, alpha: 0.75 });
   }
 
   /**
@@ -2475,7 +2669,7 @@ export class CupView {
    * real silhouette, not empty cell space.
    */
   private selectionBounds(): { x: number; y: number; w: number; h: number } {
-    if (this.isTastingBowl) {
+    if (this.isTastingBowl || this.isPairBowl) {
       const y = this.rimLocalY - 8;
       return { x: -7, y, w: this.width + 14, h: this.height + 10 - y };
     }
@@ -3523,8 +3717,28 @@ export class TeaSortView {
 
     if (this.logic.canMakeMove(sourceIdx, clickedIdx)) {
       this.lastInvalidTargetIndex = null;
+      // Presentation-only transition capture (spec §197): derive pair status
+      // from the model around this ONE pour. Nothing is stored as gameplay
+      // truth; the matched TeaId only triggers the short steam flourish.
+      let pairBefore: PairedTeaStatus = { kind: 'uncommitted' };
+      try {
+        const pre = this.logic.toState();
+        pairBefore = pairedTeaStatus({ cups: pre.cups }, pre.cupConstraints);
+      } catch {
+        pairBefore = { kind: 'uncommitted' };
+      }
       const res = this.logic.makeMove(sourceIdx, clickedIdx);
       if (res) {
+        let pairMatchedTea: TeaId | null = null;
+        try {
+          const post = this.logic.toState();
+          pairMatchedTea = pairMatchFlourishTea(
+            pairBefore,
+            pairedTeaStatus({ cups: post.cups }, post.cupConstraints),
+          );
+        } catch {
+          pairMatchedTea = null;
+        }
         this.deselectCurrent(false);
         // Strained pour (Gauntlet 6 §39-40): logic already moved m out of
         // the source, m-1 into the dest, tool loaded on stand. Animation
@@ -3551,6 +3765,7 @@ export class TeaSortView {
           res.teaBudBloomed ?? null,
           res.reaction ?? null,
           res.serveCompleted ?? null,
+          pairMatchedTea,
         );
       }
     } else {
@@ -3718,6 +3933,32 @@ export class TeaSortView {
     }
   }
 
+  /**
+   * Pair ornaments are derived from the CURRENT model on every refresh:
+   * static group identity + live contents, never cached history. Called by
+   * `renderAllCups` and at the start of every pour so reopening a committed
+   * anchor drops the accent immediately (no stale target display).
+   */
+  private refreshPairMotifs(): void {
+    try {
+      const st = this.logic.toState();
+      const members = pairedTeaMembers(st.cupConstraints);
+      if (members.length === 0) return;
+      const status = pairedTeaStatus({ cups: st.cups }, st.cupConstraints);
+      for (let k = 0; k < members.length; k++) {
+        const idx = members[k] as number;
+        const view = this.cupViews[idx];
+        if (!view) continue;
+        const layers = (st.cups[idx] as TeaId[] | undefined) ?? [];
+        const localTea =
+          layers.length === 2 && layers[0] === layers[1] ? (layers[0] as TeaId) : null;
+        view.renderPairMotif(status, k === 0 ? -1 : 1, localTea);
+      }
+    } catch {
+      // Pre-init / disposed: ornaments simply stay as last drawn.
+    }
+  }
+
   renderAllCups() {
     // Serving-order prefix is derived once per redraw from the
     // authoritative logic state (never view-owned served booleans).
@@ -3759,6 +4000,7 @@ export class TeaSortView {
         }
       }
     });
+    this.refreshPairMotifs();
     // Strainer markers always follow the authoritative strainerState.
     // During a strained pour the animation owns the pre-visual and calls
     // refresh explicitly after landing; here we sync the steady state.
@@ -4085,8 +4327,12 @@ export class TeaSortView {
     teaBudBloomed: TeaBudSlot = null,
     reaction: BlendReactionMetadata | null = null,
     serveCompleted: number | null = null,
+    pairMatchedTea: TeaId | null = null,
   ) {
     this.isAnimating = true;
+    // Derived pair accent updates immediately with the post-move model (no
+    // stale commitment during the pour animation).
+    this.refreshPairMotifs();
     const sourceView = this.cupViews[fromIdx] as CupView;
     const targetView = this.cupViews[toIdx] as CupView;
 
@@ -4422,6 +4668,33 @@ export class TeaSortView {
       }
     }
 
+    // Matched-pair flourish (Gauntlet 17 §190): the completing pour has
+    // landed and the pair is matched in logic, so BOTH bowls release a short
+    // synchronized steam shimmer (~360ms). Part of THIS pour — same single
+    // ticker, same isAnimating lock, never a second onMoveComplete. The
+    // transition is presentation metadata captured around this pour only;
+    // gameplay never stores a chosen tea.
+    if (pairMatchedTea !== null) {
+      try {
+        const members = pairedTeaMembers(this.logic.cupConstraints);
+        const teaHex = TEA_TYPES[pairMatchedTea].colorHex;
+        for (const m of members) {
+          const mv = this.cupViews[m];
+          if (!mv) continue;
+          for (let i = 0; i < 3; i++) this.spawnSteamFromCup(mv, teaHex);
+          const p = this.iceStagePoint(mv, this.logic.cups[m]?.layers.length ?? 0);
+          this.triggerRevealSparkles(p.x, p.y);
+        }
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        await this.wait(PAIR_MATCH_FLOURISH_MS);
+      } catch {
+        // Failure path: logic already matched; just redraw below.
+      } finally {
+        this.renderAllCups();
+      }
+    }
+
     // Strained catch reveal (Gauntlet 6 §40): near completion the caught
     // layer appears in the mesh on the source, then the loaded tool
     // returns to its stand. Part of THIS pour — never a second move.
@@ -4592,7 +4865,7 @@ export class TeaSortView {
     this.particles.push({
       x: cupView.container.x + cupView.visualWidth / 2 + (Math.random() * 20 - 10) * cupView.scale,
       // Steam rises from the actual rim (bowl rim for tasting vessels).
-      y: cupView.container.y + (cupView.isTastingBowl ? cupView.rimLocalY : 10) * cupView.scale,
+      y: cupView.container.y + (cupView.isTastingBowl || cupView.isPairBowl ? cupView.rimLocalY : 10) * cupView.scale,
       vx: Math.random() * 0.8 - 0.4,
       vy: -(Math.random() * 1.2 + 0.8),
       alpha: 0.35,

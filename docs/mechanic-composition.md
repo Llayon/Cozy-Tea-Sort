@@ -99,6 +99,23 @@ Blend: forbidden both directions (no reaction IDs in G15).
 - Perf: solver p95 <250ms, visited p95 <10k, no Worker, no state explosion
   (combo/strongest-single multiplier ~1.2×, far below 4× review line).
 
+## G17 — paired tea stays standalone
+
+G17 adds a RELATIONAL finality axis (two cap-2 bowls matched on the same
+emergent tea) without a new action, solver, pour path or mutable state.
+Production remains STANDALONE:
+
+- Tea Pair + Blend: forbid / forbid (chemistry never mixes with relational
+  target choice).
+- Tea Pair + Serving Order / Mystery / Tasting / Honey / Strainer / Shared
+  Tray: research level / forbid cup; every combination is rejected by the
+  generator request validator.
+- Tea Pair + non-composition siblings (teapot, targets, sink, lemon, ice,
+  thermos, cinnamon, tea bud): rejected.
+
+`validateTeaPairCombination` is the single policy entry; detailed design
+and evidence: `docs/tea-pair.md`.
+
 ## Files
 
 - `src/game/logic/mechanicCompatibility.ts` (new)

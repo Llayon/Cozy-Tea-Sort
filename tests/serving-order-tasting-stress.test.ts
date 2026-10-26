@@ -5,13 +5,21 @@
  * 50-seed child-solve fairness (doom=0, fatal rate); perf budgets
  * (solver p95 <250ms, visited p95 <10k).
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { CupConstraint, SolverAction, TeaId } from '../src/game/types';
 import { emptyFloatingIngredients, TEA_UNITS_PER_COLOR } from '../src/game/types';
 import { applyPourState, canPourState, isPuzzleWonState } from '../src/game/logic/rules';
 import { solvePuzzle } from '../src/game/logic/solver';
 import { generateLevel, createGenerateStats } from '../src/game/logic/generator';
 import { servedPrefixLength } from '../src/game/logic/servingOrder';
+
+// CPU-heavy fairness/stress loops block the worker event loop for ~30s each.
+// Yield between tests so Vitest can flush its worker RPC task updates; this
+// changes no assertions and keeps the known onTaskUpdate timeout flake out of
+// the gate.
+afterEach(async () => {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+});
 
 const PAL: TeaId[] = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
 function req() {
