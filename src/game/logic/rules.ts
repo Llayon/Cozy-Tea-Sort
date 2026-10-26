@@ -113,6 +113,10 @@ import {
   isSharedCapacityOvercap,
   sharedCapacityTransferLimit,
 } from './sharedCapacity';
+import {
+  isPairedTeaGoalSatisfied,
+  isPairedTeaMemberComplete,
+} from './teaPair';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
@@ -342,6 +346,9 @@ export function isCompleteCup(layers: TeaId[]): boolean {
  * rejects them outright).
  */
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  // Gauntlet 17: pair members have NO local finality. Even a full
+  // homogeneous [X,X] is only meaningful relationally (matched partner).
+  if (c?.pairedTeaGroup !== undefined) return false;
   const mode = c?.mode ?? 'normal';
   const cap = cupCapacity(c);
   const target = c?.targetTeaId;
@@ -407,6 +414,10 @@ export function isInFinalState(
   teaBud?: TeaBudSlot | undefined | null,
   blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
+  // G17 pair members are NEVER locally final, even at 2/2 homogeneous: the
+  // partner may still need a different tea, so reopening stays legal and
+  // searchable. Goal finality is relational, not per-vessel.
+  if (c?.pairedTeaGroup !== undefined) return false;
   if (layers.length === 0 || !isHomogeneous(layers)) return false;
   if (obstacle != null) return false;
   if (teaBud != null) return false;
@@ -1575,18 +1586,28 @@ export function targetCupState(
 }
 
 /**
- * Tea-only win core (private): every vessel satisfies
- * `cupEndStateSatisfied`, plus at least one non-empty completed vessel.
+ * Tea-only win core (private): every NON-PAIR vessel satisfies
+ * `cupEndStateSatisfied`, the paired-tea group is relationally matched when
+ * present, and at least one completed vessel exists.
  */
 function teaWonState(cups: readonly TeaId[][], constraints?: readonly CupConstraint[]): boolean {
   let completed = 0;
+  let pairPresent = false;
   for (let i = 0; i < cups.length; i++) {
     const cup = cups[i] as TeaId[];
     const c = constraints?.[i];
+    if (c?.pairedTeaGroup !== undefined) {
+      // Pair members are governed ONLY by the relational goal below:
+      // empty/normal local semantics must never win on their own.
+      pairPresent = true;
+      if (isPairedTeaMemberComplete(cup, c)) completed++;
+      continue;
+    }
     if (!cupEndStateSatisfied(cup, c)) return false;
     if (cup.length === 0) continue;
     completed++;
   }
+  if (pairPresent && !isPairedTeaGoalSatisfied({ cups }, constraints)) return false;
   return completed > 0;
 }
 

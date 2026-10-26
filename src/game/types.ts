@@ -656,6 +656,19 @@ export const SHARED_CAPACITY_LIMITS = {
 } as const;
 
 /**
+ * Paired-tea group identity (Gauntlet 17 — «Чайная пара» / TEA PAIR).
+ *
+ * Exactly TWO otherwise-normal capacity-2 bowls form one relational goal:
+ * at victory both must hold the SAME full homogeneous two-layer tea. The
+ * chosen tea is NOT stored — it emerges from current contents. Membership
+ * is STATIC vessel identity (CupConstraint), never PuzzleState.
+ *
+ * Production G17: exactly one group ('tea-pair'), exactly 2 members, no
+ * target/mustEndEmpty/serveOrder/sharedCapacityGroup, standalone only.
+ */
+export type PairedTeaGroupId = 'tea-pair';
+
+/**
  * Per-vessel constraint (puzzle/domain data, never UI data).
  *
  * Two ORTHOGONAL concepts share one small immutable record:
@@ -704,6 +717,15 @@ export const SHARED_CAPACITY_LIMITS = {
  *     cup stays on the tray — membership never moves with tea. Only valid
  *     with `mode: 'normal'`, base capacity 4, no target, no mustEndEmpty,
  *     no serveOrder (production validation rejects every other combination).
+ * - `pairedTeaGroup` controls RELATIONAL FINALITY (Gauntlet 17 — tea pair):
+ *   - absent        : ordinary vessel, no pair semantics.
+ *   - present       : this vessel belongs to a static paired-tea group
+ *     (production exactly 'tea-pair' on exactly two capacity-2 bowls).
+ *     Each member stays fully usable/reopenable; victory requires BOTH to
+ *     end full homogeneous of the SAME emergent tea. Only valid with
+ *     `mode: 'normal'`, capacity 2, no target, no mustEndEmpty, no
+ *     serveOrder, no sharedCapacityGroup (production validation rejects
+ *     every other combination).
  *
  * No Pixi/React types may ever appear in this module.
  */
@@ -737,6 +759,12 @@ export interface CupConstraint {
    * Static identity only — occupancy derives from tea lengths.
    */
   sharedCapacityGroup?: SharedCapacityGroupId;
+  /**
+   * Paired-tea group (Gauntlet 17). Undefined = ordinary vessel.
+   * Production uses exactly 'tea-pair' on exactly two capacity-2 bowls.
+   * Static identity only — pair status derives from current contents.
+   */
+  pairedTeaGroup?: PairedTeaGroupId;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -864,7 +892,7 @@ export function normalizeCupConstraints(
   return out;
 }
 
-/** Defensive copy of one constraint (all six semantic fields). */
+/** Defensive copy of one constraint (all seven semantic fields). */
 export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   const out: CupConstraint = { mode: c.mode };
   if (c.targetTeaId !== undefined) out.targetTeaId = c.targetTeaId;
@@ -872,14 +900,15 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.mustEndEmpty !== undefined) out.mustEndEmpty = c.mustEndEmpty;
   if (c.serveOrder !== undefined) out.serveOrder = c.serveOrder;
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
+  if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   return out;
 }
 
 /**
  * Stable signature for canonicalization grouping. Cups collapse ONLY
  * when their complete behavioral + end-state signature is identical:
- * mode, target, effective capacity, must-end-empty flag, serving order
- * and shared-capacity group.
+ * mode, target, effective capacity, must-end-empty flag, serving order,
+ * shared-capacity group and paired-tea group.
  *
  * Standard vessels keep their legacy signatures (`N:_`, `N:<tea>`,
  * `SRC:_`, `SNK:_`); any capacity/end-state deviation appends an
@@ -887,10 +916,13 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
  * appends its order (`N:_:O1`, `N:_:O2`) so ①, ② and ordinary cups never
  * canonicalize as interchangeable; a shared-tray member appends its group
  * (`N:_:G6`) so tray members permute with each other but never with
- * ordinary cups. Explicit defaults (`capacity: 4`,
+ * ordinary cups; a tea-pair bowl appends `:P` (`N:_:C2:D:P`) so the two
+ * symmetric pair members permute with each other but never with ordinary
+ * or tasting cap-2 vessels. Explicit defaults (`capacity: 4`,
  * `mustEndEmpty: false`) canonicalize identically to omitted fields, and
- * absent `serveOrder`/`sharedCapacityGroup` leave legacy strings
- * byte-identical (no `:O_` / `:G` markers) — no state-key fragmentation.
+ * absent `serveOrder`/`sharedCapacityGroup`/`pairedTeaGroup` leave legacy
+ * strings byte-identical (no `:O_` / `:G` / `:P` markers) — no state-key
+ * fragmentation.
  */
 export function cupConstraintSignature(c: CupConstraint): string {
   const modeSig = c.mode === 'source-only' ? 'SRC' : c.mode === 'sink-only' ? 'SNK' : 'N';
@@ -911,5 +943,9 @@ export function cupConstraintSignature(c: CupConstraint): string {
     const limit = (SHARED_CAPACITY_LIMITS as Record<string, number>)[c.sharedCapacityGroup];
     groupSuffix = limit !== undefined ? `:G${String(limit)}` : `:G${String(c.sharedCapacityGroup)}`;
   }
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}`;
+  // Paired-tea group (G17): any present group earns a distinct suffix so
+  // pair members never collapse with ordinary/tasting cap-2 vessels and both
+  // members stay symmetric. Absent group leaves legacy strings byte-identical.
+  const pairSuffix = c.pairedTeaGroup === undefined ? '' : `:P`;
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}`;
 }

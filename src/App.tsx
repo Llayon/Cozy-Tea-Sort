@@ -151,7 +151,8 @@ export default function App() {
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
         serveOrderCount: cfg.hasServingOrder ? 2 : 0,
-        sharedTrayCount: (cfg as { hasSharedTray?: boolean }).hasSharedTray ? 1 : 0,
+        sharedTrayCount: cfg.hasSharedTray ? 1 : 0,
+        teaPairCount: cfg.hasTeaPair ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -254,7 +255,8 @@ export default function App() {
         teaBudCount: cfg.hasTeaBloom ? 1 : 0,
         blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
         serveOrderCount: cfg.hasServingOrder ? 2 : 0,
-        sharedTrayCount: (cfg as { hasSharedTray?: boolean }).hasSharedTray ? 1 : 0,
+        sharedTrayCount: cfg.hasSharedTray ? 1 : 0,
+        teaPairCount: cfg.hasTeaPair ? 1 : 0,
         targetTeaIds: [...cfg.targetTeaIds],
         phase: cfg.phase,
       },
@@ -743,6 +745,18 @@ export default function App() {
         </div>
       )}
 
+      {/* Paired-tea first-encounter onboarding (Level 250 only): compact,
+           never blocking. NOT shown on 330 (no tutorial repeat). */}
+      {currentConfig.hasTeaPair && currentLevel === 250 && moves === 0 && !isWon && (
+        <div
+          id="tea-pair-tutorial-hint"
+          className="shrink-0 px-3 py-1.5 bg-[#2B2020]/95 border-b border-[#7A4E58] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F2D8DE] z-10 text-center"
+        >
+          <Coffee className="w-3.5 h-3.5 text-[#D8A0AC] shrink-0" />
+          <span>Парные пиалы должны закончить с одним и тем же чаем. Какой именно — решаешь по ходу.</span>
+        </div>
+      )}
+
       {currentConfig.hasServingOrder && currentConfig.hasTastingBowl && currentLevel === 154 && moves === 0 && !isWon && (
         <div
           id="serving-order-tasting-tutorial-hint"
@@ -1009,6 +1023,10 @@ export default function App() {
               <div className="flex items-start gap-1.5">
                 <span className="text-[#C8A878] font-bold">🍽️</span>
                 <span>Две чашки на общем подносе делят вместимость: вместе в них может быть не больше 6 слоёв чая. Переливая чай с подноса наружу, ты освобождаешь место для любой из этих двух чашек.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-[#D8A0AC] font-bold">🌸</span>
+                <span>Две парные пиалы в конце должны содержать один и тот же чай — по 2 одинаковых слоя в каждой. Цвет заранее не задан: подходящий чай выбирается по ходу решения.</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-[#E8C878] font-bold">🏵️</span>

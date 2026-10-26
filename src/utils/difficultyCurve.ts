@@ -66,9 +66,10 @@ interface MechanicPlan {
   blend: boolean;
   servingOrder: boolean;
   sharedTray: boolean;
+  teaPair: boolean;
 }
 
-const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false, sharedTray: false };
+const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false, sharedTray: false, teaPair: false };
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -337,6 +338,10 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   // L162/L242 are challenge slots under the current rotation (both cinnamon today);
   // pinning them as shared-tray preserves all <=154 levels byte-identically.
   if (levelNum === 162 || levelNum === 242) return { ...CLEAN, sharedTray: true };
+  // G17 first exposures (pinned, challenge-phase, standalone; prefix <=242
+  // unchanged). L250 carries the one-time tutorial; L330 repeats without it.
+  // Both are challenge slots under the current rotation.
+  if (levelNum === 250 || levelNum === 330) return { ...CLEAN, teaPair: true };
   const cycleIndex = (levelNum - 1) % 4; // 0 warmup, 1 challenge, 2 peak, 3 relax
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
@@ -493,7 +498,8 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasTeaBloom = plan.teaBloom;
   const hasBlend = plan.blend;
   const hasServingOrder = plan.servingOrder;
-  const hasSharedTray = (plan as { sharedTray?: boolean }).sharedTray === true;
+  const hasSharedTray = plan.sharedTray === true;
+  const hasTeaPair = plan.teaPair === true;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -537,7 +543,9 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   }
   if (plan.lemon && plan.honey) {
     phaseSubtitle = 'Лимон и мёд • 6 сосудов';
-  } else if ((plan as { sharedTray?: boolean }).sharedTray) {
+  } else if (hasTeaPair) {
+    phaseSubtitle = 'Чайная пара • 6 сосудов';
+  } else if (hasSharedTray) {
     phaseSubtitle = 'Общий поднос • 6 сосудов';
   } else if (plan.servingOrder && plan.tasting) {
     phaseSubtitle = 'Порядок подачи и пиала • 6 сосудов';
@@ -713,6 +721,31 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
   }
 
+  // Gauntlet 17 standalone enforcement: paired-tea challenge is always the
+  // winning V6 layout (4c/6v, lengths 2,2,4,4,4,0, one empty), no Mystery,
+  // no teapot. Both pair bowls are capacity 2. Palette is four eligible
+  // legacy teas (never reaction IDs).
+  if (hasTeaPair) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Чайная пара • 6 сосудов';
+    if (levelNum === 250) {
+      colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
+    } else if (levelNum === 330) {
+      colors = ['lavender', 'saffron', 'buckwheat', 'matcha'];
+    } else {
+      const quads = [
+        ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'],
+        ['lavender', 'saffron', 'buckwheat', 'matcha'],
+        ['karkade', 'milk_oolong', 'lavender', 'sea_buckthorn'],
+        ['saffron', 'buckwheat', 'matcha', 'karkade'],
+      ];
+      colors = [...(quads[Math.floor(levelNum / 4) % quads.length] as [TeaId, TeaId, TeaId, TeaId])];
+    }
+  }
+
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
   if (levelNum === 1) rewardRecipeId = 'matcha';
@@ -749,6 +782,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasBlend,
     hasServingOrder,
     hasSharedTray,
+    hasTeaPair,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

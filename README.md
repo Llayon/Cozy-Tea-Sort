@@ -59,7 +59,7 @@ The old "100% solvable via reverse shuffle" claim was false: arbitrary single-la
 
 Any level is reproducible from its seed (`seed` is stored on the generated level for bug reports).
 
-Canonical target, sink, tasting and lemon production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts`, `tastingTemplates.ts`, `lemonTemplates.ts` — topologies discovered offline with the production solver, palette-relative; lemon templates fix role c0 to sea_buckthorn) serve each level with ~1 solver validation (`*_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it.
+Canonical target, sink, tasting and lemon production configs skip the random scan entirely: bounded template banks (`targetTemplates.ts`, `sinkTemplates.ts`, `tastingTemplates.ts`, `lemonTemplates.ts` — topologies discovered offline with the production solver, palette-relative; lemon templates fix role c0 to sea_buckthorn) serve each level with ~1 solver validation (`*_TEMPLATE_ATTEMPTS <= 4`, `candidatesTried === 0`); every instantiation still passes the single `finalizeCandidate` gate, with a validated fallback ladder behind it. Later mechanics follow the same pattern (`sharedTrayTemplates.ts`, `teaPairTemplates.ts`; see `docs/`).
 
 ## Solver
 
