@@ -10,7 +10,10 @@
     "clean": "rm -rf dist server.js",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
-    "test:all-at-once": "vitest run"
+    "test:all-at-once": "vitest run",
+    "test:e2e": "playwright test e2e/release-journey.spec.ts",
+    "test:e2e:ci": "playwright test e2e/release-journey.spec.ts --grep \"L1: config|L26: config|L98: config|L106: config|L154: config|L162: config|L250: config\"",
+    "test:visual": "playwright test e2e/release-visual.spec.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -22,6 +25,7 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
