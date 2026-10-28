@@ -34,6 +34,7 @@ import { TeaSortView } from './game/view/TeaSortView';
 import { audioSynth } from './game/audio/audioSynth';
 import { telegram } from './game/telegram/telegramHaptics';
 import { generateLevel } from './game/logic/generator';
+import { generateRequestForLevelConfig } from './game/logic/productionRequest';
 import { applyWin } from './game/logic/progression';
 import { loadProgress, saveProgress } from './game/storage';
 import { makeProductionSeed } from './game/logic/rng';
@@ -44,6 +45,56 @@ import { CupSkinId, TeaRecipe, CupSkin, LevelConfig } from './types/tea';
 import { RecipeBookModal } from './components/RecipeBookModal';
 import { VictoryModal } from './components/VictoryModal';
 import { RhythmBadge } from './components/RhythmBadge';
+import { tutorialForConfig } from './game/ui/tutorials';
+
+/**
+ * G18 DEV-only visual/E2E launch controls.
+ *
+ * Enabled exclusively through Vite's `import.meta.env.DEV` (dead-code
+ * eliminated from production builds). Production UX never parses these
+ * params and the QA bridge is never installed in a release bundle.
+ *
+ * Supported query params:
+ * - qaLevel: deterministic production level number
+ * - qaSeed: deterministic level seed (defaults to the production seed)
+ * - qaTutorial: 0 hides first-exposure banners (default: normal behaviour)
+ */
+interface QaLaunch {
+  level: number;
+  seed?: string;
+  tutorial: boolean;
+}
+
+const QA_MODULE_START_MS = typeof performance !== 'undefined' ? performance.now() : 0;
+
+function readQaLaunch(): QaLaunch | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('qaLevel')) return null;
+    const rawLevel = Number(params.get('qaLevel'));
+    if (!Number.isInteger(rawLevel) || rawLevel < 1 || rawLevel > 1600) return null;
+    const rawSeed = params.get('qaSeed');
+    const tutorial = params.get('qaTutorial') !== '0';
+    return {
+      level: rawLevel,
+      seed: rawSeed && rawSeed.length > 0 ? rawSeed : undefined,
+      tutorial,
+    };
+  } catch {
+    return null;
+  }
+}
+
+interface QaCupGeometry {
+  index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  hitPadX: number;
+  hitPadY: number;
+}
 
 interface LevelBackupState {
   cups: TeaId[][];
@@ -63,9 +114,23 @@ export default function App() {
   const viewRef = useRef<TeaSortView | null>(null);
   const logicRef = useRef<TeaSortLogic | null>(null);
 
+  // DEV-only deterministic launch (G18 visual/E2E harness). Null in release.
+  const [qaLaunch] = useState<QaLaunch | null>(readQaLaunch);
+  const tutorialsVisible = qaLaunch?.tutorial !== false;
+
   // Persisted progress is loaded once; refresh restarts the current puzzle
   // (acceptable for Gauntlet 0) but never regresses earned progression.
-  const [initialProgress] = useState(loadProgress);
+  const [initialProgress] = useState(() => {
+    const stored = loadProgress();
+    if (!qaLaunch) return stored;
+    // QA launches are self-contained: the requested production level must
+    // be playable even in a fresh browser profile.
+    return {
+      ...stored,
+      currentLevel: qaLaunch.level,
+      highestUnlockedLevel: Math.max(stored.highestUnlockedLevel, qaLaunch.level),
+    };
+  });
 
   const [currentLevel, setCurrentLevel] = useState<number>(initialProgress.currentLevel);
   const [highestUnlockedLevel, setHighestUnlockedLevel] = useState<number>(
@@ -93,6 +158,15 @@ export default function App() {
   const highestUnlockedRef = useRef<number>(initialProgress.highestUnlockedLevel);
   const equippedSkinRef = useRef<CupSkinId>(initialProgress.equippedSkin);
   const seedRef = useRef<string>('');
+  // G18 DEV-only load instrumentation (read through the QA bridge). The
+  // timestamps are harmless in production and never drive gameplay.
+  const qaTimingsRef = useRef({
+    moduleStart: QA_MODULE_START_MS,
+    configReadyAt: 0,
+    generatedAt: 0,
+    boardMountedAt: 0,
+    firstInputAt: 0,
+  });
 
   const setCurrentLevelSafe = (lvl: number) => {
     currentLevelRef.current = lvl;
@@ -126,6 +200,7 @@ export default function App() {
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
   const nextConfig: LevelConfig = getLevelConfig(currentLevel + 1);
+  const tutorial = tutorialForConfig(currentConfig);
 
   // Refs mirroring collections for the single-lifetime Pixi win callback.
   const unlockedRecipeIdsRef = useRef<TeaId[]>(initialProgress.unlockedRecipes);
@@ -133,31 +208,7 @@ export default function App() {
 
   const buildLogicForLevel = (lvlNum: number, seed: string): TeaSortLogic => {
     const cfg = getLevelConfig(lvlNum);
-    const generated = generateLevel(
-      {
-        numColors: cfg.numColors,
-        colors: cfg.colors,
-        emptyCups: cfg.emptyCups,
-        hasMysteryLayer: cfg.hasMysteryLayer,
-        sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
-        sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
-        tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
-        floatingIngredient: cfg.floatingIngredient,
-        hasStrainer: cfg.hasStrainer,
-        sinkingIngredient: cfg.sinkingIngredient,
-        frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
-        thermosCupCount: cfg.hasThermos ? 1 : 0,
-        cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
-        teaBudCount: cfg.hasTeaBloom ? 1 : 0,
-        blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
-        serveOrderCount: cfg.hasServingOrder ? 2 : 0,
-        sharedTrayCount: cfg.hasSharedTray ? 1 : 0,
-        teaPairCount: cfg.hasTeaPair ? 1 : 0,
-        targetTeaIds: [...cfg.targetTeaIds],
-        phase: cfg.phase,
-      },
-      seed,
-    );
+    const generated = generateLevel(generateRequestForLevelConfig(cfg), seed);
     seedRef.current = generated.seed;
 
     initialLevelStateRef.current = {
@@ -210,7 +261,12 @@ export default function App() {
 
   /** Start (or restart) an explicit level. Does NOT touch highestUnlocked. */
   const startLevel = (lvlNum: number, seed?: string) => {
-    const logic = buildLogicForLevel(lvlNum, seed ?? makeProductionSeed(lvlNum));
+    const effectiveSeed =
+      seed ??
+      (qaLaunch?.seed && lvlNum === qaLaunch.level
+        ? qaLaunch.seed
+        : makeProductionSeed(lvlNum));
+    const logic = buildLogicForLevel(lvlNum, effectiveSeed);
     setCurrentLevelSafe(lvlNum);
     resetTransientUi();
     bindLogicToView(logic, lvlNum);
@@ -219,7 +275,10 @@ export default function App() {
   /** Footer action: a fresh puzzle for the SAME level (never a skip). */
   const reshuffleCurrentLevel = () => {
     const lvl = currentLevelRef.current;
-    startLevel(lvl, makeProductionSeed(lvl));
+    const seed = qaLaunch?.seed
+      ? `${qaLaunch.seed}:reshuffle:${Date.now().toString(36)}`
+      : makeProductionSeed(lvl);
+    startLevel(lvl, seed);
     audioSynth.playSelect();
     telegram.hapticSelection();
   };
@@ -237,31 +296,12 @@ export default function App() {
 
     const initialLvl = initialProgress.currentLevel;
     const cfg = getLevelConfig(initialLvl);
+    qaTimingsRef.current.configReadyAt = performance.now();
     const generated = generateLevel(
-      {
-        numColors: cfg.numColors,
-        colors: cfg.colors,
-        emptyCups: cfg.emptyCups,
-        hasMysteryLayer: cfg.hasMysteryLayer,
-        sourceOnlyCount: cfg.hasSourceOnlyTeapot ? 1 : 0,
-        sinkOnlyCount: cfg.hasSinkGuestCup ? 1 : 0,
-        tastingCupCount: cfg.hasTastingBowl ? 1 : 0,
-        floatingIngredient: cfg.floatingIngredient,
-        hasStrainer: cfg.hasStrainer,
-        sinkingIngredient: cfg.sinkingIngredient,
-        frozenCupCount: cfg.hasFrozenCup ? 1 : 0,
-        thermosCupCount: cfg.hasThermos ? 1 : 0,
-        cinnamonCupCount: cfg.hasCinnamon ? 1 : 0,
-        teaBudCount: cfg.hasTeaBloom ? 1 : 0,
-        blendRecipeId: cfg.hasBlend ? 'milk-tea' : undefined,
-        serveOrderCount: cfg.hasServingOrder ? 2 : 0,
-        sharedTrayCount: cfg.hasSharedTray ? 1 : 0,
-        teaPairCount: cfg.hasTeaPair ? 1 : 0,
-        targetTeaIds: [...cfg.targetTeaIds],
-        phase: cfg.phase,
-      },
-      makeProductionSeed(initialLvl),
+      generateRequestForLevelConfig(cfg),
+      qaLaunch?.seed ?? makeProductionSeed(initialLvl),
     );
+    qaTimingsRef.current.generatedAt = performance.now();
     seedRef.current = generated.seed;
 
     initialLevelStateRef.current = {
@@ -368,6 +408,9 @@ export default function App() {
       },
       onSelectCup: (idx) => {
         if (isDisposed) return;
+        if (idx !== null && qaTimingsRef.current.firstInputAt === 0) {
+          qaTimingsRef.current.firstInputAt = performance.now();
+        }
         setSelectedCupIndex(idx);
         if (idx !== null) {
           setHintMessage(null);
@@ -393,6 +436,140 @@ export default function App() {
       view.setSkin(equippedSkinRef.current);
       view.layoutCups();
       view.renderAllCups();
+      qaTimingsRef.current.boardMountedAt = performance.now();
+
+      // G18 DEV-only deterministic QA bridge. Never installed in release
+      // builds (import.meta.env.DEV is statically false there).
+      if (qaLaunch && import.meta.env.DEV) {
+        const qaBridge = {
+          version: 1,
+          moduleStart: QA_MODULE_START_MS,
+          readyAt: performance.now(),
+          get level(): number {
+            return currentLevelRef.current;
+          },
+          get seed(): string {
+            return seedRef.current;
+          },
+          get moves(): number {
+            return logicRef.current?.movesCount ?? 0;
+          },
+          get canUndo(): boolean {
+            return logicRef.current?.canUndo ?? false;
+          },
+          get isWon(): boolean {
+            return logicRef.current?.isWon() ?? false;
+          },
+          isReady(): boolean {
+            return viewRef.current === view;
+          },
+          isAnimating(): boolean {
+            return viewRef.current?.isAnimating ?? false;
+          },
+          timings(): {
+            moduleStart: number;
+            configReadyAt: number;
+            generatedAt: number;
+            boardMountedAt: number;
+            firstInputAt: number;
+          } {
+            return { ...qaTimingsRef.current };
+          },
+          debugCounts(): {
+            cups: number;
+            stageChildren: number;
+            tickerListeners: number;
+            canvases: number;
+          } {
+            const active = viewRef.current;
+            return {
+              cups: active?.cupViews.length ?? 0,
+              stageChildren: active?.app.stage.children.length ?? 0,
+              tickerListeners: active?.app.ticker.count ?? 0,
+              canvases: document.querySelectorAll('canvas').length,
+            };
+          },
+          getState() {
+            return logicRef.current?.toState() ?? null;
+          },
+          cupGeometry(): QaCupGeometry[] {
+            const active = viewRef.current;
+            const canvas = active?.canvas;
+            if (!active || !canvas) return [];
+            const rect = canvas.getBoundingClientRect();
+            return active.cupViews.map((v) => {
+              const padX = v.isTeapot ? 22 : v.isSinkOnly || v.isTastingBowl || v.isThermos ? 20 : 16;
+              const padBottom = v.isSinkOnly ? 40 : 32;
+              return {
+                index: v.index,
+                x: rect.left + v.container.x,
+                y: rect.top + v.container.y,
+                width: v.visualWidth,
+                height: v.visualHeight,
+                hitPadX: padX,
+                hitPadY: padBottom,
+              };
+            });
+          },
+          tapCup(index: number): void {
+            (view as unknown as { handleCupClick(i: number): void }).handleCupClick(index);
+          },
+          canMove(from: number, to: number): boolean {
+            return logicRef.current?.canMakeMove(from, to) ?? false;
+          },
+          firstLegalMove(): { from: number; to: number } | null {
+            const active = logicRef.current;
+            if (!active) return null;
+            for (let from = 0; from < active.cups.length; from++) {
+              for (let to = 0; to < active.cups.length; to++) {
+                if (from !== to && active.canMakeMove(from, to)) return { from, to };
+              }
+            }
+            return null;
+          },
+          async autoSolve(): Promise<{ ok: boolean; moves: number; reason?: string }> {
+            const active = logicRef.current;
+            const activeView = viewRef.current;
+            if (!active || !activeView) return { ok: false, moves: 0, reason: 'not-ready' };
+            const { solvePuzzle } = await import('./game/logic/solver');
+            const st = active.toState();
+            const solved = solvePuzzle(st.cups, {
+              cupConstraints: st.cupConstraints,
+              floatingIngredients: st.floatingIngredients,
+              sinkingIngredients: st.sinkingIngredients,
+              strainer: st.strainer,
+              iceSlots: st.iceSlots,
+              capacityObstacles: st.capacityObstacles,
+              teaBudSlots: st.teaBudSlots,
+              blendRecipe: active.blendRecipe,
+              maxVisited: 120_000,
+              maxDepth: 60,
+            });
+            if (!solved.solvable || !solved.solution) {
+              return { ok: false, moves: active.movesCount, reason: 'unsolvable' };
+            }
+            const waitIdle = async (): Promise<void> => {
+              for (let i = 0; i < 240; i++) {
+                if (!viewRef.current?.isAnimating) return;
+                await new Promise((resolve) => setTimeout(resolve, 25));
+              }
+            };
+            for (const action of solved.solution) {
+              if (action.kind !== 'pour') continue;
+              const bridge = (
+                window as unknown as { __cozyTeaQa?: { tapCup(i: number): void } }
+              ).__cozyTeaQa;
+              if (!bridge) return { ok: false, moves: active.movesCount, reason: 'bridge-gone' };
+              bridge.tapCup(action.from);
+              bridge.tapCup(action.to);
+              await waitIdle();
+              if (active.isWon()) break;
+            }
+            return { ok: active.isWon(), moves: active.movesCount };
+          },
+        };
+        (window as unknown as { __cozyTeaQa?: typeof qaBridge }).__cozyTeaQa = qaBridge;
+      }
     }).catch((err) => {
       console.error('Failed to init TeaSortView:', err);
     });
@@ -450,7 +627,10 @@ export default function App() {
   const handleNextLevel = () => {
     const completed = currentLevelRef.current;
     const next = completed + 1;
-    startLevel(next, makeProductionSeed(next));
+    startLevel(
+      next,
+      qaLaunch?.seed ? `${qaLaunch.seed}:next:${next}` : makeProductionSeed(next),
+    );
     audioSynth.playSelect();
     telegram.hapticSelection();
   };
@@ -528,7 +708,7 @@ export default function App() {
               telegram.hapticSelection();
             }}
             aria-label="Книга рецептов и чайный сервиз"
-            className="relative min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] w-10 h-10 rounded-xl bg-[#30211B] border border-[#48342B] flex items-center justify-center text-[#E8985E] hover:bg-[#3D2B23] active:scale-95 transition-all"
+            className="relative min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl bg-[#30211B] border border-[#48342B] flex items-center justify-center text-[#E8985E] hover:bg-[#3D2B23] active:scale-95 transition-all"
             title="Чайная книга и сервиз"
           >
             <BookOpen className="w-4 h-4" />
@@ -543,7 +723,7 @@ export default function App() {
             id="sound-toggle-btn"
             onClick={toggleSound}
             aria-label="Включить/выключить звук"
-            className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] w-10 h-10 rounded-xl bg-[#30211B] border border-[#48342B] flex items-center justify-center text-[#D8C2B2] hover:bg-[#3D2B23] active:scale-95 transition-all"
+            className="relative min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl bg-[#30211B] border border-[#48342B] flex items-center justify-center text-[#D8C2B2] hover:bg-[#3D2B23] active:scale-95 transition-all"
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-[#A89082]" /> : <Volume2 className="w-4 h-4 text-[#E8B878]" />}
           </button>
@@ -556,7 +736,7 @@ export default function App() {
               telegram.hapticSelection();
             }}
             aria-label="Правила и купажи"
-            className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] w-10 h-10 rounded-xl bg-[#30211B] border border-[#48342B] flex items-center justify-center text-[#D8C2B2] hover:bg-[#3D2B23] active:scale-95 transition-all"
+            className="relative min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl bg-[#30211B] border border-[#48342B] flex items-center justify-center text-[#D8C2B2] hover:bg-[#3D2B23] active:scale-95 transition-all"
           >
             <Info className="w-4 h-4" />
           </button>
@@ -587,209 +767,19 @@ export default function App() {
         )}
       </div>
 
-      {/* Teapot first-encounter onboarding (Level 6): one compact cozy hint, never blocking.
-          Suppressed beside the guest-cup / tasting / lemon banners (L22,
-          L30, L38): the teapot was already taught at L6/7/14/15 — no
-          overlapping banners on combined levels. */}
-      {currentConfig.hasSourceOnlyTeapot && !currentConfig.hasSinkGuestCup && !currentConfig.hasTastingBowl && !currentConfig.floatingIngredient && moves === 0 && !isWon && (
+      {/* G18 one-time first-exposure tutorial (centralized registry). */}
+      {tutorial && moves === 0 && !isWon && tutorialsVisible && (
         <div
-          id="teapot-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2B2115]/95 border-b border-[#5A4426] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8C98A] z-10 text-center"
+          id={tutorial.bannerId}
+          className="shrink-0 px-3 py-1.5 border-b flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] z-10 text-center"
+          style={{
+            backgroundColor: `${tutorial.tone.background}F2`,
+            borderColor: tutorial.tone.border,
+            color: tutorial.tone.text,
+          }}
         >
-          <Coffee className="w-3.5 h-3.5 text-[#E8B878] shrink-0" />
-          <span>Новый сосуд — чайник. Из него можно только разливать чай. Налить обратно нельзя.</span>
-        </div>
-      )}
-
-      {/* Guest-cup first-encounter onboarding (Level 18): compact, never blocking. */}
-      {currentConfig.hasSinkGuestCup && moves === 0 && !isWon && (
-        <div
-          id="sink-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#241B2E]/95 border-b border-[#5A4A6B] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#D9C9F0] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#C9A8E8] shrink-0" />
-          <span>Чашка гостя: в неё можно наливать чай, но переливать обратно нельзя. Выбери, какой чай подать.</span>
-        </div>
-      )}
-
-      {/* Tasting-bowl first-encounter onboarding (Level 26): compact, never blocking. */}
-      {currentConfig.hasTastingBowl && moves === 0 && !isWon && (
-        <div
-          id="tasting-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#1B2A24]/95 border-b border-[#3E5A4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#C9E8D4] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#8AC9A8] shrink-0" />
-          <span>Дегустационная пиала: в неё помещается только 2 слоя. Используй её как временное место — к концу она должна быть пустой.</span>
-        </div>
-      )}
-
-      {/* Lemon first-encounter onboarding (Level 34): compact, never blocking.
-          Suppressed on lemon+honey interaction levels (58/62) — those use the
-          combined banner below. */}
-      {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient !== 'honey' && moves === 0 && !isWon && (
-        <div
-          id="lemon-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2E2410]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0DFA8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#E8C85E] shrink-0" />
-          <span>Долька лимона: лимон плавает сверху и переезжает вместе с переливанием. К концу оставь его на облепиховом чае.</span>
-        </div>
-      )}
-
-      {/* Strainer first-encounter onboarding (Level 42): compact, never blocking. */}
-      {currentConfig.hasStrainer && moves === 0 && !isWon && (
-        <div
-          id="strainer-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#1E2A30]/95 border-b border-[#3E5A66] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#C9E4E8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#8AC9D4] shrink-0" />
-          <span>Ситечко задерживает 1 слой при переливании. Поставь его на чашку, перелей чай, а задержанный слой потом верни в подходящий сосуд.</span>
-        </div>
-      )}
-
-      {/* Sinking-honey first-encounter onboarding (Level 50): compact, never blocking.
-          Suppressed on lemon+honey interaction levels (58/62) — those use the
-          combined banner below. */}
-      {currentConfig.sinkingIngredient === 'honey' && currentConfig.floatingIngredient !== 'lemon' && moves === 0 && !isWon && (
-        <div
-          id="honey-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2E1F0E]/95 border-b border-[#7A5222] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F5D9A0] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#E8A83E] shrink-0" />
-          <span>Мёд остаётся на дне. Он переедет только когда чашка опустеет. К концу оставь его под гречишным чаем.</span>
-        </div>
-      )}
-
-      {/* Frozen-cup first-encounter onboarding (Level 66 only): compact,
-          never blocking. NOT shown on 70 (no tutorial repeat). */}
-      {currentConfig.hasFrozenCup && currentLevel === 66 && moves === 0 && !isWon && (
-        <div
-          id="frozen-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#16242E]/95 border-b border-[#3E5A6B] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#C9E2F0] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#8AC9E8] shrink-0" />
-          <span>Замёрзшая чашка пока не отдаёт чай. Долей в неё облепиховый — лёд растает.</span>
-        </div>
-      )}
-
-      {/* Thermos first-encounter onboarding (Level 74 only): compact,
-           never blocking. NOT shown on 78 (no tutorial repeat). */}
-      {currentConfig.hasThermos && currentLevel === 74 && moves === 0 && !isWon && (
-        <div
-          id="thermos-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2A2118]/95 border-b border-[#6B5A3E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0D9A8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#E8C878] shrink-0" />
-          <span>В высокий термос помещается 5 слоёв. Это удобный временный запас, но к концу термос нужно опустошить.</span>
-        </div>
-      )}
-
-      {/* Cinnamon first-encounter onboarding (Level 82 only): compact,
-           never blocking. NOT shown on 86 (no tutorial repeat). */}
-      {currentConfig.hasCinnamon && currentLevel === 82 && moves === 0 && !isWon && (
-        <div
-          id="cinnamon-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2E1C12]/95 border-b border-[#7A4A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F2C9A0] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#E8A05E] shrink-0" />
-          <span>Палочка корицы оставляет место только для 2 слоёв. Полностью опустоши чашку — палочка уберётся, и снова поместится 4.</span>
-        </div>
-      )}
-
-      {/* Tea-bloom first-encounter onboarding (Level 90 only): compact,
-           never blocking. NOT shown on 94 (no tutorial repeat). */}
-      {currentConfig.hasTeaBloom && currentLevel === 90 && moves === 0 && !isWon && (
-        <div
-          id="tea-bloom-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#1E2A1A]/95 border-b border-[#4A6B3E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#D4E8B8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#9AC878] shrink-0" />
-          <span>На дне спрятан чайный бутон. Полностью опустоши чашку — он распустится.</span>
-        </div>
-      )}
-
-      {/* Blend first-encounter onboarding (Level 98 only): compact,
-           never blocking. NOT shown on 102 (no tutorial repeat). */}
-      {currentConfig.hasBlend && currentLevel === 98 && moves === 0 && !isWon && (
-        <div
-          id="blend-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2E2118]/95 border-b border-[#7A5A3E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0D9B8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#D8A05E] shrink-0" />
-          <span>Чёрный чай и молоко соединяются при соприкосновении. Два слоя превращаются в один молочный чай.</span>
-        </div>
-      )}
-
-      {/* Serving-order first-encounter onboarding (Level 106 only): compact,
-           never blocking. NOT shown on 110 (no tutorial repeat). */}
-      {currentConfig.hasServingOrder && currentLevel === 106 && moves === 0 && !isWon && (
-        <div
-          id="serving-order-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#232A1E]/95 border-b border-[#5A6B4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#DCE8C8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#B8C898] shrink-0" />
-          <span>Сначала собери чашку ①, потом ②. Поданную чашку больше не переливают.</span>
-        </div>
-      )}
-
-      {/* G15 composition first-encounter (Level 154 only): both mechanics are
-           already known (tasting L26, serving L106), so one concise contextual
-           hint. Never blocking. NOT shown on later mixed levels (234, …). */}
-      {(currentConfig as { hasSharedTray?: boolean }).hasSharedTray && currentLevel === 162 && moves === 0 && !isWon && (
-        <div
-          id="shared-tray-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#232A1E]/95 border-b border-[#5A6B4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#DCE8C8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#B8C898] shrink-0" />
-          <span>На подносе всего 6 мест для чая. Освободи место в одной чашке — оно появится для другой.</span>
-        </div>
-      )}
-
-      {/* Paired-tea first-encounter onboarding (Level 250 only): compact,
-           never blocking. NOT shown on 330 (no tutorial repeat). */}
-      {currentConfig.hasTeaPair && currentLevel === 250 && moves === 0 && !isWon && (
-        <div
-          id="tea-pair-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2B2020]/95 border-b border-[#7A4E58] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F2D8DE] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#D8A0AC] shrink-0" />
-          <span>Парные пиалы должны закончить с одним и тем же чаем. Какой именно — решаешь по ходу.</span>
-        </div>
-      )}
-
-      {currentConfig.hasServingOrder && currentConfig.hasTastingBowl && currentLevel === 154 && moves === 0 && !isWon && (
-        <div
-          id="serving-order-tasting-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#232A1E]/95 border-b border-[#5A6B4E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#DCE8C8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#B8C898] shrink-0" />
-          <span>Порядок подачи действует и здесь: сначала ①, потом ②.</span>
-        </div>
-      )}
-
-      {/* Lemon+honey interaction first-encounter onboarding (Level 58 only):
-           compact, never blocking. NOT shown on 62 (no tutorial repeat). */}
-      {currentConfig.floatingIngredient === 'lemon' && currentConfig.sinkingIngredient === 'honey' && currentLevel === 58 && moves === 0 && !isWon && (
-        <div
-          id="lemon-honey-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#2E2410]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#F0DFA8] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#E8C85E] shrink-0" />
-          <span>Лимон уезжает сразу, мёд — только из пустеющей чашки. В финале лимон нужен облепиховому чаю, мёд — гречишному.</span>
-        </div>
-      )}
-
-      {/* Named-serving first-encounter onboarding (Level 10): compact, never blocking. */}
-      {currentConfig.targetTeaIds.length > 0 && moves === 0 && !isWon && (
-        <div
-          id="target-tutorial-hint"
-          className="shrink-0 px-3 py-1.5 bg-[#252015]/95 border-b border-[#6B5A2E] flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-[#E8D9A0] z-10 text-center"
-        >
-          <Coffee className="w-3.5 h-3.5 text-[#E8C878] shrink-0" />
-          <span>
-            Именная сервировка: чашки с золотым знаком ждут свой чай. Их можно использовать как обычно, но в
-            конце нужный сорт должен оказаться именно в своей чашке.
-          </span>
+          <Coffee className="w-3.5 h-3.5 shrink-0" style={{ color: tutorial.tone.icon }} />
+          <span>{tutorial.text}</span>
         </div>
       )}
 
@@ -937,7 +927,8 @@ export default function App() {
               <button
                 id="close-info-btn"
                 onClick={() => setShowInfo(false)}
-                className="w-7 h-7 rounded-lg bg-[#30211B] flex items-center justify-center text-[#B39D8D] hover:text-[#FFF]"
+                aria-label="Закрыть правила"
+                className="relative w-11 h-11 rounded-lg bg-[#30211B] flex items-center justify-center text-[#B39D8D] hover:text-[#FFF]"
               >
                 <X className="w-4 h-4" />
               </button>
