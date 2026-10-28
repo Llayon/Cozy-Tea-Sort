@@ -18,7 +18,16 @@ bun run dev        # local dev server
 bun run typecheck  # tsc --noEmit (strict)
 bun run test       # authoritative batched quality gate (scripts/run-tests.mjs)
 bun run build      # vite build
+
+# G18 release/visual evidence (Playwright)
+bun run test:e2e       # full mobile release journey (structural, no pixel diff)
+bun run test:e2e:ci    # bounded critical browser gate used by quality CI
+bun run test:visual    # full 360/390/430/1280 screenshot audit (DEV evidence)
 ```
+
+The browser harness uses the DEV-only `?qaLevel=&qaSeed=&qaTutorial=` launch and
+`window.__cozyTeaQa`; production builds do not parse those params or install the
+bridge. See `docs/g18-audit.md` for the G18 evidence package.
 
 ## Architecture
 

@@ -1,0 +1,946 @@
+[
+  {
+    "level": 1,
+    "seed": "g18-e2e:1:0",
+    "viewport": "360x800",
+    "mechanic": "base",
+    "tutorial": null,
+    "expectedCues": [
+      "clean board"
+    ],
+    "file": "360x800-base-L1.png"
+  },
+  {
+    "level": 3,
+    "seed": "g18-e2e:3:0",
+    "viewport": "360x800",
+    "mechanic": "mystery",
+    "tutorial": null,
+    "expectedCues": [
+      "mystery notice",
+      "foam-hidden bottom layer"
+    ],
+    "file": "360x800-mystery-L3.png"
+  },
+  {
+    "level": 6,
+    "seed": "g18-e2e:6:0",
+    "viewport": "360x800",
+    "mechanic": "teapot",
+    "tutorial": null,
+    "expectedCues": [
+      "teapot silhouette"
+    ],
+    "file": "360x800-teapot-L6.png"
+  },
+  {
+    "level": 10,
+    "seed": "g18-e2e:10:0",
+    "viewport": "360x800",
+    "mechanic": "targets",
+    "tutorial": null,
+    "expectedCues": [
+      "target medallions"
+    ],
+    "file": "360x800-targets-L10.png"
+  },
+  {
+    "level": 18,
+    "seed": "g18-e2e:18:0",
+    "viewport": "360x800",
+    "mechanic": "sink",
+    "tutorial": null,
+    "expectedCues": [
+      "guest cup saucer/handle"
+    ],
+    "file": "360x800-sink-L18.png"
+  },
+  {
+    "level": 26,
+    "seed": "g18-e2e:26:0",
+    "viewport": "360x800",
+    "mechanic": "tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "shallow gold-rim tasting bowl"
+    ],
+    "file": "360x800-tasting-L26.png"
+  },
+  {
+    "level": 34,
+    "seed": "g18-e2e:34:0",
+    "viewport": "360x800",
+    "mechanic": "lemon",
+    "tutorial": null,
+    "expectedCues": [
+      "lemon slice on surface"
+    ],
+    "file": "360x800-lemon-L34.png"
+  },
+  {
+    "level": 42,
+    "seed": "g18-e2e:42:0",
+    "viewport": "360x800",
+    "mechanic": "strainer",
+    "tutorial": null,
+    "expectedCues": [
+      "strainer stand"
+    ],
+    "file": "360x800-strainer-L42.png"
+  },
+  {
+    "level": 50,
+    "seed": "g18-e2e:50:0",
+    "viewport": "360x800",
+    "mechanic": "honey",
+    "tutorial": null,
+    "expectedCues": [
+      "honey blob at bottom"
+    ],
+    "file": "360x800-honey-L50.png"
+  },
+  {
+    "level": 58,
+    "seed": "g18-e2e:58:0",
+    "viewport": "360x800",
+    "mechanic": "lemon-honey",
+    "tutorial": null,
+    "expectedCues": [
+      "lemon slice",
+      "honey blob"
+    ],
+    "file": "360x800-lemon-honey-L58.png"
+  },
+  {
+    "level": 66,
+    "seed": "g18-e2e:66:0",
+    "viewport": "360x800",
+    "mechanic": "frozen",
+    "tutorial": null,
+    "expectedCues": [
+      "ice slab"
+    ],
+    "file": "360x800-frozen-L66.png"
+  },
+  {
+    "level": 74,
+    "seed": "g18-e2e:74:0",
+    "viewport": "360x800",
+    "mechanic": "thermos",
+    "tutorial": null,
+    "expectedCues": [
+      "tall thermos silhouette"
+    ],
+    "file": "360x800-thermos-L74.png"
+  },
+  {
+    "level": 82,
+    "seed": "g18-e2e:82:0",
+    "viewport": "360x800",
+    "mechanic": "cinnamon",
+    "tutorial": null,
+    "expectedCues": [
+      "cinnamon stick"
+    ],
+    "file": "360x800-cinnamon-L82.png"
+  },
+  {
+    "level": 90,
+    "seed": "g18-e2e:90:0",
+    "viewport": "360x800",
+    "mechanic": "tea-bloom",
+    "tutorial": null,
+    "expectedCues": [
+      "tea bud at bottom"
+    ],
+    "file": "360x800-tea-bloom-L90.png"
+  },
+  {
+    "level": 98,
+    "seed": "g18-e2e:98:0",
+    "viewport": "360x800",
+    "mechanic": "blend",
+    "tutorial": null,
+    "expectedCues": [
+      "black tea + milk palette"
+    ],
+    "file": "360x800-blend-L98.png"
+  },
+  {
+    "level": 106,
+    "seed": "g18-e2e:106:0",
+    "viewport": "360x800",
+    "mechanic": "serving-order",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered serving saucers"
+    ],
+    "file": "360x800-serving-order-L106.png"
+  },
+  {
+    "level": 154,
+    "seed": "g18-e2e:154:0",
+    "viewport": "360x800",
+    "mechanic": "order-tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered saucers",
+      "tasting bowl"
+    ],
+    "file": "360x800-order-tasting-L154.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "360x800",
+    "mechanic": "shared-tray",
+    "tutorial": null,
+    "expectedCues": [
+      "one continuous tray",
+      "six group markers"
+    ],
+    "file": "360x800-shared-tray-L162.png"
+  },
+  {
+    "level": 250,
+    "seed": "g18-e2e:250:0",
+    "viewport": "360x800",
+    "mechanic": "tea-pair",
+    "tutorial": null,
+    "expectedCues": [
+      "two paired rose bowls",
+      "mirrored floral halves"
+    ],
+    "file": "360x800-tea-pair-L250.png"
+  },
+  {
+    "level": 10,
+    "seed": "g18-e2e:10:0",
+    "viewport": "360x800",
+    "mechanic": "tutorial-10",
+    "tutorial": "target-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "360x800-tutorial-10-L10-tutorial.png"
+  },
+  {
+    "level": 58,
+    "seed": "g18-e2e:58:0",
+    "viewport": "360x800",
+    "mechanic": "tutorial-58",
+    "tutorial": "lemon-honey-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "360x800-tutorial-58-L58-tutorial.png"
+  },
+  {
+    "level": 154,
+    "seed": "g18-e2e:154:0",
+    "viewport": "360x800",
+    "mechanic": "tutorial-154",
+    "tutorial": "serving-order-tasting-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "360x800-tutorial-154-L154-tutorial.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "360x800",
+    "mechanic": "tutorial-162",
+    "tutorial": "shared-tray-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "360x800-tutorial-162-L162-tutorial.png"
+  },
+  {
+    "level": 250,
+    "seed": "g18-e2e:250:0",
+    "viewport": "360x800",
+    "mechanic": "tutorial-250",
+    "tutorial": "tea-pair-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "360x800-tutorial-250-L250-tutorial.png"
+  },
+  {
+    "level": 1,
+    "seed": "g18-e2e:1:0",
+    "viewport": "390x844",
+    "mechanic": "base",
+    "tutorial": null,
+    "expectedCues": [
+      "clean board"
+    ],
+    "file": "390x844-base-L1.png"
+  },
+  {
+    "level": 3,
+    "seed": "g18-e2e:3:0",
+    "viewport": "390x844",
+    "mechanic": "mystery",
+    "tutorial": null,
+    "expectedCues": [
+      "mystery notice",
+      "foam-hidden bottom layer"
+    ],
+    "file": "390x844-mystery-L3.png"
+  },
+  {
+    "level": 6,
+    "seed": "g18-e2e:6:0",
+    "viewport": "390x844",
+    "mechanic": "teapot",
+    "tutorial": null,
+    "expectedCues": [
+      "teapot silhouette"
+    ],
+    "file": "390x844-teapot-L6.png"
+  },
+  {
+    "level": 10,
+    "seed": "g18-e2e:10:0",
+    "viewport": "390x844",
+    "mechanic": "targets",
+    "tutorial": null,
+    "expectedCues": [
+      "target medallions"
+    ],
+    "file": "390x844-targets-L10.png"
+  },
+  {
+    "level": 18,
+    "seed": "g18-e2e:18:0",
+    "viewport": "390x844",
+    "mechanic": "sink",
+    "tutorial": null,
+    "expectedCues": [
+      "guest cup saucer/handle"
+    ],
+    "file": "390x844-sink-L18.png"
+  },
+  {
+    "level": 26,
+    "seed": "g18-e2e:26:0",
+    "viewport": "390x844",
+    "mechanic": "tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "shallow gold-rim tasting bowl"
+    ],
+    "file": "390x844-tasting-L26.png"
+  },
+  {
+    "level": 34,
+    "seed": "g18-e2e:34:0",
+    "viewport": "390x844",
+    "mechanic": "lemon",
+    "tutorial": null,
+    "expectedCues": [
+      "lemon slice on surface"
+    ],
+    "file": "390x844-lemon-L34.png"
+  },
+  {
+    "level": 42,
+    "seed": "g18-e2e:42:0",
+    "viewport": "390x844",
+    "mechanic": "strainer",
+    "tutorial": null,
+    "expectedCues": [
+      "strainer stand"
+    ],
+    "file": "390x844-strainer-L42.png"
+  },
+  {
+    "level": 50,
+    "seed": "g18-e2e:50:0",
+    "viewport": "390x844",
+    "mechanic": "honey",
+    "tutorial": null,
+    "expectedCues": [
+      "honey blob at bottom"
+    ],
+    "file": "390x844-honey-L50.png"
+  },
+  {
+    "level": 58,
+    "seed": "g18-e2e:58:0",
+    "viewport": "390x844",
+    "mechanic": "lemon-honey",
+    "tutorial": null,
+    "expectedCues": [
+      "lemon slice",
+      "honey blob"
+    ],
+    "file": "390x844-lemon-honey-L58.png"
+  },
+  {
+    "level": 66,
+    "seed": "g18-e2e:66:0",
+    "viewport": "390x844",
+    "mechanic": "frozen",
+    "tutorial": null,
+    "expectedCues": [
+      "ice slab"
+    ],
+    "file": "390x844-frozen-L66.png"
+  },
+  {
+    "level": 74,
+    "seed": "g18-e2e:74:0",
+    "viewport": "390x844",
+    "mechanic": "thermos",
+    "tutorial": null,
+    "expectedCues": [
+      "tall thermos silhouette"
+    ],
+    "file": "390x844-thermos-L74.png"
+  },
+  {
+    "level": 82,
+    "seed": "g18-e2e:82:0",
+    "viewport": "390x844",
+    "mechanic": "cinnamon",
+    "tutorial": null,
+    "expectedCues": [
+      "cinnamon stick"
+    ],
+    "file": "390x844-cinnamon-L82.png"
+  },
+  {
+    "level": 90,
+    "seed": "g18-e2e:90:0",
+    "viewport": "390x844",
+    "mechanic": "tea-bloom",
+    "tutorial": null,
+    "expectedCues": [
+      "tea bud at bottom"
+    ],
+    "file": "390x844-tea-bloom-L90.png"
+  },
+  {
+    "level": 98,
+    "seed": "g18-e2e:98:0",
+    "viewport": "390x844",
+    "mechanic": "blend",
+    "tutorial": null,
+    "expectedCues": [
+      "black tea + milk palette"
+    ],
+    "file": "390x844-blend-L98.png"
+  },
+  {
+    "level": 106,
+    "seed": "g18-e2e:106:0",
+    "viewport": "390x844",
+    "mechanic": "serving-order",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered serving saucers"
+    ],
+    "file": "390x844-serving-order-L106.png"
+  },
+  {
+    "level": 154,
+    "seed": "g18-e2e:154:0",
+    "viewport": "390x844",
+    "mechanic": "order-tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered saucers",
+      "tasting bowl"
+    ],
+    "file": "390x844-order-tasting-L154.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "390x844",
+    "mechanic": "shared-tray",
+    "tutorial": null,
+    "expectedCues": [
+      "one continuous tray",
+      "six group markers"
+    ],
+    "file": "390x844-shared-tray-L162.png"
+  },
+  {
+    "level": 250,
+    "seed": "g18-e2e:250:0",
+    "viewport": "390x844",
+    "mechanic": "tea-pair",
+    "tutorial": null,
+    "expectedCues": [
+      "two paired rose bowls",
+      "mirrored floral halves"
+    ],
+    "file": "390x844-tea-pair-L250.png"
+  },
+  {
+    "level": 6,
+    "seed": "g18-e2e:6:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-6",
+    "tutorial": "teapot-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-6-L6-tutorial.png"
+  },
+  {
+    "level": 10,
+    "seed": "g18-e2e:10:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-10",
+    "tutorial": "target-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-10-L10-tutorial.png"
+  },
+  {
+    "level": 18,
+    "seed": "g18-e2e:18:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-18",
+    "tutorial": "sink-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-18-L18-tutorial.png"
+  },
+  {
+    "level": 26,
+    "seed": "g18-e2e:26:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-26",
+    "tutorial": "tasting-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-26-L26-tutorial.png"
+  },
+  {
+    "level": 34,
+    "seed": "g18-e2e:34:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-34",
+    "tutorial": "lemon-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-34-L34-tutorial.png"
+  },
+  {
+    "level": 42,
+    "seed": "g18-e2e:42:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-42",
+    "tutorial": "strainer-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-42-L42-tutorial.png"
+  },
+  {
+    "level": 50,
+    "seed": "g18-e2e:50:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-50",
+    "tutorial": "honey-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-50-L50-tutorial.png"
+  },
+  {
+    "level": 58,
+    "seed": "g18-e2e:58:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-58",
+    "tutorial": "lemon-honey-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-58-L58-tutorial.png"
+  },
+  {
+    "level": 66,
+    "seed": "g18-e2e:66:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-66",
+    "tutorial": "frozen-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-66-L66-tutorial.png"
+  },
+  {
+    "level": 74,
+    "seed": "g18-e2e:74:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-74",
+    "tutorial": "thermos-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-74-L74-tutorial.png"
+  },
+  {
+    "level": 82,
+    "seed": "g18-e2e:82:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-82",
+    "tutorial": "cinnamon-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-82-L82-tutorial.png"
+  },
+  {
+    "level": 90,
+    "seed": "g18-e2e:90:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-90",
+    "tutorial": "tea-bloom-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-90-L90-tutorial.png"
+  },
+  {
+    "level": 98,
+    "seed": "g18-e2e:98:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-98",
+    "tutorial": "blend-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-98-L98-tutorial.png"
+  },
+  {
+    "level": 106,
+    "seed": "g18-e2e:106:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-106",
+    "tutorial": "serving-order-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-106-L106-tutorial.png"
+  },
+  {
+    "level": 154,
+    "seed": "g18-e2e:154:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-154",
+    "tutorial": "serving-order-tasting-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-154-L154-tutorial.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-162",
+    "tutorial": "shared-tray-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-162-L162-tutorial.png"
+  },
+  {
+    "level": 250,
+    "seed": "g18-e2e:250:0",
+    "viewport": "390x844",
+    "mechanic": "tutorial-250",
+    "tutorial": "tea-pair-tutorial-hint",
+    "expectedCues": [
+      "tutorial copy fits mobile"
+    ],
+    "file": "390x844-tutorial-250-L250-tutorial.png"
+  },
+  {
+    "level": 1,
+    "seed": "g18-e2e:1:0",
+    "viewport": "430x932",
+    "mechanic": "base",
+    "tutorial": null,
+    "expectedCues": [
+      "clean board"
+    ],
+    "file": "430x932-base-L1.png"
+  },
+  {
+    "level": 3,
+    "seed": "g18-e2e:3:0",
+    "viewport": "430x932",
+    "mechanic": "mystery",
+    "tutorial": null,
+    "expectedCues": [
+      "mystery notice",
+      "foam-hidden bottom layer"
+    ],
+    "file": "430x932-mystery-L3.png"
+  },
+  {
+    "level": 6,
+    "seed": "g18-e2e:6:0",
+    "viewport": "430x932",
+    "mechanic": "teapot",
+    "tutorial": null,
+    "expectedCues": [
+      "teapot silhouette"
+    ],
+    "file": "430x932-teapot-L6.png"
+  },
+  {
+    "level": 10,
+    "seed": "g18-e2e:10:0",
+    "viewport": "430x932",
+    "mechanic": "targets",
+    "tutorial": null,
+    "expectedCues": [
+      "target medallions"
+    ],
+    "file": "430x932-targets-L10.png"
+  },
+  {
+    "level": 18,
+    "seed": "g18-e2e:18:0",
+    "viewport": "430x932",
+    "mechanic": "sink",
+    "tutorial": null,
+    "expectedCues": [
+      "guest cup saucer/handle"
+    ],
+    "file": "430x932-sink-L18.png"
+  },
+  {
+    "level": 26,
+    "seed": "g18-e2e:26:0",
+    "viewport": "430x932",
+    "mechanic": "tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "shallow gold-rim tasting bowl"
+    ],
+    "file": "430x932-tasting-L26.png"
+  },
+  {
+    "level": 34,
+    "seed": "g18-e2e:34:0",
+    "viewport": "430x932",
+    "mechanic": "lemon",
+    "tutorial": null,
+    "expectedCues": [
+      "lemon slice on surface"
+    ],
+    "file": "430x932-lemon-L34.png"
+  },
+  {
+    "level": 42,
+    "seed": "g18-e2e:42:0",
+    "viewport": "430x932",
+    "mechanic": "strainer",
+    "tutorial": null,
+    "expectedCues": [
+      "strainer stand"
+    ],
+    "file": "430x932-strainer-L42.png"
+  },
+  {
+    "level": 50,
+    "seed": "g18-e2e:50:0",
+    "viewport": "430x932",
+    "mechanic": "honey",
+    "tutorial": null,
+    "expectedCues": [
+      "honey blob at bottom"
+    ],
+    "file": "430x932-honey-L50.png"
+  },
+  {
+    "level": 58,
+    "seed": "g18-e2e:58:0",
+    "viewport": "430x932",
+    "mechanic": "lemon-honey",
+    "tutorial": null,
+    "expectedCues": [
+      "lemon slice",
+      "honey blob"
+    ],
+    "file": "430x932-lemon-honey-L58.png"
+  },
+  {
+    "level": 66,
+    "seed": "g18-e2e:66:0",
+    "viewport": "430x932",
+    "mechanic": "frozen",
+    "tutorial": null,
+    "expectedCues": [
+      "ice slab"
+    ],
+    "file": "430x932-frozen-L66.png"
+  },
+  {
+    "level": 74,
+    "seed": "g18-e2e:74:0",
+    "viewport": "430x932",
+    "mechanic": "thermos",
+    "tutorial": null,
+    "expectedCues": [
+      "tall thermos silhouette"
+    ],
+    "file": "430x932-thermos-L74.png"
+  },
+  {
+    "level": 82,
+    "seed": "g18-e2e:82:0",
+    "viewport": "430x932",
+    "mechanic": "cinnamon",
+    "tutorial": null,
+    "expectedCues": [
+      "cinnamon stick"
+    ],
+    "file": "430x932-cinnamon-L82.png"
+  },
+  {
+    "level": 90,
+    "seed": "g18-e2e:90:0",
+    "viewport": "430x932",
+    "mechanic": "tea-bloom",
+    "tutorial": null,
+    "expectedCues": [
+      "tea bud at bottom"
+    ],
+    "file": "430x932-tea-bloom-L90.png"
+  },
+  {
+    "level": 98,
+    "seed": "g18-e2e:98:0",
+    "viewport": "430x932",
+    "mechanic": "blend",
+    "tutorial": null,
+    "expectedCues": [
+      "black tea + milk palette"
+    ],
+    "file": "430x932-blend-L98.png"
+  },
+  {
+    "level": 106,
+    "seed": "g18-e2e:106:0",
+    "viewport": "430x932",
+    "mechanic": "serving-order",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered serving saucers"
+    ],
+    "file": "430x932-serving-order-L106.png"
+  },
+  {
+    "level": 154,
+    "seed": "g18-e2e:154:0",
+    "viewport": "430x932",
+    "mechanic": "order-tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered saucers",
+      "tasting bowl"
+    ],
+    "file": "430x932-order-tasting-L154.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "430x932",
+    "mechanic": "shared-tray",
+    "tutorial": null,
+    "expectedCues": [
+      "one continuous tray",
+      "six group markers"
+    ],
+    "file": "430x932-shared-tray-L162.png"
+  },
+  {
+    "level": 250,
+    "seed": "g18-e2e:250:0",
+    "viewport": "430x932",
+    "mechanic": "tea-pair",
+    "tutorial": null,
+    "expectedCues": [
+      "two paired rose bowls",
+      "mirrored floral halves"
+    ],
+    "file": "430x932-tea-pair-L250.png"
+  },
+  {
+    "level": 1,
+    "seed": "g18-e2e:1:0",
+    "viewport": "1280x800",
+    "mechanic": "base",
+    "tutorial": null,
+    "expectedCues": [
+      "clean board"
+    ],
+    "file": "1280x800-base-L1.png"
+  },
+  {
+    "level": 154,
+    "seed": "g18-e2e:154:0",
+    "viewport": "1280x800",
+    "mechanic": "order-tasting",
+    "tutorial": null,
+    "expectedCues": [
+      "numbered saucers",
+      "tasting bowl"
+    ],
+    "file": "1280x800-order-tasting-L154.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "1280x800",
+    "mechanic": "shared-tray",
+    "tutorial": null,
+    "expectedCues": [
+      "one continuous tray",
+      "six group markers"
+    ],
+    "file": "1280x800-shared-tray-L162.png"
+  },
+  {
+    "level": 250,
+    "seed": "g18-e2e:250:0",
+    "viewport": "1280x800",
+    "mechanic": "tea-pair",
+    "tutorial": null,
+    "expectedCues": [
+      "two paired rose bowls",
+      "mirrored floral halves"
+    ],
+    "file": "1280x800-tea-pair-L250.png"
+  },
+  {
+    "level": 162,
+    "seed": "g18-e2e:162:0",
+    "viewport": "390x844",
+    "mechanic": "shared-tray-partial",
+    "tutorial": null,
+    "expectedCues": [
+      "occupancy 4/6",
+      "one continuous tray",
+      "six markers"
+    ],
+    "file": "390x844-shared-tray-partial.png"
+  }
+]

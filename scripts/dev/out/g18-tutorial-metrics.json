@@ -1,0 +1,172 @@
+[
+  {
+    "level": 6,
+    "bannerId": "teapot-tutorial-hint",
+    "text": "Новый сосуд — чайник. Из него можно только разливать чай. Налить обратно нельзя.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 10,
+    "bannerId": "target-tutorial-hint",
+    "text": "Именная сервировка: чашки с золотым знаком ждут свой чай. Их можно использовать как обычно, но в конце нужный сорт должен оказаться именно в своей чашке.",
+    "height": 60.3,
+    "width": 360,
+    "lines": 3,
+    "canvasHeight": 599,
+    "fits": true
+  },
+  {
+    "level": 18,
+    "bannerId": "sink-tutorial-hint",
+    "text": "Чашка гостя: в неё можно наливать чай, но переливать обратно нельзя. Выбери, какой чай подать.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 26,
+    "bannerId": "tasting-tutorial-hint",
+    "text": "Дегустационная пиала: в неё помещается только 2 слоя. Используй её как временное место — к концу она должна быть пустой.",
+    "height": 60.3,
+    "width": 360,
+    "lines": 3,
+    "canvasHeight": 599,
+    "fits": true
+  },
+  {
+    "level": 34,
+    "bannerId": "lemon-tutorial-hint",
+    "text": "Долька лимона: лимон плавает сверху и переезжает вместе с переливанием. К концу оставь его на облепиховом чае.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 42,
+    "bannerId": "strainer-tutorial-hint",
+    "text": "Ситечко задерживает 1 слой при переливании. Поставь его на чашку, перелей чай, а задержанный слой потом верни в подходящий сосуд.",
+    "height": 60.3,
+    "width": 360,
+    "lines": 3,
+    "canvasHeight": 599,
+    "fits": true
+  },
+  {
+    "level": 50,
+    "bannerId": "honey-tutorial-hint",
+    "text": "Мёд остаётся на дне. Он переедет только когда чашка опустеет. К концу оставь его под гречишным чаем.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 58,
+    "bannerId": "lemon-honey-tutorial-hint",
+    "text": "Лимон уезжает сразу, мёд — только из пустеющей чашки. В финале лимон нужен облепиховому чаю, мёд — гречишному.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 66,
+    "bannerId": "frozen-tutorial-hint",
+    "text": "Замёрзшая чашка пока не отдаёт чай. Долей в неё облепиховый — лёд растает.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 74,
+    "bannerId": "thermos-tutorial-hint",
+    "text": "В высокий термос помещается 5 слоёв. Это удобный временный запас, но к концу термос нужно опустошить.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 82,
+    "bannerId": "cinnamon-tutorial-hint",
+    "text": "Палочка корицы оставляет место только для 2 слоёв. Полностью опустоши чашку — палочка уберётся, и снова поместится 4.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 90,
+    "bannerId": "tea-bloom-tutorial-hint",
+    "text": "На дне спрятан чайный бутон. Полностью опустоши чашку — он распустится.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 98,
+    "bannerId": "blend-tutorial-hint",
+    "text": "Чёрный чай и молоко соединяются при соприкосновении. Два слоя превращаются в один молочный чай.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 106,
+    "bannerId": "serving-order-tutorial-hint",
+    "text": "Сначала собери чашку ①, потом ②. Поданную чашку больше не переливают.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 154,
+    "bannerId": "serving-order-tasting-tutorial-hint",
+    "text": "Порядок подачи действует и здесь: сначала ①, потом ②.",
+    "height": 28.8,
+    "width": 360,
+    "lines": 1,
+    "canvasHeight": 630,
+    "fits": true
+  },
+  {
+    "level": 162,
+    "bannerId": "shared-tray-tutorial-hint",
+    "text": "На подносе всего 6 мест для чая. Освободи место в одной чашке — оно появится для другой.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  },
+  {
+    "level": 250,
+    "bannerId": "tea-pair-tutorial-hint",
+    "text": "Парные пиалы должны закончить с одним и тем же чаем. Какой именно — решаешь по ходу.",
+    "height": 44.5,
+    "width": 360,
+    "lines": 2,
+    "canvasHeight": 615,
+    "fits": true
+  }
+]

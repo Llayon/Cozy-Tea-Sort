@@ -1,0 +1,855 @@
+{
+  "gauntlet": "G18",
+  "command": "bunx tsx scripts/dev/g18-performance-bench.ts",
+  "seedPolicy": "g18-perf:<type>:<0..99>",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.14.0",
+    "cpus": 16,
+    "model": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     "
+  },
+  "generatedAt": "2026-10-28T10:05:22.880Z",
+  "results": [
+    {
+      "type": "warmup-clean",
+      "level": 1,
+      "phase": "warmup",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 19.5,
+        "p90": 83.3,
+        "p95": 89.5,
+        "max": 192.6
+      },
+      "solverMs": {
+        "p50": 1.7,
+        "p90": 3.2,
+        "p95": 4.2,
+        "max": 5
+      },
+      "minMoves": {
+        "min": 4,
+        "p50": 6,
+        "p95": 6,
+        "max": 6
+      },
+      "visited": {
+        "p50": 55,
+        "p90": 72,
+        "p95": 75,
+        "max": 80
+      },
+      "solverCalls": {
+        "p50": 4,
+        "p95": 17,
+        "max": 27
+      },
+      "templateAttempts": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      }
+    },
+    {
+      "type": "challenge-clean",
+      "level": 2,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 54.1,
+        "p90": 210.4,
+        "p95": 280.8,
+        "max": 430.3
+      },
+      "solverMs": {
+        "p50": 10.8,
+        "p90": 17.8,
+        "p95": 19.9,
+        "max": 23.8
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 257,
+        "p90": 379,
+        "p95": 432,
+        "max": 437
+      },
+      "solverCalls": {
+        "p50": 3,
+        "p95": 10,
+        "max": 15
+      },
+      "templateAttempts": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      }
+    },
+    {
+      "type": "peak-mystery",
+      "level": 3,
+      "phase": "peak",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 101,
+        "p90": 329.1,
+        "p95": 413,
+        "max": 729.5
+      },
+      "solverMs": {
+        "p50": 45.8,
+        "p90": 70.4,
+        "p95": 76.1,
+        "max": 92.7
+      },
+      "minMoves": {
+        "min": 10,
+        "p50": 14,
+        "p95": 14,
+        "max": 14
+      },
+      "visited": {
+        "p50": 917,
+        "p90": 1276,
+        "p95": 1423,
+        "max": 1734
+      },
+      "solverCalls": {
+        "p50": 2,
+        "p95": 5,
+        "max": 10
+      },
+      "templateAttempts": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      }
+    },
+    {
+      "type": "teapot",
+      "level": 6,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 40.6,
+        "p90": 115.4,
+        "p95": 129.8,
+        "max": 164.2
+      },
+      "solverMs": {
+        "p50": 4.2,
+        "p90": 7.9,
+        "p95": 9.2,
+        "max": 15.5
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 130,
+        "p90": 191,
+        "p95": 242,
+        "max": 290
+      },
+      "solverCalls": {
+        "p50": 5,
+        "p95": 15,
+        "max": 18
+      },
+      "templateAttempts": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      }
+    },
+    {
+      "type": "targets",
+      "level": 10,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 19.6,
+        "p90": 27.6,
+        "p95": 28.7,
+        "max": 39.6
+      },
+      "solverMs": {
+        "p50": 19,
+        "p90": 26,
+        "p95": 27.9,
+        "max": 33
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 9,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 515,
+        "p90": 584,
+        "p95": 762,
+        "max": 762
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "sink",
+      "level": 18,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 17.9,
+        "p90": 34,
+        "p95": 39.9,
+        "max": 44.3
+      },
+      "solverMs": {
+        "p50": 18.8,
+        "p90": 32.6,
+        "p95": 37.6,
+        "max": 46.2
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 8,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 575,
+        "p90": 771,
+        "p95": 1193,
+        "max": 1193
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "tasting",
+      "level": 26,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 13.9,
+        "p90": 26.2,
+        "p95": 29,
+        "max": 42.6
+      },
+      "solverMs": {
+        "p50": 14.3,
+        "p90": 26.1,
+        "p95": 28.4,
+        "max": 34.2
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 9,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 356,
+        "p90": 582,
+        "p95": 603,
+        "max": 615
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "lemon",
+      "level": 34,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 14.4,
+        "p90": 26.6,
+        "p95": 35.3,
+        "max": 40.1
+      },
+      "solverMs": {
+        "p50": 12.7,
+        "p90": 25.8,
+        "p95": 31.5,
+        "max": 51.6
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 9,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 255,
+        "p90": 367,
+        "p95": 522,
+        "max": 522
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "strainer",
+      "level": 42,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 2.3,
+        "p90": 4,
+        "p95": 5.2,
+        "max": 10.6
+      },
+      "solverMs": {
+        "p50": 1.5,
+        "p90": 2.6,
+        "p95": 3.7,
+        "max": 5.8
+      },
+      "minMoves": {
+        "min": 12,
+        "p50": 13,
+        "p95": 15,
+        "max": 15
+      },
+      "visited": {
+        "p50": 46,
+        "p90": 67,
+        "p95": 67,
+        "max": 73
+      },
+      "solverCalls": {
+        "p50": 2,
+        "p95": 2,
+        "max": 2
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "honey",
+      "level": 50,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 21.1,
+        "p90": 30.7,
+        "p95": 32.7,
+        "max": 48.4
+      },
+      "solverMs": {
+        "p50": 21,
+        "p90": 27.7,
+        "p95": 32,
+        "max": 45.5
+      },
+      "minMoves": {
+        "min": 10,
+        "p50": 11,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 328,
+        "p90": 437,
+        "p95": 442,
+        "max": 442
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "lemon-honey",
+      "level": 58,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 38.1,
+        "p90": 66.2,
+        "p95": 86.9,
+        "max": 95.8
+      },
+      "solverMs": {
+        "p50": 33.5,
+        "p90": 61.5,
+        "p95": 86.2,
+        "max": 89.8
+      },
+      "minMoves": {
+        "min": 10,
+        "p50": 12,
+        "p95": 14,
+        "max": 14
+      },
+      "visited": {
+        "p50": 523,
+        "p90": 820,
+        "p95": 1198,
+        "max": 1198
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "frozen",
+      "level": 66,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 9.8,
+        "p90": 15.2,
+        "p95": 16.3,
+        "max": 27.6
+      },
+      "solverMs": {
+        "p50": 9.6,
+        "p90": 14.7,
+        "p95": 15.1,
+        "max": 21
+      },
+      "minMoves": {
+        "min": 9,
+        "p50": 11,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 186,
+        "p90": 251,
+        "p95": 264,
+        "max": 270
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "thermos",
+      "level": 74,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 78,
+        "p90": 141,
+        "p95": 146.2,
+        "max": 161.4
+      },
+      "solverMs": {
+        "p50": 78,
+        "p90": 146.3,
+        "p95": 158,
+        "max": 167.9
+      },
+      "minMoves": {
+        "min": 9,
+        "p50": 11,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 1525,
+        "p90": 2578,
+        "p95": 2625,
+        "max": 2625
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "cinnamon",
+      "level": 82,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 19.3,
+        "p90": 32.4,
+        "p95": 34.4,
+        "max": 40.8
+      },
+      "solverMs": {
+        "p50": 17.9,
+        "p90": 28.5,
+        "p95": 33.4,
+        "max": 44.9
+      },
+      "minMoves": {
+        "min": 9,
+        "p50": 11,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 356,
+        "p90": 452,
+        "p95": 571,
+        "max": 675
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "tea-bloom",
+      "level": 90,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 35.1,
+        "p90": 57.4,
+        "p95": 65.9,
+        "max": 72.9
+      },
+      "solverMs": {
+        "p50": 34.3,
+        "p90": 58.4,
+        "p95": 63.2,
+        "max": 80.6
+      },
+      "minMoves": {
+        "min": 10,
+        "p50": 12,
+        "p95": 14,
+        "max": 14
+      },
+      "visited": {
+        "p50": 508,
+        "p90": 854,
+        "p95": 854,
+        "max": 968
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "blend",
+      "level": 98,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 208.8,
+        "p90": 422.8,
+        "p95": 467.1,
+        "max": 510.4
+      },
+      "solverMs": {
+        "p50": 221.5,
+        "p90": 436.1,
+        "p95": 483.1,
+        "max": 523.6
+      },
+      "minMoves": {
+        "min": 12,
+        "p50": 12,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 2771,
+        "p90": 4843,
+        "p95": 6246,
+        "max": 6246
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "serving-order",
+      "level": 106,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 74.2,
+        "p90": 110.8,
+        "p95": 114.8,
+        "max": 136.7
+      },
+      "solverMs": {
+        "p50": 73.9,
+        "p90": 110.7,
+        "p95": 118.4,
+        "max": 135.8
+      },
+      "minMoves": {
+        "min": 11,
+        "p50": 12,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 1341,
+        "p90": 1882,
+        "p95": 1882,
+        "max": 2020
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "order-tasting",
+      "level": 154,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 92.4,
+        "p90": 113,
+        "p95": 118.5,
+        "max": 129.8
+      },
+      "solverMs": {
+        "p50": 89,
+        "p90": 107.7,
+        "p95": 117,
+        "max": 148.2
+      },
+      "minMoves": {
+        "min": 11,
+        "p50": 12,
+        "p95": 12,
+        "max": 12
+      },
+      "visited": {
+        "p50": 1646,
+        "p90": 1742,
+        "p95": 2034,
+        "max": 2034
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "shared-tray",
+      "level": 162,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 78.7,
+        "p90": 152.4,
+        "p95": 168,
+        "max": 216.5
+      },
+      "solverMs": {
+        "p50": 76.9,
+        "p90": 151.3,
+        "p95": 176.1,
+        "max": 206
+      },
+      "minMoves": {
+        "min": 9,
+        "p50": 11,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 1208,
+        "p90": 2361,
+        "p95": 2578,
+        "max": 2745
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    {
+      "type": "tea-pair",
+      "level": 250,
+      "phase": "challenge",
+      "seeds": 100,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 13.6,
+        "p90": 20.2,
+        "p95": 21.6,
+        "max": 28.2
+      },
+      "solverMs": {
+        "p50": 13.2,
+        "p90": 19.2,
+        "p95": 20.1,
+        "max": 23.6
+      },
+      "minMoves": {
+        "min": 10,
+        "p50": 12,
+        "p95": 13,
+        "max": 13
+      },
+      "visited": {
+        "p50": 275,
+        "p90": 384,
+        "p95": 394,
+        "max": 394
+      },
+      "solverCalls": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      },
+      "templateAttempts": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    }
+  ]
+}
