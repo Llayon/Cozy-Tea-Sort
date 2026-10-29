@@ -72,7 +72,8 @@ export function RecipeBookModal({
           <button
             id="close-recipe-book-button"
             onClick={onClose}
-            className="p-2 rounded-xl text-[#C2AA94] hover:text-[#F3EAD8] hover:bg-[#3D2B22] transition-colors"
+            aria-label="Закрыть чайную книгу"
+            className="p-3 rounded-xl text-[#C2AA94] hover:text-[#F3EAD8] hover:bg-[#3D2B22] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

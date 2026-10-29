@@ -1123,6 +1123,62 @@ function ensureLegacyResizeGuard(app: Application): void {
   }
 }
 
+/**
+ * Shared-tray group geometry (G18 visual hardening).
+ *
+ * G16 rendered one independent plank + six markers under EACH member cup
+ * (12 markers total), which reads as two separate trays rather than one
+ * shared six-layer resource. This pure helper builds ONE continuous tray
+ * spanning both member cup positions with exactly six group markers.
+ * Presentation-only: occupancy still derives from live cup lengths.
+ */
+export interface SharedTrayMemberGeometry {
+  index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SharedTrayGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  markerY: number;
+  markerXs: number[];
+  memberIndices: number[];
+}
+
+export const SHARED_TRAY_PLANK_H = 11;
+export const SHARED_TRAY_SIDE_PAD = 14;
+
+export function sharedTrayGeometry(
+  members: readonly SharedTrayMemberGeometry[],
+): SharedTrayGeometry | null {
+  if (members.length !== 2) return null;
+  const [a, b] = members as [SharedTrayMemberGeometry, SharedTrayMemberGeometry];
+  const left = Math.min(a.x, b.x) - SHARED_TRAY_SIDE_PAD;
+  const right = Math.max(a.x + a.width, b.x + b.width) + SHARED_TRAY_SIDE_PAD;
+  const bottom = Math.max(a.y + a.height, b.y + b.height);
+  const width = right - left;
+  if (!(width > 0)) return null;
+  const markerCount = sharedCapacityLimit('tea-tray');
+  const span = Math.max(1, width - 26);
+  const markerXs = Array.from({ length: markerCount }, (_, i) =>
+    markerCount === 1 ? left + width / 2 : left + 13 + (span * i) / (markerCount - 1),
+  );
+  return {
+    x: left,
+    y: bottom - 1,
+    width,
+    height: SHARED_TRAY_PLANK_H,
+    markerY: bottom - 1 + SHARED_TRAY_PLANK_H / 2,
+    markerXs,
+    memberIndices: [a.index, b.index],
+  };
+}
+
 export class CupView {
   index: number;
   container: Container;
@@ -2317,32 +2373,11 @@ export class CupView {
    * ring (shape-coded, never color-only). No group → layer cleared.
    * No lock icons, no red borders: capacity, not locking.
    */
-  renderTrayMotif(group: string | undefined, occupancy: number) {
-    const g = this.trayGraphics;
-    g.clear();
-    if (group === undefined) return;
-    const limit = sharedCapacityLimit('tea-tray');
-    const filled = Math.max(0, Math.min(limit, Math.floor(occupancy)));
-    const w = this.width;
-    const h = this.height;
-    const cx = w / 2;
-    // Wooden plank: restrained, fits the existing saucer/shadow language.
-    const plankW = w / 2 + 10;
-    g.roundRect(cx - plankW, h - 1, plankW * 2, 11, 5).fill({ color: 0x8a6844, alpha: 0.85 });
-    g.roundRect(cx - plankW, h - 1, plankW * 2, 11, 5).stroke({ width: 1.2, color: 0x5a4028, alpha: 0.9 });
-    // Six markers in fixed positions along the plank front edge.
-    const dotY = h + 4.5;
-    const span = plankW * 2 - 12;
-    for (let i = 0; i < limit; i++) {
-      const dx = limit === 1 ? cx : cx - span / 2 + (span * i) / (limit - 1);
-      if (i < filled) {
-        g.circle(dx, dotY, 2.6).fill({ color: 0x9fc46a, alpha: 1 });
-        g.circle(dx, dotY, 2.6).stroke({ width: 1, color: 0x3d5229, alpha: 0.9 });
-      } else {
-        g.circle(dx, dotY, 2.6).fill({ color: 0x2a1d12, alpha: 0.45 });
-        g.circle(dx, dotY, 2.6).stroke({ width: 1, color: 0xd8c9a8, alpha: 0.75 });
-      }
-    }
+  renderTrayMotif(_group: string | undefined, _occupancy: number) {
+    // G18: retained as an explicit clear for the legacy per-cup layer.
+    // The shared tray is ONE view-level object (sharedTrayGraphics) so two
+    // member cups can never render independent planks/marker sets again.
+    this.trayGraphics.clear();
   }
 
   /**
@@ -2374,10 +2409,13 @@ export class CupView {
     g.circle(cx, cy, 7).fill({ color: 0xfff6f2, alpha: 0.74 });
     g.circle(cx, cy, 7).stroke({ width: 1.4, color: 0xc98fa0, alpha: 0.72 });
 
-    // Three petals on this bowl's half of the shared flower.
+    // Three petals on this bowl's half of the shared flower. The left bowl
+    // grows its half toward the right, the right bowl toward the left, so
+    // the pair reads as two mirrored halves of ONE motif (never two
+    // identical/offset flowers or an ordered/numbered cue).
     for (let i = 0; i < 3; i++) {
-      const angle = (Math.PI / 4) * (i - 1) + (side < 0 ? Math.PI : 0);
-      const px = cx + Math.cos(angle) * 6.4 * side;
+      const angle = (Math.PI / 4) * (i - 1) + (side > 0 ? Math.PI : 0);
+      const px = cx + Math.cos(angle) * 6.4;
       const py = cy + Math.sin(angle) * 6.4;
       g.ellipse(px, py, 3.1, 2.2).fill({ color: accent, alpha: status.kind === 'conflict' ? 0.66 : 0.82 });
       g.ellipse(px, py, 3.1, 2.2).stroke({ width: 0.9, color: 0x8a5a68, alpha: 0.45 });
@@ -2746,6 +2784,12 @@ export class TeaSortView {
   rootContainer = new Container();
   backgroundContainer = new Container();
   tableGraphics = new Graphics();
+  /**
+   * ONE continuous shared tray per production group (G18). Drawn beneath
+   * both member cups from live cup geometry + derived group occupancy; no
+   * per-cup duplicate planks/markers.
+   */
+  sharedTrayGraphics = new Graphics();
   cupsContainer = new Container();
   streamGraphics = new Graphics();
   particlesGraphics = new Graphics();
@@ -2996,6 +3040,8 @@ export class TeaSortView {
     this.app.stage.addChild(this.rootContainer);
     this.rootContainer.addChild(this.backgroundContainer);
     this.rootContainer.addChild(this.tableGraphics);
+    this.sharedTrayGraphics.eventMode = 'none';
+    this.rootContainer.addChild(this.sharedTrayGraphics);
     this.rootContainer.addChild(this.cupsContainer);
     this.rootContainer.addChild(this.streamGraphics);
     this.transitGraphics.eventMode = 'none';
@@ -3194,6 +3240,7 @@ export class TeaSortView {
     });
 
     this.drawTableBackground(width, height);
+    this.refreshSharedTray();
     this.layoutStrainerStand(width, height);
   }
 
@@ -3959,28 +4006,82 @@ export class TeaSortView {
     }
   }
 
+  /**
+   * Draw ONE continuous shared tray spanning both member cups + exactly six
+   * capacity markers at the group's front edge. Filled markers derive from
+   * combined live cup lengths (the same group-occupancy truth used by the
+   * rules); no view-owned counter, no second gameplay source.
+   */
+  refreshSharedTray(): void {
+    const g = this.sharedTrayGraphics;
+    g.clear();
+    if (this.cupViews.length === 0) return;
+    const members = this.cupViews.filter(
+      (v) => v.constraint.sharedCapacityGroup === 'tea-tray',
+    );
+    if (members.length !== 2) return;
+    const geometry = sharedTrayGeometry(
+      members.map((v) => ({
+        index: v.index,
+        x: v.homeX,
+        y: v.homeY,
+        width: v.visualWidth,
+        height: v.visualHeight,
+      })),
+    );
+    if (!geometry) return;
+
+    let occupancy = 0;
+    for (const v of members) {
+      occupancy += this.logic.cups[v.index]?.layers.length ?? 0;
+    }
+    const limit = sharedCapacityLimit('tea-tray');
+    const filled = Math.max(0, Math.min(limit, Math.floor(occupancy)));
+
+    // One continuous wooden tray: outer body + warm top rail + dark lip.
+    g.roundRect(geometry.x - 2, geometry.y + 2, geometry.width + 4, geometry.height + 3, 6).fill({
+      color: 0x120c0a,
+      alpha: 0.3,
+    });
+    g.roundRect(geometry.x, geometry.y, geometry.width, geometry.height, 5).fill({
+      color: 0x8a6844,
+      alpha: 0.92,
+    });
+    g.roundRect(geometry.x, geometry.y, geometry.width, geometry.height, 5).stroke({
+      width: 1.4,
+      color: 0x5a4028,
+      alpha: 0.95,
+    });
+    g.roundRect(geometry.x + 7, geometry.y + 1.3, geometry.width - 14, 1.6, 0.8).fill({
+      color: 0xd6ad7e,
+      alpha: 0.55,
+    });
+    // Six shape-coded group markers (filled = occupied slot; hollow = free).
+    // They live on the ONE tray, never duplicated per cup.
+    for (let i = 0; i < geometry.markerXs.length; i++) {
+      const dx = geometry.markerXs[i] as number;
+      if (i < filled) {
+        g.circle(dx, geometry.markerY, 2.7).fill({ color: 0x9fc46a, alpha: 1 });
+        g.circle(dx, geometry.markerY, 2.7).stroke({ width: 1, color: 0x3d5229, alpha: 0.9 });
+      } else {
+        g.circle(dx, geometry.markerY, 2.7).fill({ color: 0x2a1d12, alpha: 0.5 });
+        g.circle(dx, geometry.markerY, 2.7).stroke({ width: 1, color: 0xd8c9a8, alpha: 0.8 });
+      }
+    }
+  }
+
   renderAllCups() {
     // Serving-order prefix is derived once per redraw from the
     // authoritative logic state (never view-owned served booleans).
     let servePrefix = -1;
-    // Shared-tray group occupancy is derived once per redraw from current
-    // cup lengths + static constraints (never a view-owned counter).
-    let trayOccupancy = -1;
     try {
       const lst = this.logic.toState();
       servePrefix = servedPrefixLength(
         { cups: lst.cups, floatingIngredients: lst.floatingIngredients },
         lst.cupConstraints,
       );
-      trayOccupancy = 0;
-      for (let i = 0; i < lst.cups.length; i++) {
-        if (lst.cupConstraints[i]?.sharedCapacityGroup === 'tea-tray') {
-          trayOccupancy += (lst.cups[i] as unknown[]).length;
-        }
-      }
     } catch {
       servePrefix = -1;
-      trayOccupancy = -1;
     }
     this.logic.cups.forEach((cup, idx) => {
       const view = this.cupViews[idx];
@@ -3992,14 +4093,12 @@ export class TeaSortView {
         } else {
           view.renderServeMotif(undefined, false, false);
         }
-        const group = view.constraint.sharedCapacityGroup;
-        if (trayOccupancy >= 0 && group !== undefined) {
-          view.renderTrayMotif(group, trayOccupancy);
-        } else {
-          view.renderTrayMotif(undefined, 0);
-        }
+        // Legacy per-cup layer always cleared; the shared tray is drawn
+        // once for the group below.
+        view.renderTrayMotif(undefined, 0);
       }
     });
+    this.refreshSharedTray();
     this.refreshPairMotifs();
     // Strainer markers always follow the authoritative strainerState.
     // During a strained pour the animation owns the pre-visual and calls

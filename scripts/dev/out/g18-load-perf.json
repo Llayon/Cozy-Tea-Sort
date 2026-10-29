@@ -1,0 +1,56 @@
+{
+  "viewport": "390x844",
+  "deviceScaleFactor": 1,
+  "rows": [
+    {
+      "level": 1,
+      "moduleStart": 635.5,
+      "configReadyAt": 786.5,
+      "generatedAt": 848.4000000953674,
+      "boardMountedAt": 941.5,
+      "firstInputAt": 1802.7000000476837,
+      "loadToBoard": 306,
+      "loadToInteractive": 1167.2000000476837
+    },
+    {
+      "level": 98,
+      "moduleStart": 644.7000000476837,
+      "configReadyAt": 660.2000000476837,
+      "generatedAt": 773.8000001907349,
+      "boardMountedAt": 931.1000001430511,
+      "firstInputAt": 1895.6000001430511,
+      "loadToBoard": 286.40000009536743,
+      "loadToInteractive": 1250.9000000953674
+    },
+    {
+      "level": 154,
+      "moduleStart": 746.6000001430511,
+      "configReadyAt": 771.7999999523163,
+      "generatedAt": 879.4000000953674,
+      "boardMountedAt": 1043.2999999523163,
+      "firstInputAt": 1968.2000000476837,
+      "loadToBoard": 296.69999980926514,
+      "loadToInteractive": 1221.5999999046326
+    },
+    {
+      "level": 162,
+      "moduleStart": 664.1999998092651,
+      "configReadyAt": 687.3999998569489,
+      "generatedAt": 788.8999998569489,
+      "boardMountedAt": 949.2999999523163,
+      "firstInputAt": 1886.7999999523163,
+      "loadToBoard": 285.10000014305115,
+      "loadToInteractive": 1222.6000001430511
+    },
+    {
+      "level": 250,
+      "moduleStart": 671.5999999046326,
+      "configReadyAt": 694.5999999046326,
+      "generatedAt": 720.4000000953674,
+      "boardMountedAt": 908.7000000476837,
+      "firstInputAt": 1821.2999999523163,
+      "loadToBoard": 237.10000014305115,
+      "loadToInteractive": 1149.7000000476837
+    }
+  ]
+}

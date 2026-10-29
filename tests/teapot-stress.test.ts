@@ -4,6 +4,7 @@ import { generateLevel, validateLevelStructure, type GenerateRequest } from '../
 import { solvePuzzle } from '../src/game/logic/solver';
 import { depthAccepted } from '../src/game/logic/difficulty';
 import { isWonState } from '../src/game/logic/rules';
+import { yieldToHost } from './cooperative-yield';
 
 /**
  * Gauntlet 1 §20: seeded stress coverage for asymmetric vessels.
@@ -70,8 +71,9 @@ function checkLevel(level: ReturnType<typeof generateLevel>, req: GenerateReques
 }
 
 describe('teapot stress: 100 seeds challenge source-only', () => {
-  it('all valid + solver-accepted', () => {
+  it('all valid + solver-accepted', async () => {
     for (let s = 0; s < 100; s++) {
+      if (s > 0 && s % 5 === 0) await yieldToHost();
       const seed = `stress:teapot:challenge:${s}`;
       checkLevel(generateLevel(CHALLENGE_TEAPOT, seed), CHALLENGE_TEAPOT, seed);
     }
@@ -79,8 +81,9 @@ describe('teapot stress: 100 seeds challenge source-only', () => {
 });
 
 describe('teapot stress: 100 seeds peak source-only + mystery', () => {
-  it('all valid + solver-accepted', () => {
+  it('all valid + solver-accepted', async () => {
     for (let s = 0; s < 100; s++) {
+      if (s > 0 && s % 5 === 0) await yieldToHost();
       const seed = `stress:teapot:peak:${s}`;
       const level = generateLevel(PEAK_TEAPOT_MYSTERY, seed);
       checkLevel(level, PEAK_TEAPOT_MYSTERY, seed);

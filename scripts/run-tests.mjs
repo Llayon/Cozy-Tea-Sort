@@ -53,6 +53,14 @@ const batches = [
   { name: 'target matrix', files: ['tests/target.test.ts'] },
   { name: 'target templates + fast path', files: ['tests/target-templates.test.ts', 'tests/target-fastpath.test.ts'] },
   { name: 'test runner self-checks', files: ['tests/test-runner.test.ts'] },
+  {
+    name: 'G18 rollout freeze + tutorial + visual contract',
+    files: [
+      'tests/g18-rollout-freeze.test.ts',
+      'tests/g18-tutorial-audit.test.ts',
+      'tests/g18-visual-contract.test.ts',
+    ],
+  },
   { name: 'teapot + target stress', files: ['tests/target-stress-teapot.test.ts'] },
   { name: 'target challenge stress', files: ['tests/target-stress-challenge.test.ts'] },
   { name: 'target peak stress', files: ['tests/target-stress-peak.test.ts'] },

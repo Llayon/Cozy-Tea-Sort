@@ -2,6 +2,9 @@ node_modules/
 build/
 dist/
 coverage/
+test-results/
+playwright-report/
+scripts/dev/out/g18-screens/
 .DS_Store
 *.log
 .env*

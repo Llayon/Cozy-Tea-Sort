@@ -1,0 +1,57 @@
+{
+  "gauntlet": "G18",
+  "command": "bunx tsx scripts/dev/g18-performance-bench.ts",
+  "seedPolicy": "g18-perf:<type>:<0..99>",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.14.0",
+    "cpus": 16,
+    "model": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     "
+  },
+  "generatedAt": "2026-10-28T10:12:50.254Z",
+  "results": [
+    {
+      "type": "challenge-clean",
+      "level": 2,
+      "phase": "challenge",
+      "seeds": 300,
+      "failures": 0,
+      "fallbacks": 0,
+      "genMs": {
+        "p50": 59.4,
+        "p90": 200.5,
+        "p95": 266,
+        "max": 433.6
+      },
+      "solverMs": {
+        "p50": 11.1,
+        "p90": 18.1,
+        "p95": 20.9,
+        "max": 30.8
+      },
+      "minMoves": {
+        "min": 7,
+        "p50": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "visited": {
+        "p50": 266,
+        "p90": 411,
+        "p95": 437,
+        "max": 511
+      },
+      "solverCalls": {
+        "p50": 3,
+        "p95": 11,
+        "max": 17
+      },
+      "templateAttempts": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      }
+    }
+  ]
+}

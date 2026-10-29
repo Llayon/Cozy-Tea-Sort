@@ -20,3 +20,7 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run build
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Mobile release browser gate
+        run: bun run test:e2e:ci

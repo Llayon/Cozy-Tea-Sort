@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { getLevelConfig, mechanicPlanForLevel } from '../src/utils/difficultyCurve';
 import { generateLevel } from '../src/game/logic/generator';
 import type { TeaId } from '../src/game/types';
+import { yieldToHost } from './cooperative-yield';
 
 function toReq(levelNum: number) {
   const cfg = getLevelConfig(levelNum);
@@ -78,9 +79,12 @@ describe('post-112 combo cadence (§28)', () => {
 });
 
 describe('sweep 1-1300 (§35)', () => {
-  it('all levels generate; combos only allowed slots; no blend leak', () => {
+  it('all levels generate; combos only allowed slots; no blend leak', async () => {
     let comboCount = 0;
     for (let n = 1; n <= 1300; n++) {
+      // Infrastructure-only cooperative yield: this is the remaining long
+      // synchronous generation sweep; assertions/order/coverage unchanged.
+      if (n > 1 && n % 20 === 0) await yieldToHost();
       const cfg = getLevelConfig(n);
       const lvl = generateLevel(toReq(n), `g15-rollout-${n}`);
       expect(lvl.cups.length).toBeGreaterThan(0);

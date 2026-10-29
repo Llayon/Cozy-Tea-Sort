@@ -8,6 +8,7 @@ import {
 import { solvePuzzle } from '../src/game/logic/solver';
 import { depthAccepted } from '../src/game/logic/difficulty';
 import { isWonState } from '../src/game/logic/rules';
+import { yieldToHost } from './cooperative-yield';
 
 const CONFIGS: Array<{ name: string; req: GenerateRequest; seeds: number }> = [
   {
@@ -58,8 +59,11 @@ const CONFIGS: Array<{ name: string; req: GenerateRequest; seeds: number }> = [
 
 describe('generator property tests (deterministic seeds)', () => {
   for (const cfg of CONFIGS) {
-    it(`${cfg.name}: ${cfg.seeds} seeds all valid + solver-accepted`, () => {
+    it(`${cfg.name}: ${cfg.seeds} seeds all valid + solver-accepted`, async () => {
       for (let s = 0; s < cfg.seeds; s++) {
+        // Infrastructure-only: keep the vitest worker RPC responsive during
+        // this CPU-heavy seed loop (no assertion/coverage change).
+        if (s > 0 && s % 5 === 0) await yieldToHost();
         const seed = `gauntlet0:${cfg.name}:${s}`;
         const level = generateLevel(cfg.req, seed);
 
