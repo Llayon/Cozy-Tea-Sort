@@ -11,7 +11,7 @@
   - `bddb4a2` docs: record G18 release audit and visual evidence
 - PR: opened from `feat/g18-release-hardening` to `main` (URL recorded in the final handoff).
 - Worktree: `D:\Programms\Max\Cozy-Tea-Sort-g18-release-hardening` (`feat/g18-release-hardening`).
-- Original WIP fingerprint: 24 modified/untracked pixel-art files hashed before work; before/after comparison performed at completion (identical). No stash/reset/clean/checkout-over/merge/stage of the original dirty pixel-art files.
+- Original WIP fingerprint: 27 working-tree entries (9 modified/untracked source files + 18 pixel-art assets) hashed before work; before/after comparison at completion is identical. No stash/reset/clean/checkout-over/merge/stage of the original dirty pixel-art files.
 
 ## 2. Baseline
 
