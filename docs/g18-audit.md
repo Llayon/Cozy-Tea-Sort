@@ -166,7 +166,7 @@ Same machine, same command, same seeds, 100 seeds/type, reference/final runs bac
 - Rollout: unchanged (except intentional UX-only tutorial visibility).
 - Visual matrix: critical mobile states reviewed; structural gates pass.
 - Performance: no unexplained >15% regression (final report).
-- Test/browser/build/Pages/CI: see final report.
+- Test/browser/build: canonical unit gate **3/3 consecutive green** (147/147 files); full mobile E2E **3/3 consecutive green** (32/32 each); bounded CI browser subset 7/7; build/Pages green. CI status is recorded in the final handoff after PR.
 
 ## Limitations
 

@@ -4,53 +4,53 @@
   "rows": [
     {
       "level": 1,
-      "moduleStart": 823.2999999523163,
-      "configReadyAt": 1110.2999999523163,
-      "generatedAt": 1178.2000000476837,
-      "boardMountedAt": 1350.8999998569489,
-      "firstInputAt": 2517.2000000476837,
-      "loadToBoard": 527.5999999046326,
-      "loadToInteractive": 1693.9000000953674
+      "moduleStart": 635.5,
+      "configReadyAt": 786.5,
+      "generatedAt": 848.4000000953674,
+      "boardMountedAt": 941.5,
+      "firstInputAt": 1802.7000000476837,
+      "loadToBoard": 306,
+      "loadToInteractive": 1167.2000000476837
     },
     {
       "level": 98,
-      "moduleStart": 745.5,
-      "configReadyAt": 774.8000001907349,
-      "generatedAt": 903,
-      "boardMountedAt": 1070.9000000953674,
-      "firstInputAt": 2123,
-      "loadToBoard": 325.40000009536743,
-      "loadToInteractive": 1377.5
+      "moduleStart": 644.7000000476837,
+      "configReadyAt": 660.2000000476837,
+      "generatedAt": 773.8000001907349,
+      "boardMountedAt": 931.1000001430511,
+      "firstInputAt": 1895.6000001430511,
+      "loadToBoard": 286.40000009536743,
+      "loadToInteractive": 1250.9000000953674
     },
     {
       "level": 154,
-      "moduleStart": 701.7999999523163,
-      "configReadyAt": 730.7999999523163,
-      "generatedAt": 825.1000001430511,
-      "boardMountedAt": 999.4000000953674,
-      "firstInputAt": 2094.2000000476837,
-      "loadToBoard": 297.60000014305115,
-      "loadToInteractive": 1392.4000000953674
+      "moduleStart": 746.6000001430511,
+      "configReadyAt": 771.7999999523163,
+      "generatedAt": 879.4000000953674,
+      "boardMountedAt": 1043.2999999523163,
+      "firstInputAt": 1968.2000000476837,
+      "loadToBoard": 296.69999980926514,
+      "loadToInteractive": 1221.5999999046326
     },
     {
       "level": 162,
-      "moduleStart": 751.7000000476837,
-      "configReadyAt": 783.2999999523163,
-      "generatedAt": 892,
-      "boardMountedAt": 1069.4000000953674,
-      "firstInputAt": 2387.7999999523163,
-      "loadToBoard": 317.7000000476837,
-      "loadToInteractive": 1636.0999999046326
+      "moduleStart": 664.1999998092651,
+      "configReadyAt": 687.3999998569489,
+      "generatedAt": 788.8999998569489,
+      "boardMountedAt": 949.2999999523163,
+      "firstInputAt": 1886.7999999523163,
+      "loadToBoard": 285.10000014305115,
+      "loadToInteractive": 1222.6000001430511
     },
     {
       "level": 250,
-      "moduleStart": 807.6000001430511,
-      "configReadyAt": 836.2000000476837,
-      "generatedAt": 862,
-      "boardMountedAt": 1047.8000001907349,
-      "firstInputAt": 2176.100000143051,
-      "loadToBoard": 240.20000004768372,
-      "loadToInteractive": 1368.5
+      "moduleStart": 671.5999999046326,
+      "configReadyAt": 694.5999999046326,
+      "generatedAt": 720.4000000953674,
+      "boardMountedAt": 908.7000000476837,
+      "firstInputAt": 1821.2999999523163,
+      "loadToBoard": 237.10000014305115,
+      "loadToInteractive": 1149.7000000476837
     }
   ]
 }

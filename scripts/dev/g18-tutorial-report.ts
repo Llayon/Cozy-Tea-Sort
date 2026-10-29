@@ -126,7 +126,7 @@ lines.push('|---|---:|---|---|---:|---|---|---|---:|---|');
 for (const t of TUTORIALS) {
   const m = metricFor(t.level);
   lines.push(
-    `| ${t.mechanic} | ${t.level} | ${esc(t.text)} | ${esc(HELP[t.id])} | ${words(t.text)} / ${words(HELP[t.id])} | ${esc(t.concept)} | none | ${VISUAL[t.id]} | ${oldCount(OLD_KEY[t.id])} | ${m?.lines ?? '—'} lines / ${m?.height ?? '—'}px |`,
+    `| ${t.mechanic} | ${t.level} | ${esc(t.text)} | ${esc(HELP[t.id])} | ${words(t.text)} / ${words(HELP[t.id])} | ${esc(t.concept)} | none | ${VISUAL[t.id]} | ${oldCount(OLD_KEY[t.id])} | ${m?.lines ?? '—'} ${m?.lines === 1 ? 'line' : 'lines'} / ${m?.height ?? '—'}px |`,
   );
 }
 lines.push('');

@@ -270,6 +270,15 @@ test.describe('layout, modal and resize sanity', () => {
     await openQa(page, 162);
     await expectLayout(page, 'L162 360x800');
 
+    // Selected-tea banner must not push controls/board out of the 360px view.
+    const cups = await qaState(page);
+    const source = cups.cups.findIndex((c) => c.length > 0);
+    expect(source).toBeGreaterThanOrEqual(0);
+    await clickCup(page, source);
+    await page.waitForTimeout(100);
+    await expectLayout(page, 'L162 360x800 selected tea');
+    await clearSelection(page);
+
     await page.locator('#info-toggle-btn').click();
     await page.waitForSelector('#tea-menu-modal');
     const modal = page.locator('#tea-menu-modal > div');

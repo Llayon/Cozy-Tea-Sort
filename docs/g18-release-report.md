@@ -3,11 +3,15 @@
 ## 1. Source
 
 - Starting SHA: `f2d28287aa0f67e096309800d2224fa5ee574e81` (G17 final, `origin/main`).
-- Ending SHA: **PENDING COMMIT**.
-- Commits: **PENDING**.
-- PR: **PENDING**.
+- Ending SHA: branch tip at PR (see PR head; final `origin/main` SHA reported after merge).
+- Commits: 4 code/test/docs commits + final evidence update (see PR).
+  - `95c38dc` fix: clarify mobile vessel, tutorial and header presentation
+  - `2bb7164` test: add cooperative yields for long generator gates
+  - `fb75715` test: add G18 rollout freeze and mobile release browser harness
+  - `bddb4a2` docs: record G18 release audit and visual evidence
+- PR: opened from `feat/g18-release-hardening` to `main` (URL recorded in the final handoff).
 - Worktree: `D:\Programms\Max\Cozy-Tea-Sort-g18-release-hardening` (`feat/g18-release-hardening`).
-- Original WIP fingerprint: recorded before work; before/after comparison **PENDING**. No stash/reset/clean/checkout-over/merge/stage of the original dirty pixel-art files.
+- Original WIP fingerprint: 24 modified/untracked pixel-art files hashed before work; before/after comparison performed at completion (identical). No stash/reset/clean/checkout-over/merge/stage of the original dirty pixel-art files.
 
 ## 2. Baseline
 
@@ -118,7 +122,7 @@ Generator/solver sources are untouched in G18; reference/final runs were same-ma
 - Runner changes: cooperative yields every 5 seeds in two heavy loops + every 20 levels in the 1–1300 sweep. No assertion/seed/coverage/pass criteria changes.
 - Classifier guarantees preserved: tests still prove unassigned/duplicate/missing fail, real assertion no retry, unknown error no retry, exact known RPC only retryable.
 - Discovery/assignment: 147 test files assigned exactly once after the three new G18 tests (144 → 147).
-- Final 3× full canonical gate: **PENDING**.
+- Final 3× full canonical gate: **PASS** — 147/147 files, EXIT=0 each; durations 1322s, 1124s, 1183s. No unknown failures; no retry was needed in the final runs.
 
 ## 9. Architecture
 
@@ -141,16 +145,18 @@ Generator/solver sources are untouched in G18; reference/final runs were same-ma
 
 ## 11. Quality
 
-- `bun install --frozen-lockfile`: **PENDING FINAL** (last check: no changes).
-- `bun run typecheck`: green.
-- `bun run test`: **PENDING FINAL 3×**.
-- E2E gate: **PENDING FINAL 3×**.
-- `bun run build`: green; Pages build green.
-- Console errors: dev E2E gate clean (external fonts/Telegram stubbed; no app errors); production preview check pending.
+- `bun install --frozen-lockfile`: **PASS** (checked 119 installs / 260 packages, no changes).
+- `bun run typecheck`: **PASS** (including e2e + playwright config).
+- `bun run test`: **PASS 3/3 consecutive full gates** — 147/147 files, EXIT=0, 1322s / 1124s / 1183s; no RPC retries in those runs.
+- E2E gate: **PASS 3/3 consecutive full mobile runs** — 32/32 tests each, 6.7–6.8m; bounded CI subset 7/7 in 1.3m.
+- `bun run build`: **PASS**; `GITHUB_PAGES=true bun run build`: **PASS**.
+- Console errors: dev E2E gate clean (external fonts/Telegram stubbed; no app errors); production preview clean (0 console errors, 0 page errors, 0 local asset failures, canvas present, QA bridge absent).
 - Asset failures: local asset gate clean in E2E.
-- Quality CI: updated with bounded critical browser gate; final CI run pending.
+- Build warning: only the pre-existing >500kB chunk warning; no new serious warning.
+- Bundle: main 872.79kB (baseline 873.30kB), gzip 225.89kB; total dist 1,175,883B (baseline 1,177,906B). Pages build main 872.81kB / total 1,175,995B. JS growth -0.2%, well under 5%.
+- Quality CI: updated with bounded critical browser gate; final CI run pending PR.
 - Pages CI: pending PR merge.
-- Final SHA: **PENDING**.
+- Final SHA: **PENDING** (reported after merge).
 
 ## 12. Evidence level
 
