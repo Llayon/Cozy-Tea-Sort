@@ -124,6 +124,7 @@ Exactly one bottom layer may be hidden (`hiddenCount = 1`) in a cup with ≥ 3 l
 ## Progression & persistence
 
 - `currentLevel` = puzzle being played; `highestUnlockedLevel` = furthest earned (completing N unlocks N+1).
+- Persisted progression is bounded by `MAX_PERSISTED_LEVEL = 10_000` (G19). Completing the max level never unlocks MAX+1.
 - `N → N+1` happens only through the victory flow. The footer action ("Другой расклад") reshuffles the **same** level.
 - "New recipe/skin" banners appear only when the persistent collection actually gains an entry (replays stay silent).
 - Persisted (validated, never trusted blindly): highest unlocked, unlocked recipes/skins, equipped skin, mute. Refresh restarts the current puzzle but never regresses progression.

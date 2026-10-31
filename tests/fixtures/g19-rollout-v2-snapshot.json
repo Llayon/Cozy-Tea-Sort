@@ -1,0 +1,7662 @@
+{
+  "gauntlet": "G19",
+  "baseSha": "1a350ef345d73d7e3d476e2c0f1d6c82af26a548",
+  "generatedAt": "2026-10-31T04:03:36.641Z",
+  "boundary": {
+    "v1MaxLevel": 330,
+    "v2FirstChallengeLevel": 334,
+    "deckLength": 28
+  },
+  "deck": [
+    "frozen",
+    "sharedTray",
+    "honey",
+    "teaBloom",
+    "tasting",
+    "thermos",
+    "lemon",
+    "servingOrder",
+    "sink",
+    "targets",
+    "teaPair",
+    "strainer",
+    "cinnamon",
+    "teapotHoney",
+    "lemonHoney",
+    "teapotTasting",
+    "teapotSink",
+    "blend",
+    "teapotLemon",
+    "orderTasting",
+    "teapotTargets",
+    "teapotStrainer",
+    "honey",
+    "tasting",
+    "lemon",
+    "sink",
+    "targets",
+    "servingOrder"
+  ],
+  "levels": [
+    {
+      "level": 331,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 332,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 333,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 334,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 335,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 336,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 337,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 338,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 339,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 340,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 341,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 342,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 343,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 344,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 345,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 346,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 347,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 348,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 349,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 350,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 351,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 352,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 353,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 354,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 355,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 356,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 357,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 358,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 359,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 360,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 361,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 362,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 363,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 364,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 365,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 366,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 367,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 368,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 369,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 370,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 371,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 372,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 373,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 374,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 375,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 376,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 377,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 378,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 379,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 380,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 381,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 382,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 383,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 384,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 385,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 386,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 387,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 388,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 389,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 390,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 391,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 392,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 393,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 394,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 395,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 396,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 397,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 398,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 399,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 400,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 401,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 402,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 403,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 404,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 405,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 406,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 407,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 408,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 409,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 410,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 411,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 412,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 413,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 414,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 415,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 416,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 417,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 418,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 419,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 420,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 421,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 422,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 423,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 424,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 425,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 426,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 427,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 428,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 429,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 430,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 431,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 432,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 433,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 434,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 435,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 436,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 437,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 438,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 439,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 440,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 441,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 442,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 443,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 444,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 445,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 446,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 447,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 448,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 449,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 450,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 451,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 452,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 453,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 454,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 455,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 456,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 457,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 458,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 459,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 460,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 461,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 462,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 463,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 464,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 465,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 466,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 467,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 468,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 469,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 470,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 471,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 472,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 473,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 474,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 475,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 476,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 477,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 478,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 479,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 480,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 481,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 482,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 483,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 484,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 485,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 486,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 487,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 488,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 489,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 490,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 491,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 492,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 493,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 494,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 495,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 496,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 497,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 498,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 499,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 500,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 501,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 502,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 503,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 504,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 505,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 506,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 507,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 508,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 509,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 510,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 511,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 512,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 513,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 514,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 515,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 516,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 517,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 518,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 519,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 520,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 521,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 522,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 523,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 524,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 525,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 526,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 527,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 528,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 529,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 530,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 531,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 532,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 533,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 534,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 535,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 536,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 537,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 538,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 539,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 540,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 541,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 542,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 543,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 544,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 545,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 546,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 547,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 548,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 549,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 550,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 551,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 552,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 553,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 554,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 555,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 556,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 557,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 558,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 559,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 560,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 561,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 562,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 563,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 564,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 565,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 566,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 567,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 568,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 569,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 570,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 571,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 572,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 573,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 574,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 575,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 576,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 577,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 578,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 579,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 580,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 581,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 582,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 583,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 584,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 585,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 586,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 587,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 588,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 589,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 590,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 591,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 592,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 593,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 594,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 595,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 596,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 597,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 598,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 599,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 600,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 601,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 602,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 603,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 604,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 605,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 606,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 607,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 608,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 609,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 610,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 611,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 612,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 613,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 614,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 615,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 616,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 617,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 618,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 619,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 620,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 621,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 622,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 623,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 624,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 625,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 626,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 627,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 628,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 629,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 630,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 631,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 632,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 633,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 634,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 635,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 636,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 637,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 638,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 639,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 640,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 641,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 642,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 643,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 644,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 645,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 646,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 647,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 648,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 649,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 650,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 651,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 652,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 653,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 654,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 655,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 656,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 657,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 658,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 659,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 660,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 661,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 662,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 663,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 664,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 665,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 666,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 667,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 668,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 669,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 670,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 671,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 672,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 673,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 674,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 675,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 676,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 677,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 678,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 679,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 680,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 681,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 682,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 683,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 684,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 685,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 686,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 687,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 688,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 689,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 690,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 691,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 692,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 693,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 694,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 695,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 696,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 697,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 698,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 699,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 700,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 701,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 702,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 703,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 704,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 705,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 706,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 707,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 708,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 709,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 710,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 711,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 712,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 713,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 714,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 715,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 716,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 717,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 718,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 719,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 720,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 721,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 722,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 723,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 724,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 725,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 726,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 727,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 728,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 729,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 730,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 731,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 732,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 733,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 734,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 735,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 736,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 737,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 738,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 739,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 740,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 741,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 742,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 743,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 744,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 745,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 746,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 747,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 748,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 749,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 750,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 751,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 752,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 753,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 754,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 755,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 756,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 757,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 758,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 759,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 760,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 761,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 762,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 763,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 764,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 765,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 766,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 767,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 768,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 769,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 770,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 771,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 772,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 773,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 774,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 775,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 776,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 777,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 778,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 779,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 780,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 781,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 782,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 783,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 784,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 785,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 786,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 787,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 788,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 789,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 790,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 791,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 792,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 793,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 794,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 795,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 796,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 797,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 798,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 799,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 800,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 801,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 802,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 803,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 804,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 805,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 806,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 807,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 808,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 809,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 810,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 811,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 812,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 813,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 814,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 815,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 816,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 817,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 818,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 819,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 820,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 821,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 822,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 823,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 824,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 825,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 826,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 827,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 828,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 829,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 830,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 831,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 832,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 833,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 834,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 835,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 836,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 837,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 838,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 839,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 840,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 841,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 842,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 843,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 844,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 845,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 846,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 847,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 848,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 849,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 850,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 851,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 852,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 853,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 854,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 855,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 856,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 857,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 858,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 859,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 860,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 861,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 862,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 863,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 864,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 865,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 866,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 867,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 868,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 869,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 870,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 871,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 872,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 873,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 874,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 875,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 876,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 877,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 878,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 879,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 880,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 881,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 882,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 883,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 884,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 885,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 886,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 887,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 888,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 889,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 890,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 891,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 892,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 893,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 894,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 895,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 896,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 897,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 898,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 899,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 900,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 901,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 902,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 903,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 904,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 905,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 906,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 907,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 908,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 909,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 910,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 911,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 912,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 913,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 914,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 915,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 916,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 917,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 918,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 919,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 920,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 921,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 922,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 923,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 924,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 925,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 926,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 927,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 928,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 929,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 930,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 931,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 932,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 933,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 934,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 935,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 936,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 937,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 938,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 939,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 940,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 941,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 942,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 943,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 944,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 945,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 946,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 947,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 948,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 949,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 950,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 951,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 952,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 953,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 954,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 955,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 956,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 957,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 958,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 959,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 960,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 961,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 962,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 963,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 964,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 965,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 966,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 967,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 968,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 969,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 970,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 971,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 972,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 973,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 974,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 975,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 976,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 977,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 978,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 979,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 980,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 981,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 982,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 983,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 984,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 985,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 986,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 987,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 988,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 989,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 990,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 991,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 992,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 993,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 994,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 995,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 996,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 997,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 998,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 999,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1000,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1001,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1002,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1003,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1004,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1005,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1006,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 1007,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1008,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1009,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1010,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 1011,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1012,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1013,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1014,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1015,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1016,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1017,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1018,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 1019,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1020,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1021,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1022,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1023,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1024,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1025,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1026,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 1027,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1028,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1029,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1030,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1031,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1032,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1033,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1034,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1035,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1036,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1037,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1038,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1039,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1040,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1041,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1042,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1043,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1044,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1045,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1046,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 1047,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1048,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1049,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1050,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 1051,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1052,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1053,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1054,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 1055,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1056,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1057,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1058,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 1059,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1060,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1061,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1062,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 1063,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1064,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1065,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1066,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 1067,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1068,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1069,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1070,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 1071,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1072,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1073,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1074,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 1075,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1076,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1077,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1078,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 1079,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1080,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1081,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1082,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 1083,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1084,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1085,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1086,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 1087,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1088,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1089,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1090,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 1091,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1092,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1093,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1094,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1095,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1096,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1097,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1098,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1099,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1100,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1101,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1102,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1103,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1104,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1105,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1106,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1107,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1108,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1109,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1110,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1111,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1112,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1113,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1114,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1115,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1116,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1117,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1118,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 1119,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1120,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1121,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1122,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 1123,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1124,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1125,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1126,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1127,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1128,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1129,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1130,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 1131,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1132,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1133,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1134,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1135,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1136,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1137,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1138,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 1139,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1140,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1141,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1142,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1143,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1144,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1145,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1146,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1147,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1148,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1149,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1150,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1151,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1152,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1153,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1154,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1155,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1156,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1157,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1158,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 1159,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1160,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1161,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1162,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 1163,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1164,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1165,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1166,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 1167,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1168,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1169,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1170,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 1171,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1172,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1173,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1174,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 1175,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1176,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1177,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1178,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 1179,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1180,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1181,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1182,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 1183,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1184,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1185,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1186,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 1187,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1188,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1189,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1190,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 1191,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1192,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1193,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1194,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 1195,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1196,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1197,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1198,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 1199,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1200,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1201,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1202,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 1203,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1204,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1205,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1206,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1207,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1208,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1209,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1210,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1211,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1212,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1213,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1214,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1215,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1216,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1217,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1218,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1219,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1220,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1221,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1222,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1223,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1224,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1225,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1226,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1227,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1228,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1229,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1230,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 1231,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1232,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1233,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1234,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 1235,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1236,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1237,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1238,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1239,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1240,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1241,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1242,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 1243,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1244,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1245,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1246,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1247,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1248,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1249,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1250,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 1251,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1252,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1253,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1254,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1255,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1256,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1257,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1258,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1259,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1260,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1261,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1262,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1263,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1264,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1265,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1266,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1267,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1268,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1269,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1270,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 1271,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1272,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1273,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1274,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 1275,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1276,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1277,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1278,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 1279,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1280,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1281,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1282,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 1283,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1284,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1285,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1286,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 1287,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1288,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1289,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1290,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 1291,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1292,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1293,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1294,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 1295,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1296,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1297,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1298,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 1299,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1300,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1301,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1302,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 1303,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1304,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1305,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1306,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 1307,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1308,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1309,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1310,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 1311,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1312,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1313,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1314,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 1315,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1316,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1317,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1318,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1319,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1320,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1321,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1322,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1323,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1324,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1325,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1326,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1327,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1328,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1329,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1330,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1331,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1332,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1333,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1334,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1335,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1336,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1337,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1338,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1339,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1340,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1341,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1342,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 1343,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1344,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1345,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1346,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 1347,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1348,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1349,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1350,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1351,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1352,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1353,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1354,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 1355,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1356,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1357,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1358,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1359,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1360,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1361,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1362,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 1363,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1364,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1365,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1366,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1367,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1368,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1369,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1370,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1371,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1372,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1373,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1374,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1375,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1376,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1377,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1378,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1379,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1380,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1381,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1382,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 1383,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1384,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1385,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1386,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 1387,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1388,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1389,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1390,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 1391,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1392,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1393,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1394,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 1395,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1396,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1397,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1398,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 1399,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1400,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1401,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1402,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 1403,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1404,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1405,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1406,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 1407,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1408,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1409,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1410,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 1411,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1412,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1413,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1414,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 1415,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1416,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1417,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1418,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 1419,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1420,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1421,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1422,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 1423,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1424,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1425,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1426,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 1427,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1428,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1429,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1430,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1431,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1432,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1433,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1434,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1435,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1436,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1437,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1438,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1439,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1440,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1441,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1442,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1443,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1444,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1445,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1446,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1447,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1448,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1449,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1450,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1451,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1452,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1453,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1454,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 1455,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1456,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1457,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1458,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 1459,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1460,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1461,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1462,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1463,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1464,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1465,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1466,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 1467,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1468,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1469,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1470,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1471,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1472,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1473,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1474,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 1475,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1476,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1477,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1478,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1479,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1480,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1481,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1482,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1483,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1484,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1485,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1486,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1487,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1488,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1489,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1490,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1491,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1492,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1493,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1494,
+      "phase": "challenge",
+      "plan": "teaPair",
+      "hash": "3446143088795ca9"
+    },
+    {
+      "level": 1495,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1496,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1497,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1498,
+      "phase": "challenge",
+      "plan": "strainer",
+      "hash": "e39d59f485b7ee99"
+    },
+    {
+      "level": 1499,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1500,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1501,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1502,
+      "phase": "challenge",
+      "plan": "cinnamon",
+      "hash": "2e1dca2def1e0ad8"
+    },
+    {
+      "level": 1503,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1504,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1505,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1506,
+      "phase": "challenge",
+      "plan": "honey+teapot",
+      "hash": "1783ac6d48d20be7"
+    },
+    {
+      "level": 1507,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1508,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1509,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1510,
+      "phase": "challenge",
+      "plan": "honey+lemon",
+      "hash": "c9d4d449f02781bc"
+    },
+    {
+      "level": 1511,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1512,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1513,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1514,
+      "phase": "challenge",
+      "plan": "tasting+teapot",
+      "hash": "efecde89e06a63dd"
+    },
+    {
+      "level": 1515,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1516,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1517,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1518,
+      "phase": "challenge",
+      "plan": "sink+teapot",
+      "hash": "8a45cf6703bdd3bc"
+    },
+    {
+      "level": 1519,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1520,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1521,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1522,
+      "phase": "challenge",
+      "plan": "blend",
+      "hash": "9a2f44604c6ecdd9"
+    },
+    {
+      "level": 1523,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1524,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1525,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1526,
+      "phase": "challenge",
+      "plan": "lemon+teapot",
+      "hash": "781c0efb367894db"
+    },
+    {
+      "level": 1527,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1528,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1529,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1530,
+      "phase": "challenge",
+      "plan": "servingOrder+tasting",
+      "hash": "059da037269f8f3c"
+    },
+    {
+      "level": 1531,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1532,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1533,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1534,
+      "phase": "challenge",
+      "plan": "targets+teapot",
+      "hash": "2a97e89d1fc51209"
+    },
+    {
+      "level": 1535,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1536,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1537,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1538,
+      "phase": "challenge",
+      "plan": "strainer+teapot",
+      "hash": "cf7f539de230e61e"
+    },
+    {
+      "level": 1539,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1540,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1541,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1542,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1543,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1544,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1545,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1546,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1547,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1548,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1549,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1550,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1551,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1552,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1553,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1554,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1555,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1556,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1557,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1558,
+      "phase": "challenge",
+      "plan": "targets",
+      "hash": "f134e79bdd0653e4"
+    },
+    {
+      "level": 1559,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1560,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1561,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1562,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1563,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1564,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1565,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1566,
+      "phase": "challenge",
+      "plan": "frozen",
+      "hash": "c014836c32eab07f"
+    },
+    {
+      "level": 1567,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1568,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1569,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1570,
+      "phase": "challenge",
+      "plan": "sharedTray",
+      "hash": "d98c22152e29cfbb"
+    },
+    {
+      "level": 1571,
+      "phase": "peak",
+      "plan": "strainer",
+      "hash": "57c69ed95bd2a451"
+    },
+    {
+      "level": 1572,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1573,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1574,
+      "phase": "challenge",
+      "plan": "honey",
+      "hash": "b95059b2444e96bb"
+    },
+    {
+      "level": 1575,
+      "phase": "peak",
+      "plan": "lemon",
+      "hash": "a776a495f129c17b"
+    },
+    {
+      "level": 1576,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1577,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1578,
+      "phase": "challenge",
+      "plan": "teaBloom",
+      "hash": "22bbff47ea0bf848"
+    },
+    {
+      "level": 1579,
+      "phase": "peak",
+      "plan": "tasting",
+      "hash": "78ed9f62afeacfb3"
+    },
+    {
+      "level": 1580,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1581,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1582,
+      "phase": "challenge",
+      "plan": "tasting",
+      "hash": "fe6d62228233d77a"
+    },
+    {
+      "level": 1583,
+      "phase": "peak",
+      "plan": "sink",
+      "hash": "a5c5c3c1fce2140a"
+    },
+    {
+      "level": 1584,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1585,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1586,
+      "phase": "challenge",
+      "plan": "thermos",
+      "hash": "9be68b65610ad3aa"
+    },
+    {
+      "level": 1587,
+      "phase": "peak",
+      "plan": "targets",
+      "hash": "3653c39167591f1d"
+    },
+    {
+      "level": 1588,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1589,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1590,
+      "phase": "challenge",
+      "plan": "lemon",
+      "hash": "21de507253cb1680"
+    },
+    {
+      "level": 1591,
+      "phase": "peak",
+      "plan": "teapot",
+      "hash": "2ff9ede97fe912ba"
+    },
+    {
+      "level": 1592,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1593,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1594,
+      "phase": "challenge",
+      "plan": "servingOrder",
+      "hash": "8e65376ab764a18c"
+    },
+    {
+      "level": 1595,
+      "phase": "peak",
+      "plan": "clean",
+      "hash": "5177702267aa9c14"
+    },
+    {
+      "level": 1596,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    },
+    {
+      "level": 1597,
+      "phase": "warmup",
+      "plan": "clean",
+      "hash": "be8ee1e3f57ce303"
+    },
+    {
+      "level": 1598,
+      "phase": "challenge",
+      "plan": "sink",
+      "hash": "9dab8a27b4f39265"
+    },
+    {
+      "level": 1599,
+      "phase": "peak",
+      "plan": "honey",
+      "hash": "a24666a4c203f647"
+    },
+    {
+      "level": 1600,
+      "phase": "relax",
+      "plan": "clean",
+      "hash": "50dcf5cf409b8476"
+    }
+  ]
+}

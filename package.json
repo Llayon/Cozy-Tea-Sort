@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
     "test:all-at-once": "vitest run",
-    "test:e2e": "playwright test e2e/release-journey.spec.ts",
-    "test:e2e:ci": "playwright test e2e/release-journey.spec.ts --grep \"L1: config|L26: config|L98: config|L106: config|L154: config|L162: config|L250: config\"",
+    "test:e2e": "playwright test e2e/release-journey.spec.ts e2e/g19-long-run.spec.ts",
+    "test:e2e:ci": "playwright test e2e/release-journey.spec.ts e2e/g19-long-run.spec.ts --grep \"L1: config|L26: config|L98: config|L106: config|L154: config|L162: config|L250: config|G19\"",
     "test:visual": "playwright test e2e/release-visual.spec.ts"
   },
   "dependencies": {

@@ -61,6 +61,18 @@ const batches = [
       'tests/g18-visual-contract.test.ts',
     ],
   },
+  {
+    name: 'G19 rollout V2 + recurrence',
+    files: ['tests/g19-rollout-v2.test.ts', 'tests/g19-recurrence.test.ts'],
+  },
+  {
+    name: 'G19 freeze + persistence + long-run generation',
+    files: [
+      'tests/g19-freeze.test.ts',
+      'tests/g19-persistence-boundary.test.ts',
+      'tests/g19-long-run-generation.test.ts',
+    ],
+  },
   { name: 'teapot + target stress', files: ['tests/target-stress-teapot.test.ts'] },
   { name: 'target challenge stress', files: ['tests/target-stress-challenge.test.ts'] },
   { name: 'target peak stress', files: ['tests/target-stress-peak.test.ts'] },

@@ -51,7 +51,7 @@ export function pickTargetPair(palette: TeaId[]): TeaId[] {
   return [palette[0] as TeaId, palette[2] as TeaId];
 }
 
-interface MechanicPlan {
+export interface MechanicPlan {
   teapot: boolean;
   targets: boolean;
   sink: boolean;
@@ -70,6 +70,119 @@ interface MechanicPlan {
 }
 
 const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false, sharedTray: false, teaPair: false };
+
+/**
+ * G19 rollout boundary.
+ *
+ * 1–330 is the historical/onboarding rotation validated by G18 and stays
+ * semantically frozen. The first V2 challenge slot is L334 (L331 peak,
+ * L332 relax, L333 warmup keep the existing four-phase rhythm). Only the
+ * long-run CHALLENGE rotation changes; peak/warmup/relax policy is untouched.
+ */
+export const ROLLOUT_V1_MAX_LEVEL = 330;
+export const ROLLOUT_V2_FIRST_CHALLENGE_LEVEL = 334;
+
+/**
+ * Rollout V2 challenge deck: a deterministic, product-curated cycle of the
+ * EXISTING proven challenge plans. It owns WHICH plan appears, never rules,
+ * compatibility, generation or win semantics.
+ *
+ * 28 challenge slots × 4 levels = 112-level steady-state cadence.
+ */
+export type V2ChallengeMechanicId =
+  | 'frozen'
+  | 'sharedTray'
+  | 'honey'
+  | 'teaBloom'
+  | 'tasting'
+  | 'thermos'
+  | 'lemon'
+  | 'servingOrder'
+  | 'sink'
+  | 'targets'
+  | 'teaPair'
+  | 'strainer'
+  | 'cinnamon'
+  | 'teapotHoney'
+  | 'lemonHoney'
+  | 'teapotTasting'
+  | 'teapotSink'
+  | 'blend'
+  | 'teapotLemon'
+  | 'orderTasting'
+  | 'teapotTargets'
+  | 'teapotStrainer';
+
+const V2_PLAN_FLAGS: Record<V2ChallengeMechanicId, readonly (keyof MechanicPlan)[]> = {
+  frozen: ['frozen'],
+  sharedTray: ['sharedTray'],
+  honey: ['honey'],
+  teaBloom: ['teaBloom'],
+  tasting: ['tasting'],
+  thermos: ['thermos'],
+  lemon: ['lemon'],
+  servingOrder: ['servingOrder'],
+  sink: ['sink'],
+  targets: ['targets'],
+  teaPair: ['teaPair'],
+  strainer: ['strainer'],
+  cinnamon: ['cinnamon'],
+  teapotHoney: ['teapot', 'honey'],
+  lemonHoney: ['lemon', 'honey'],
+  teapotTasting: ['teapot', 'tasting'],
+  teapotSink: ['teapot', 'sink'],
+  blend: ['blend'],
+  teapotLemon: ['teapot', 'lemon'],
+  orderTasting: ['servingOrder', 'tasting'],
+  teapotTargets: ['teapot', 'targets'],
+  teapotStrainer: ['teapot', 'strainer'],
+};
+
+function planFromV2Id(id: V2ChallengeMechanicId): MechanicPlan {
+  const plan: MechanicPlan = { ...CLEAN };
+  for (const flag of V2_PLAN_FLAGS[id]) plan[flag] = true;
+  return plan;
+}
+
+/**
+ * Exact product order (G19 §23). Repeated familiar entries are intentional:
+ * Honey/Tasting/Lemon/Sink/Targets/ServingOrder appear twice per deck; every
+ * advanced plan appears exactly once. No runtime shuffle.
+ */
+export const V2_CHALLENGE_DECK_IDS: readonly V2ChallengeMechanicId[] = [
+  'frozen',
+  'sharedTray',
+  'honey',
+  'teaBloom',
+  'tasting',
+  'thermos',
+  'lemon',
+  'servingOrder',
+  'sink',
+  'targets',
+  'teaPair',
+  'strainer',
+  'cinnamon',
+  'teapotHoney',
+  'lemonHoney',
+  'teapotTasting',
+  'teapotSink',
+  'blend',
+  'teapotLemon',
+  'orderTasting',
+  'teapotTargets',
+  'teapotStrainer',
+  'honey',
+  'tasting',
+  'lemon',
+  'sink',
+  'targets',
+  'servingOrder',
+];
+
+export const CHALLENGE_DECK_V2: readonly MechanicPlan[] = V2_CHALLENGE_DECK_IDS.map(planFromV2Id);
+
+export const CHALLENGE_DECK_V2_LENGTH = CHALLENGE_DECK_V2.length;
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -315,14 +428,68 @@ const PINNED_ROLLOUT_105_112: Record<number, MechanicPlan> = {
 };
 
 /**
- * Mechanic plan for any level: pinned table for 1–112, then a deterministic
- * rotation (warmup/relax clean; challenge/peak cycle through ≤2-special
- * combos, never honey + lemon / strainer / sink / tasting / targets except
- * the dedicated lemon+honey interaction, never strainer + lemon / sink /
- * tasting / targets, never lemon + sink / lemon + tasting / lemon +
- * targets / sink + targets / tasting + sink / tasting + targets, never
- * three specials together; frozen cup, thermos, cinnamon, tea bloom, blend
- * and serving order stay standalone; no serving combinations yet).
+ * Historical challenge rotation (V1), used for levels 113–330.
+ *
+ * Preserved verbatim from G18: challenge cycle residue 0–19. This function
+ * exists only so the frozen historical boundary is explicit and testable;
+ * it is never used for levels >= ROLLOUT_V2_FIRST_CHALLENGE_LEVEL.
+ */
+export function challengeMechanicPlanV1(levelNum: number): MechanicPlan {
+  const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
+  switch (cycleNumber % 20) {
+    case 0: return { ...CLEAN, teaBloom: true };
+    case 1: return { ...CLEAN, cinnamon: true };
+    case 2: return { ...CLEAN, thermos: true };
+    case 3: return { ...CLEAN, frozen: true };
+    case 4: return { ...CLEAN, lemon: true, honey: true };
+    case 5: return { ...CLEAN, honey: true };
+    case 6: return { ...CLEAN, teapot: true, honey: true };
+    case 7: return { ...CLEAN, strainer: true };
+    case 8: return { ...CLEAN, teapot: true, strainer: true };
+    case 9: return { ...CLEAN, lemon: true };
+    case 10: return { ...CLEAN, teapot: true, lemon: true };
+    case 11: return { ...CLEAN, tasting: true };
+    case 12: return { ...CLEAN, teapot: true, tasting: true };
+    case 13: return { ...CLEAN, sink: true };
+    case 14: return { ...CLEAN, teapot: true, sink: true };
+    case 15: return { ...CLEAN, targets: true };
+    case 17: return { ...CLEAN, blend: true };
+    case 18: return { ...CLEAN, servingOrder: true };
+    case 19: return { ...CLEAN, servingOrder: true, tasting: true };
+    default: return { ...CLEAN, teapot: true, targets: true };
+  }
+}
+
+/**
+ * Rollout V2 challenge policy (levels >=334, challenge phase only).
+ *
+ * Slot formula is explicit and level-number based:
+ *   v2ChallengeIndex = (level - 334) / 4
+ *   slot             = v2ChallengeIndex % 28
+ *
+ * No RNG, no seed, no session/storage input. Throws on non-challenge levels
+ * so a future dispatcher mistake fails loudly instead of silently shifting
+ * the deck.
+ */
+export function challengeMechanicPlanV2(levelNum: number): MechanicPlan {
+  const offset = levelNum - ROLLOUT_V2_FIRST_CHALLENGE_LEVEL;
+  if (!Number.isInteger(levelNum) || offset < 0 || offset % 4 !== 0) {
+    throw new Error(
+      `challengeMechanicPlanV2 expects a V2 challenge level (334 + 4n), got ${levelNum}`,
+    );
+  }
+  const index = offset / 4;
+  return { ...(CHALLENGE_DECK_V2[index % CHALLENGE_DECK_V2_LENGTH] as MechanicPlan) };
+}
+
+/**
+ * Mechanic plan for any level: pinned table for 1–112, pinned first
+ * exposures at 162/242/250/330, then the versioned deterministic rotation.
+ *
+ * 1–330 uses the frozen V1 challenge rotation. From L334 the challenge
+ * rotation switches to the explicit 28-slot Rollout V2 deck. Peak, warmup
+ * and relax policy is unchanged; only the long-run challenge selection is
+ * versioned.
  */
 export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const pinned =
@@ -346,39 +513,12 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // challenge (no mystery): tea bloom → cinnamon → thermos → frozen cup →
-    // lemon+honey → honey → teapot+honey → strainer → teapot+strainer →
-    // lemon → teapot+lemon → tasting → teapot+tasting → sink → teapot+sink →
-    // targets → teapot+targets → milk-tea blend → serving order →
-    // serving-order+tasting composition (all standalone except the
-    // established ≤2-special combos plus the single G15 Tier-A composition;
-    // NO bloom/blend/serving-other combinations).
-    // (Levels 1–112 are pinned, so this rotation only affects 113+; the
-    // pre-G14 18-cycle order is preserved exactly, with serving order as the
-    // 19th residue (G14) and serving-order+tasting as the 20th (G15) so no
-    // existing mechanic shifts within its residue class.)
-    switch (cycleNumber % 20) {
-      case 0: return { ...CLEAN, teaBloom: true };
-      case 1: return { ...CLEAN, cinnamon: true };
-      case 2: return { ...CLEAN, thermos: true };
-      case 3: return { ...CLEAN, frozen: true };
-      case 4: return { ...CLEAN, lemon: true, honey: true };
-      case 5: return { ...CLEAN, honey: true };
-      case 6: return { ...CLEAN, teapot: true, honey: true };
-      case 7: return { ...CLEAN, strainer: true };
-      case 8: return { ...CLEAN, teapot: true, strainer: true };
-      case 9: return { ...CLEAN, lemon: true };
-      case 10: return { ...CLEAN, teapot: true, lemon: true };
-      case 11: return { ...CLEAN, tasting: true };
-      case 12: return { ...CLEAN, teapot: true, tasting: true };
-      case 13: return { ...CLEAN, sink: true };
-      case 14: return { ...CLEAN, teapot: true, sink: true };
-      case 15: return { ...CLEAN, targets: true };
-      case 17: return { ...CLEAN, blend: true };
-      case 18: return { ...CLEAN, servingOrder: true };
-      case 19: return { ...CLEAN, servingOrder: true, tasting: true };
-      default: return { ...CLEAN, teapot: true, targets: true };
+    // Version boundary: V1 is frozen through L330; every V2 challenge level
+    // (334 + 4n) selects from the explicit 28-slot product deck.
+    if (levelNum >= ROLLOUT_V2_FIRST_CHALLENGE_LEVEL) {
+      return challengeMechanicPlanV2(levelNum);
     }
+    return challengeMechanicPlanV1(levelNum);
   }
   // peak (mystery always on, plus AT MOST ONE more mechanic):
   // honey+mystery → strainer+mystery → lemon+mystery → tasting+mystery →

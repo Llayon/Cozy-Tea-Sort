@@ -469,7 +469,11 @@ describe('G17 rollout: challenge-only standalone L250/L330', () => {
     }
     let count = 0;
     for (let lvl = 1; lvl <= 400; lvl++) if (getLevelConfig(lvl).hasTeaPair) count++;
-    expect(count).toBe(2);
+    // G19 Rollout V2 intentionally schedules the first recurring Tea Pair at
+    // L374 in addition to the frozen L250/L330 exposures.
+    expect(count).toBe(3);
+    expect(getLevelConfig(374).hasTeaPair).toBe(true);
+    expect(getLevelConfig(374).phase).toBe('challenge');
   });
 
   it('generates both rollout levels through the App request mapping', () => {
