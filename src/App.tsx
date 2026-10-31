@@ -35,7 +35,7 @@ import { audioSynth } from './game/audio/audioSynth';
 import { telegram } from './game/telegram/telegramHaptics';
 import { generateLevel } from './game/logic/generator';
 import { generateRequestForLevelConfig } from './game/logic/productionRequest';
-import { applyWin } from './game/logic/progression';
+import { applyWin, MAX_PERSISTED_LEVEL } from './game/logic/progression';
 import { loadProgress, saveProgress } from './game/storage';
 import { makeProductionSeed } from './game/logic/rng';
 import { TeaRoomBackground } from './components/TeaRoomBackground';
@@ -73,7 +73,7 @@ function readQaLaunch(): QaLaunch | null {
     const params = new URLSearchParams(window.location.search);
     if (!params.has('qaLevel')) return null;
     const rawLevel = Number(params.get('qaLevel'));
-    if (!Number.isInteger(rawLevel) || rawLevel < 1 || rawLevel > 1600) return null;
+    if (!Number.isInteger(rawLevel) || rawLevel < 1 || rawLevel > MAX_PERSISTED_LEVEL) return null;
     const rawSeed = params.get('qaSeed');
     const tutorial = params.get('qaTutorial') !== '0';
     return {
@@ -199,7 +199,11 @@ export default function App() {
   const hintTimerRef = useRef<number | null>(null);
 
   const currentConfig: LevelConfig = getLevelConfig(currentLevel);
-  const nextConfig: LevelConfig = getLevelConfig(currentLevel + 1);
+  // At the persisted product bound the "next" preview stays on MAX; the
+  // victory flow must never imply an unlockable MAX + 1.
+  const nextConfig: LevelConfig = getLevelConfig(
+    Math.min(MAX_PERSISTED_LEVEL, currentLevel + 1),
+  );
   const tutorial = tutorialForConfig(currentConfig);
 
   // Refs mirroring collections for the single-lifetime Pixi win callback.
@@ -626,7 +630,8 @@ export default function App() {
   /** The ONLY legitimate N -> N+1 transition: via the victory flow. */
   const handleNextLevel = () => {
     const completed = currentLevelRef.current;
-    const next = completed + 1;
+    // Product progression is bounded: completing MAX cannot start MAX + 1.
+    const next = Math.min(MAX_PERSISTED_LEVEL, completed + 1);
     startLevel(
       next,
       qaLaunch?.seed ? `${qaLaunch.seed}:next:${next}` : makeProductionSeed(next),
@@ -677,7 +682,9 @@ export default function App() {
               <h1 className="text-xs sm:text-sm font-semibold tracking-wide text-[#F8EFE4] leading-tight">
                 Чайный купаж
               </h1>
-              <span className="text-[10px] sm:text-[11px] text-[#A68F80]">#{currentLevel}</span>
+              <span id="level-number" className="text-[10px] sm:text-[11px] text-[#A68F80]">
+                #{currentLevel}
+              </span>
             </div>
             <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-[#A68F80]">
               <span>Ходов: {moves}</span>

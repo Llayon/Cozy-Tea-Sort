@@ -11,6 +11,15 @@
 
 import { CupSkinId, TeaId } from '../types';
 
+/**
+ * G19 product progression bound.
+ *
+ * Levels are deterministic procedural progression, not handcrafted content.
+ * 10,000 is the persisted product limit: it comfortably covers the audited
+ * long-run rollout while keeping garbage localStorage values human-scale.
+ */
+export const MAX_PERSISTED_LEVEL = 10_000;
+
 export interface WinRewards {
   recipeId?: TeaId;
   skinId?: CupSkinId;
@@ -29,9 +38,12 @@ export interface WinApplication extends ProgressCollections {
 }
 
 export function sanitizeLevel(n: unknown, fallback = 1): number {
+  const safeFallback = Number.isFinite(fallback)
+    ? Math.max(1, Math.min(MAX_PERSISTED_LEVEL, Math.floor(fallback)))
+    : 1;
   const v = typeof n === 'number' ? n : typeof n === 'string' ? parseInt(n, 10) : NaN;
-  if (!Number.isFinite(v)) return fallback;
-  return Math.max(1, Math.min(999, Math.floor(v as number)));
+  if (!Number.isFinite(v)) return safeFallback;
+  return Math.max(1, Math.min(MAX_PERSISTED_LEVEL, Math.floor(v as number)));
 }
 
 export function isLevelUnlocked(level: number, highestUnlockedLevel: number): boolean {
@@ -49,9 +61,11 @@ export function applyWin(
   rewards: WinRewards,
 ): WinApplication {
   const completed = sanitizeLevel(completedLevel);
+  // Completing MAX keeps the unlock at MAX: never persist MAX + 1.
+  const nextUnlock = Math.min(MAX_PERSISTED_LEVEL, completed + 1);
   const highestUnlockedLevel = Math.max(
     sanitizeLevel(prev.highestUnlockedLevel),
-    completed + 1,
+    nextUnlock,
   );
 
   let unlockedRecipes = prev.unlockedRecipes;

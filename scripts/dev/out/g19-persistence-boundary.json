@@ -1,0 +1,424 @@
+{
+  "gauntlet": "G19",
+  "generatedAt": "2026-10-30T21:27:54.661Z",
+  "expectedMax": 10000,
+  "cases": {
+    "stored-current-1000-highest-1600": {
+      "stored": {
+        "cozy_tea_current_level": "1000",
+        "cozy_tea_highest_unlocked": "1600",
+        "cozy_tea_level": "1600"
+      },
+      "loaded": {
+        "currentLevel": 1000,
+        "highestUnlockedLevel": 1600,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "stored-current-1600-highest-1500": {
+      "stored": {
+        "cozy_tea_current_level": "1600",
+        "cozy_tea_highest_unlocked": "1500"
+      },
+      "loaded": {
+        "currentLevel": 1500,
+        "highestUnlockedLevel": 1500,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "stored-highest-99999999": {
+      "stored": {
+        "cozy_tea_current_level": "1600",
+        "cozy_tea_highest_unlocked": "99999999"
+      },
+      "loaded": {
+        "currentLevel": 1600,
+        "highestUnlockedLevel": 10000,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "stored-legacy-1200-no-highest": {
+      "stored": {
+        "cozy_tea_current_level": "1200",
+        "cozy_tea_level": "1200"
+      },
+      "loaded": {
+        "currentLevel": 1200,
+        "highestUnlockedLevel": 1200,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "stored-invalid-garbage": {
+      "stored": {
+        "cozy_tea_current_level": "not-a-level",
+        "cozy_tea_highest_unlocked": "NaN",
+        "cozy_tea_level": "null"
+      },
+      "loaded": {
+        "currentLevel": 1,
+        "highestUnlockedLevel": 1,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "stored-zero-negative": {
+      "stored": {
+        "cozy_tea_current_level": "0",
+        "cozy_tea_highest_unlocked": "-5"
+      },
+      "loaded": {
+        "currentLevel": 1,
+        "highestUnlockedLevel": 1,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "stored-empty": {
+      "stored": {},
+      "loaded": {
+        "currentLevel": 1,
+        "highestUnlockedLevel": 1,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "save-current-1000-highest-1600": {
+      "input": {
+        "currentLevel": 1000,
+        "highestUnlockedLevel": 1600
+      },
+      "raw": {
+        "cozy_tea_current_level": "1000",
+        "cozy_tea_highest_unlocked": "1600",
+        "cozy_tea_level": "1600"
+      },
+      "loaded": {
+        "currentLevel": 1000,
+        "highestUnlockedLevel": 1600,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "save-current-1600-highest-1600": {
+      "input": {
+        "currentLevel": 1600,
+        "highestUnlockedLevel": 1600
+      },
+      "raw": {
+        "cozy_tea_current_level": "1600",
+        "cozy_tea_highest_unlocked": "1600",
+        "cozy_tea_level": "1600"
+      },
+      "loaded": {
+        "currentLevel": 1600,
+        "highestUnlockedLevel": 1600,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "save-current-10000-highest-10000": {
+      "input": {
+        "currentLevel": 10000,
+        "highestUnlockedLevel": 10000
+      },
+      "raw": {
+        "cozy_tea_current_level": "10000",
+        "cozy_tea_highest_unlocked": "10000",
+        "cozy_tea_level": "10000"
+      },
+      "loaded": {
+        "currentLevel": 10000,
+        "highestUnlockedLevel": 10000,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "save-huge-values": {
+      "input": {
+        "currentLevel": 99999999,
+        "highestUnlockedLevel": 99999999
+      },
+      "raw": {
+        "cozy_tea_current_level": "10000",
+        "cozy_tea_highest_unlocked": "10000",
+        "cozy_tea_level": "10000"
+      },
+      "loaded": {
+        "currentLevel": 10000,
+        "highestUnlockedLevel": 10000,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "win-999-from-999": {
+      "prevHighest": 999,
+      "completed": 999,
+      "highestAfter": 1000,
+      "expectedMax": 10000
+    },
+    "win-1000-from-1000": {
+      "prevHighest": 1000,
+      "completed": 1000,
+      "highestAfter": 1001,
+      "expectedMax": 10000
+    },
+    "win-1599-from-1599": {
+      "prevHighest": 1599,
+      "completed": 1599,
+      "highestAfter": 1600,
+      "expectedMax": 10000
+    },
+    "win-1600-from-1600": {
+      "prevHighest": 1600,
+      "completed": 1600,
+      "highestAfter": 1601,
+      "expectedMax": 10000
+    },
+    "win-max-minus-1-from-max-minus-1": {
+      "prevHighest": 9999,
+      "completed": 9999,
+      "highestAfter": 10000,
+      "expectedMax": 10000
+    },
+    "win-max-from-max": {
+      "prevHighest": 10000,
+      "completed": 10000,
+      "highestAfter": 10000,
+      "expectedMax": 10000
+    },
+    "win-max-from-below": {
+      "prevHighest": 1,
+      "completed": 10000,
+      "highestAfter": 10000,
+      "expectedMax": 10000
+    },
+    "win-over-max": {
+      "prevHighest": 10000,
+      "completed": 10001,
+      "highestAfter": 10000,
+      "expectedMax": 10000
+    },
+    "persist-win-999": {
+      "prevHighest": 999,
+      "completed": 999,
+      "highestAfter": 1000,
+      "raw": {
+        "cozy_tea_current_level": "1000",
+        "cozy_tea_highest_unlocked": "1000",
+        "cozy_tea_level": "1000"
+      },
+      "loaded": {
+        "currentLevel": 1000,
+        "highestUnlockedLevel": 1000,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "persist-win-1000": {
+      "prevHighest": 1000,
+      "completed": 1000,
+      "highestAfter": 1001,
+      "raw": {
+        "cozy_tea_current_level": "1001",
+        "cozy_tea_highest_unlocked": "1001",
+        "cozy_tea_level": "1001"
+      },
+      "loaded": {
+        "currentLevel": 1001,
+        "highestUnlockedLevel": 1001,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "persist-win-1599": {
+      "prevHighest": 1599,
+      "completed": 1599,
+      "highestAfter": 1600,
+      "raw": {
+        "cozy_tea_current_level": "1600",
+        "cozy_tea_highest_unlocked": "1600",
+        "cozy_tea_level": "1600"
+      },
+      "loaded": {
+        "currentLevel": 1600,
+        "highestUnlockedLevel": 1600,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "persist-win-1600": {
+      "prevHighest": 1600,
+      "completed": 1600,
+      "highestAfter": 1601,
+      "raw": {
+        "cozy_tea_current_level": "1601",
+        "cozy_tea_highest_unlocked": "1601",
+        "cozy_tea_level": "1601"
+      },
+      "loaded": {
+        "currentLevel": 1601,
+        "highestUnlockedLevel": 1601,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "persist-win-max-minus-1": {
+      "prevHighest": 9999,
+      "completed": 9999,
+      "highestAfter": 10000,
+      "raw": {
+        "cozy_tea_current_level": "10000",
+        "cozy_tea_highest_unlocked": "10000",
+        "cozy_tea_level": "10000"
+      },
+      "loaded": {
+        "currentLevel": 10000,
+        "highestUnlockedLevel": 10000,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "persist-win-max": {
+      "prevHighest": 10000,
+      "completed": 10000,
+      "highestAfter": 10000,
+      "raw": {
+        "cozy_tea_current_level": "10000",
+        "cozy_tea_highest_unlocked": "10000",
+        "cozy_tea_level": "10000"
+      },
+      "loaded": {
+        "currentLevel": 10000,
+        "highestUnlockedLevel": 10000,
+        "unlockedRecipes": [
+          "matcha"
+        ],
+        "unlockedSkins": [
+          "glass"
+        ],
+        "equippedSkin": "glass",
+        "muted": false
+      }
+    },
+    "sanitize": {
+      "0": 1,
+      "1": 1,
+      "330": 330,
+      "998": 998,
+      "999": 999,
+      "1000": 1000,
+      "1001": 1001,
+      "1599": 1599,
+      "1600": 1600,
+      "1601": 1601,
+      "9999": 9999,
+      "10000": 10000,
+      "10001": 10000,
+      "99999999": 10000,
+      "-1": 1,
+      "NaN": 1,
+      "Infinity": 1
+    }
+  },
+  "invariantViolations": []
+}
