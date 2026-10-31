@@ -169,6 +169,15 @@ are in the report table.
 98. Worktree removed: **PENDING** after merge.
 99. WIP intact: **PENDING** final fingerprint.
 
+## CI follow-up
+
+- First PR CI run caught a real 4-digit header overflow at 360/390 px
+  (info button exceeded the viewport by 1–3 px). The fix tightens the base
+  header padding and right-icon gap without shrinking the 44 px controls.
+  Targeted 360/390 L1000/L1600 E2E, the full CI browser subset, typecheck,
+  visual-contract tests and the full E2E suite were rerun on the fixed tree.
+  No test tolerance was widened.
+
 ## Limitations
 
 - Historical boundary debt is separate from V2 steady-state behavior:

@@ -671,7 +671,7 @@ export default function App() {
       {/* Top Header */}
       <header
         id="app-header"
-        className="shrink-0 flex items-center justify-between px-2.5 sm:px-4 py-2 sm:py-2.5 pt-[max(8px,env(safe-area-inset-top))] bg-[#241A16]/95 border-b border-[#3D2C24] backdrop-blur-md z-20 gap-1.5"
+        className="shrink-0 flex items-center justify-between px-2 sm:px-4 py-2 sm:py-2.5 pt-[max(8px,env(safe-area-inset-top))] bg-[#241A16]/95 border-b border-[#3D2C24] backdrop-blur-md z-20 gap-1.5"
       >
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#35251F] border border-[#523A2F] flex items-center justify-center text-[#E8985E] shadow-inner shrink-0">
@@ -705,7 +705,7 @@ export default function App() {
         </div>
 
         {/* Right action icons with >=44px mobile touch ergonomics */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
           {/* Recipe Book / Shelf */}
           <button
             id="recipe-book-btn"
