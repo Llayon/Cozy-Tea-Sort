@@ -1,0 +1,232 @@
+# G19 — long-run progression / Rollout V2 report
+
+Source start: `origin/main` `1a350ef345d73d7e3d476e2c0f1d6c82af26a548`
+(G18 final). All work is in `Cozy-Tea-Sort-g19-long-run`, branch
+`feat/g19-long-run`.
+
+## Product change
+
+Only the long-run **challenge** rotation changed. There is no new mechanic,
+TeaId, action, goal, capacity rule, composition, solver behavior, template
+bank or gameplay rule.
+
+- Historical / V1: `level <= 330` (frozen, G18 oracle).
+- Rollout V2: challenge levels `334 + 4n` (`n >= 0`).
+- L331 peak, L332 relax, L333 warmup keep the existing four-level rhythm.
+- First V2 challenge: **L334** (Frozen).
+
+The V2 deck is a typed readonly list of existing plans, converted through
+one narrow helper:
+
+```text
+v2ChallengeIndex = (level - 334) / 4
+slot             = v2ChallengeIndex % 28
+```
+
+No runtime shuffle, no seed/session/storage input.
+
+## Exact 28-slot deck
+
+| Slot | Level | Plan |
+|---:|---:|---|
+| 0 | 334 | Frozen |
+| 1 | 338 | Shared Tray |
+| 2 | 342 | Honey |
+| 3 | 346 | Tea Bloom |
+| 4 | 350 | Tasting |
+| 5 | 354 | Thermos |
+| 6 | 358 | Lemon |
+| 7 | 362 | Serving Order |
+| 8 | 366 | Sink |
+| 9 | 370 | Targets |
+| 10 | 374 | Tea Pair |
+| 11 | 378 | Strainer |
+| 12 | 382 | Cinnamon |
+| 13 | 386 | Teapot+Honey |
+| 14 | 390 | Lemon+Honey |
+| 15 | 394 | Teapot+Tasting |
+| 16 | 398 | Teapot+Sink |
+| 17 | 402 | Blend |
+| 18 | 406 | Teapot+Lemon |
+| 19 | 410 | Order+Tasting |
+| 20 | 414 | Teapot+Targets |
+| 21 | 418 | Teapot+Strainer |
+| 22 | 422 | Honey |
+| 23 | 426 | Tasting |
+| 24 | 430 | Lemon |
+| 25 | 434 | Sink |
+| 26 | 438 | Targets |
+| 27 | 442 | Serving Order |
+
+Deck repeats at L446. 28 challenge slots × 4 levels = 112-level steady-state
+span for a once-per-deck plan.
+
+Compatibility is still owned by `mechanicCompatibility.ts`; the deck only
+selects which already-valid plan appears. Shared Tray, Tea Pair and Blend
+remain standalone. The only composition in the deck is the shipped
+Serving Order + Tasting plan.
+
+## Recurrence: before vs after
+
+Old evidence: `scripts/dev/out/g19-recurrence-baseline.json` (pre-change,
+L1–L5000). New evidence:
+`scripts/dev/out/g19-recurrence-summary.json` (post-change, L1–L10000).
+“Old max gap” is through L1600; boundary gap is the one allowed
+`lastV1 -> firstV2` catch-up.
+
+| Mechanic | Old count ≤1600 | Old max gap | Last V1 | First V2 | Boundary gap | New steady max | New median | Count ≤2000 | Count ≤10000 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Shared Tray | 2 | 80 | 242 | 338 | 96 | **112** | 112 | 17 | 89 |
+| Tea Pair | 2 | 80 | 330 | 374 | 44 | **112** | 112 | 17 | 88 |
+| Frozen | 18 | **240** | 170 | 334 | **164** | **112** | 112 | 18 | 90 |
+| Thermos | 20 | 88 | 326 | 354 | 28 | 112 | 112 | 20 | 92 |
+| Cinnamon | 18 | **236** | 322 | 382 | 60 | 112 | 112 | 18 | 89 |
+| Tea Bloom | 21 | 80 | 318 | 346 | 28 | 112 | 112 | 20 | 92 |
+| Blend | 21 | 80 | 306 | 402 | 96 | 112 | 112 | 20 | 91 |
+| Serving Order | 21 | 80 | 310 | 362 | 52 | 80 | 56 | 34 | 178 |
+| Order+Tasting | 19 | 80 | 314 | 410 | 96 | 112 | 112 | 18 | 89 |
+| Lemon+Honey | 20 | 112 | 254 | 390 | 136 | 112 | 112 | 19 | 90 |
+| Teapot+Honey | 19 | 128 | 262 | 386 | 124 | 112 | 112 | 18 | 89 |
+| Teapot+Strainer | 19 | 144 | 270 | 418 | 148 | 112 | 112 | 18 | 89 |
+| Teapot+Lemon | 20 | 80 | 278 | 406 | 128 | 112 | 112 | 19 | 90 |
+| Teapot+Tasting | 20 | 96 | 286 | 394 | 108 | 112 | 112 | 19 | 90 |
+| Teapot+Sink | 20 | 112 | 294 | 398 | 104 | 112 | 112 | 19 | 90 |
+| Teapot+Targets | 20 | 128 | 302 | 414 | 112 | 112 | 112 | 19 | 90 |
+| Honey | 73 | 32 | 258 | 342 | 84 | 80 | 56 | 99 | 492 |
+| Tasting | 68 | 80 | 282 | 350 | 68 | 76 | 56 | 95 | 488 |
+| Lemon | 72 | 32 | 274 | 358 | 84 | 72 | 56 | 99 | 492 |
+| Sink | 68 | 91 | 290 | 366 | 76 | 68 | 56 | 94 | 488 |
+| Targets | 70 | 84 | 298 | 370 | 72 | 68 | 68 | 95 | 488 |
+| Strainer | 70 | 44 | 266 | 378 | 112 | 112 | 112 | 82 | 403 |
+
+### Modern mechanic cadence
+
+- **Shared Tray:** `162 -> 242 -> 338 -> 450 -> 562 -> ...` (was
+  `162 -> 242 -> nothing`). Steady max gap 112.
+- **Tea Pair:** `250 -> 330 -> 374 -> 486 -> 598 -> ...` (was
+  `250 -> 330 -> nothing`). Steady max gap 112.
+- **Blend:** one challenge per 112 levels (`402, 514, 626, ...`); exactly
+  once per 28 challenge slots.
+- **Order+Tasting:** `410, 522, 634, ...`; once per deck.
+- Frozen and Cinnamon keep one historical boundary gap above 112
+  (164 and their old 240/236 gaps respectively); those are **frozen prefix
+  debt**, not V2 steady-state failures. Cinnamon’s V2 cadence itself is 112.
+
+No advanced V2 mechanic disappears: every once-per-deck plan has
+steady-state max = 112 through L10000. Repeated familiar entries alternate
+max gaps of 68–80.
+
+## Freeze 1–330
+
+- G18 fixture used unchanged: `tests/fixtures/g18-rollout-snapshot.json`.
+- New intentional G19 oracle: `tests/fixtures/g19-rollout-v2-snapshot.json`
+  (levels 331–1600, phase + plan + semantic hash + deck), generated by
+  `scripts/dev/g19-snapshot.ts` and compared in
+  `tests/g19-rollout-v2.test.ts`. The G18 fixture is never overwritten.
+- L1–L330 semantic rollout: **330/330 identical** (`tests/g19-freeze.test.ts`).
+- L331–L333 phase/plan: identical.
+- Generated G18 samples in prefix: **40/40 identical** for canonical key,
+  topology hash, minMoves, hidden counts, initial fingerprint and stats.
+- 26 G18 samples above L330: 13 unchanged (non-challenge), 13 intentionally
+  changed (all challenge-phase V2 selections). The G18 fixture is not
+  overwritten or deleted.
+
+## Phase medians (generated, 331–2000)
+
+Seed policy `g19-rollout:<level>:0`; 2000/2000 generated with 0 exceptions
+and 0 fallbacks.
+
+| Phase | G18 1–330 p50 | G19 331–2000 p50 | p95 | max |
+|---|---:|---:|---:|---:|
+| warmup | 6 | 6 | 6 | 6 |
+| challenge | 11 | 10 | 13 | 15 |
+| peak | 14 | 13 | 17 | 18 |
+| relax | 6 | 6 | 6 | 6 |
+
+Warmup/relax special count is 0 through L10000. Peak stay
+mystery-governed with the existing allowlist; no V2 deck-only mechanic leaks
+into peak.
+
+### Local spike report
+
+Phase-local rolling comparison (10 previous same-phase generated levels,
+flag current − median ≥ 3):
+
+- warmup: 0
+- relax: 0
+- challenge: 33 candidates, concentrated in Strainer / Serving Order /
+  Shared Tray naturally deeper templates; no rollout change made.
+- peak: 43 candidates, concentrated in Honey/Strainer peak companions;
+  pre-existing peak identity, no rollout change made.
+
+These are contextual evidence, not balance failures. No template bank was
+re-curated.
+
+## Generation audit
+
+Full production generation L1–L2000 (real `generateLevel`):
+
+- levels: 2000
+- generated: 2000
+- exceptions: 0
+- fallback: 0
+- wall: 124.2s
+- challenge aggregates: minMoves p50 10 / p95 13 / max 15;
+  visited p50 368 / p95 1882 / max 6246;
+  generator p50 21.69ms / p95 122.76ms / max 520.58ms;
+  independent re-solve p50 21.84ms / p95 120.54ms / max 510.77ms;
+  solver calls 537; template attempts 498.
+
+Long-range stratified sample L2001–L10000: **1241 levels**, 0 exceptions,
+0 fallbacks. It includes every V2 deck slot, every phase, 500-level
+boundaries and the 9990–10000 persistence window.
+
+Evidence:
+`scripts/dev/out/g19-generation-1-2000.json`,
+`scripts/dev/out/g19-generation-long-range.json`.
+
+### Watched per-mechanic performance (331+)
+
+| Plan | n | gen p50 / p95 / max ms | solver p50 / p95 / max ms | visited p50 / p95 / max |
+|---|---:|---|---|---|
+| Blend | 17 | 192.73 / 520.58 / 520.58 | 196.96 / 510.77 / 510.77 | 2357 / 6246 / 6246 |
+| Shared Tray | 17 | 70.09 / 206.26 / 206.26 | 66.01 / 210.82 / 210.82 | 1208 / 2745 / 2745 |
+| Tea Pair | 18 | 10.67 / 17.88 / 17.88 | 10.00 / 22.36 / 22.36 | 228 / 394 / 394 |
+| Serving Order | 34 | 78.27 / 128.00 / 153.82 | 78.48 / 121.53 / 146.65 | 1306 / 1882 / 2020 |
+| Order+Tasting | 17 | 93.80 / 109.27 / 109.27 | 93.65 / 99.85 / 99.85 | 1646 / 1653 / 1653 |
+| Frozen | 17 | 11.46 / 15.33 / 15.33 | 10.79 / 15.78 / 15.78 | 191 / 251 / 251 |
+| Cinnamon | 17 | 24.28 / 45.15 / 45.15 | 22.01 / 45.03 / 45.03 | 358 / 675 / 675 |
+| Tea Bloom | 17 | 43.98 / 84.02 / 84.02 | 46.05 / 87.29 / 87.29 | 589 / 968 / 968 |
+
+Blend is deliberately the heaviest scheduled mechanic but remains
+1/112 levels (one per deck). Generator/solver code is unchanged; any
+differences are measurement noise.
+
+## Tutorials / UX contracts
+
+- Every V2 deck slot returns `tutorialForConfig(...) === null`: no
+  recurrence tutorial spam.
+- First exposures remain `L162` Shared Tray and `L250` Tea Pair.
+- Help copy and the visual contracts (continuous tray, six markers, pair
+  halves, tasting distinction, 44px controls, safe areas) are unchanged.
+- Subtitle for each V2 slot is the existing mechanic subtitle (for example
+  L338 `Общий поднос • 6 сосудов`, L374 `Чайная пара • 6 сосудов`,
+  L402 `Молочный купаж • 6 сосудов`).
+
+## Bundle / performance
+
+- Main JS: **874.09 kB** (G18 release: 872.79 kB) = **+1.30 kB / +0.15%**,
+  far below the <1% target.
+- Total `dist`: 1,177,179 B (G18: 1,177,906 B).
+- No generator/solver code change; no >15% p95 regression attributable to
+  G19 selection.
+
+## Limitations
+
+- Historical boundary debt is reported, not hidden: Frozen keeps a 164-level
+  catch-up gap before L334; Cinnamon’s old 236-level gap is in the frozen
+  prefix. V2 steady-state cadence is bounded at 112.
+- No subjective retention/fun claim is made from recurrence metrics.
+- Physical-device verification was not performed in this environment; mobile
+  evidence is Playwright at 360×800 / 390×844 / 430×932, not a hardware
+  claim.

@@ -1,12 +1,17 @@
 /**
- * G18 rollout freeze — levels 1–1600 must remain semantically identical
- * except for the documented one-time tutorial visibility metadata.
+ * G18 rollout freeze — levels 1–330 remain semantically identical.
+ *
+ * G19 introduces an intentional Rollout V2 challenge policy from L334, so
+ * the G18 oracle is still authoritative for the frozen historical prefix
+ * (1–330) and for G18 generated samples in that prefix. Levels 331+ are
+ * covered by the dedicated G19 freeze/V2 tests; the G18 fixture itself is
+ * never regenerated or deleted.
  *
  * Fast part: per-level semantic config hashes (phase, palette, vessels,
  * mechanic plan, capacity/special flags, target goals, generator request).
- * Bounded generation part: pinned + sampled deterministic seeds compare
- * canonical initial keys, topology hashes, minMoves and full initial-state
- * fingerprints against the G17-final baseline.
+ * Bounded generation part: sampled deterministic seeds compare canonical
+ * initial keys, topology hashes, minMoves and full fingerprints against the
+ * G18-final baseline.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -57,17 +62,17 @@ const fixture = JSON.parse(
   }>;
 };
 
-describe('G18 rollout freeze (levels 1–1600)', () => {
+describe('G18 rollout freeze (historical prefix 1–330)', () => {
   it('baseline is the frozen G17-final source', () => {
     expect(fixture.sourceSha).toBe('f2d28287aa0f67e096309800d2224fa5ee574e81');
     expect(fixture.levelCount).toBe(1600);
     expect(fixture.levels).toHaveLength(1600);
   });
 
-  it('every level keeps its exact rollout/mechanic semantics', () => {
+  it('every frozen historical level keeps its exact rollout/mechanic semantics', () => {
     const expected = new Map(fixture.levels.map((r) => [r.level, r.hash]));
     const diffs: Array<{ level: number; expected: string; actual: string }> = [];
-    for (let level = 1; level <= 1600; level++) {
+    for (let level = 1; level <= 330; level++) {
       const actual = semanticConfigHash(level);
       const want = expected.get(level);
       if (want !== actual) diffs.push({ level, expected: want ?? '(missing)', actual });
@@ -126,9 +131,9 @@ describe('G18 rollout freeze (levels 1–1600)', () => {
     }
   });
 
-  it('deterministic pinned/sample seeds regenerate the same canonical puzzle', () => {
+  it('deterministic pinned/sample seeds in the frozen prefix regenerate the same canonical puzzle', () => {
     const diffs: string[] = [];
-    for (const sample of fixture.samples) {
+    for (const sample of fixture.samples.filter((row) => row.level <= 330)) {
       const cfg = getLevelConfig(sample.level);
       const actual = generateRecord(cfg, primarySeed(sample.level));
       const checks: Array<[string, unknown, unknown]> = [
