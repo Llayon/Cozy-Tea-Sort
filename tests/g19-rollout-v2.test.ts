@@ -176,10 +176,11 @@ describe('G19 Rollout V2 deck: exact product order', () => {
     expect(mechanicPlanForLevel(446)).toEqual(EXPECTED_PLANS[0]);
   });
 
-  it('10 full decks repeat exactly (280 challenge slots / 1120 levels)', () => {
-    for (let deck = 0; deck < 10; deck++) {
+  it('the two complete V2 decks before the G20 V3 boundary repeat exactly', () => {
+    for (let deck = 0; deck < 2; deck++) {
       for (let i = 0; i < 28; i++) {
         const level = 334 + 4 * (deck * 28 + i);
+        expect(level).toBeLessThanOrEqual(557);
         expect(mechanicPlanForLevel(level), `deck ${deck} slot ${i} L${level}`).toEqual(
           EXPECTED_PLANS[i],
         );
@@ -193,7 +194,7 @@ describe('G19 Rollout V2 deck: exact product order', () => {
     }
   });
 
-  it('intentional G19 snapshot 331–1600 is exact and readable', () => {
+  it('frozen G19 snapshot 331–557 is exact and readable', () => {
     expect(G19_SNAPSHOT.baseSha).toBe('1a350ef345d73d7e3d476e2c0f1d6c82af26a548');
     expect(G19_SNAPSHOT.boundary).toEqual({
       v1MaxLevel: 330,
@@ -202,8 +203,10 @@ describe('G19 Rollout V2 deck: exact product order', () => {
     });
     expect(G19_SNAPSHOT.deck).toEqual(EXPECTED_DECK.map((entry) => entry.id));
     expect(G19_SNAPSHOT.levels).toHaveLength(1270);
+    const frozen = G19_SNAPSHOT.levels.filter((row) => row.level <= 557);
+    expect(frozen).toHaveLength(227);
     const diffs: string[] = [];
-    for (const row of G19_SNAPSHOT.levels) {
+    for (const row of frozen) {
       const cfg = getLevelConfig(row.level);
       const actualHash = semanticConfigHash(row.level);
       const actualPlan = key(mechanicPlanForLevel(row.level));

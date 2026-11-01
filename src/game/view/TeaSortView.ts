@@ -30,6 +30,7 @@ import {
   TeaId,
   cloneCupConstraint,
   cupCapacity,
+  isSteepingFlaskConstraint,
   isTastingCupConstraint,
   isThermosCupConstraint,
 } from '../types';
@@ -42,6 +43,7 @@ import {
   canActAsSource,
   floatingIngredientHostSatisfied,
   isCompleteCup,
+  isSteepingFlaskReady,
   pourRejectCodeState,
   sinkingIngredientHostSatisfied,
   targetCupState,
@@ -87,6 +89,9 @@ export const THERMOS_BODY_H = 160;
 /** High-thermos body width: slightly narrower than the standard 64 glass. */
 export const THERMOS_WIDTH = 56;
 
+/** Steeping-flask width (G20): slender carafe, same 4-layer readability. */
+export const STEEPING_FLASK_WIDTH = 56;
+
 /**
  * Thermos liquid slot height for a given container height: the interior
  * (rim inset → base, minus the standard 16px rim air gap) divided by the
@@ -119,6 +124,9 @@ export function fullVesselHint(constraint: CupConstraint): string {
   }
   if (isThermosCupConstraint(constraint)) {
     return 'Термос заполнен (5/5)! Выберите другой сосуд или пустой стакан.';
+  }
+  if (isSteepingFlaskConstraint(constraint)) {
+    return 'Колба заполнена (4/4)! Выберите другой сосуд или пустой стакан.';
   }
   const cap = cupCapacity(constraint);
   return `Стакан полон (${cap}/${cap})! Выберите другой сосуд или пустой стакан.`;
@@ -156,6 +164,8 @@ export const STRAINER_LOADED_HINT = 'Ситечко уже держит чай �
 export const STRAINER_EMPTY_HINT = 'Ситечко пусто — сначала поймайте слой при переливании.';
 /** Placement needs a non-empty host. */
 export const STRAINER_TARGET_EMPTY_HINT = 'Ситечко ставится только на сосуд с чаем.';
+/** Steeping flask partial source is intentionally locked (G20). */
+export const STEEPING_NOT_READY_HINT = 'Сначала наполни колбу до краёв';
 /** Guest cup can never host the tool. */
 export const STRAINER_SINK_HOST_HINT = 'На чашку гостя ситечко не ставится.';
 /** Tool already on this vessel. */
@@ -278,6 +288,13 @@ export function sharedTrayPourHint(code: PourRejectCode): string {
 /** Alias set for forward-compat with alternate test import names. */
 export const getSharedTrayPourHint = sharedTrayPourHint;
 export const sharedTrayRejectHint = sharedTrayPourHint;
+
+/** Steeping-flask UX copy (G20): soft source-readiness hint only. */
+export function steepingFlaskPourHint(code: PourRejectCode): string {
+  return code === 'source-steeping-not-ready' ? STEEPING_NOT_READY_HINT : '';
+}
+export const getSteepingFlaskPourHint = steepingFlaskPourHint;
+export const steepingFlaskRejectHint = steepingFlaskPourHint;
 export const strainerPlaceRejectHint = strainerPlaceHint;
 export const getStrainerPlaceHint = strainerPlaceHint;
 export const placeStrainerHint = strainerPlaceHint;
@@ -1278,6 +1295,8 @@ export class CupView {
    * byte-identical to before).
    */
   pairGraphics: Graphics;
+  /** Steeping-flask open/partial/ready cue (G20, derived every redraw). */
+  flaskGraphics: Graphics;
   /**
    * Attached-tool marker (Gauntlet 6 §35): small brass mesh drawn over the
    * host rim when `logic.strainerState` says the EMPTY tool is attached
@@ -1346,6 +1365,14 @@ export class CupView {
    */
   get isThermos(): boolean {
     return isThermosCupConstraint(this.constraint);
+  }
+
+  /**
+   * Steeping flask (заварочная колба, Gauntlet 20): static identity only.
+   * Ready/partial visual state is derived every redraw from current layers.
+   */
+  get isSteepingFlask(): boolean {
+    return isSteepingFlaskConstraint(this.constraint);
   }
 
   /**
@@ -1633,6 +1660,8 @@ export class CupView {
       this.width = 72;
     } else if (isThermosCupConstraint(this.constraint)) {
       this.width = THERMOS_WIDTH;
+    } else if (isSteepingFlaskConstraint(this.constraint)) {
+      this.width = STEEPING_FLASK_WIDTH;
     } else {
       this.width = 64;
     }
@@ -1715,6 +1744,12 @@ export class CupView {
     this.pairGraphics = new Graphics();
     this.pairGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.pairGraphics);
+
+    // Steeping-flask cue (G20): open/partial/ready derived from current
+    // layers. Never a second ticker or gameplay lock; eventMode none.
+    this.flaskGraphics = new Graphics();
+    this.flaskGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.flaskGraphics);
 
     this.strainerGraphics = new Graphics();
     this.strainerGraphics.eventMode = 'none';
@@ -1799,6 +1834,15 @@ export class CupView {
         .roundRect(3, this.rimLocalY + 4, w - 6, h - 6 - (this.rimLocalY + 4), 10)
         .fill({ color: 0xffffff });
       this.drawTastingBowlFrame(w, h);
+      return;
+    }
+
+    // Steeping flask (Gauntlet 20): slender glass carafe with a narrow neck
+    // and side stopper; full standard 4-layer liquid box stays readable.
+    if (this.isSteepingFlask) {
+      this.liquidMask.clear();
+      this.liquidMask.roundRect(2, 4, w - 4, h - 6, r).fill({ color: 0xffffff });
+      this.drawSteepingFlaskFrame(w, h);
       return;
     }
 
@@ -2308,6 +2352,92 @@ export class CupView {
   }
 
   /**
+   * Steeping-flask silhouette (Gauntlet 20): slender carafe, open receiving
+   * neck, soft glass language. The partial/ready stopper and steam are a
+   * separate derived layer (`renderFlask`), so the body never stores state.
+   */
+  private drawSteepingFlaskFrame(w: number, h: number) {
+    const g = this.glassOverlay;
+    const r = 16;
+    let bodyFill = 0xffffff;
+    let bodyFillAlpha = 0.1;
+    let edgeColor = 0xffffff;
+    let edgeAlpha = 0.82;
+    let accent = 0x9ad0e8;
+    if (this.skinId === 'ceramic') {
+      bodyFill = 0x5a3d2b;
+      bodyFillAlpha = 0.2;
+      edgeColor = 0xc49a75;
+      accent = 0xe0b98a;
+    } else if (this.skinId === 'porcelain') {
+      bodyFill = 0xfffaea;
+      bodyFillAlpha = 0.24;
+      edgeColor = 0xffffff;
+      accent = 0xe8c878;
+    }
+
+    // Slender rounded body with a narrow neck taper.
+    g.beginPath();
+    g.moveTo(8, 8);
+    g.quadraticCurveTo(0, 10, 0, h - r);
+    g.quadraticCurveTo(0, h, r, h);
+    g.lineTo(w - r, h);
+    g.quadraticCurveTo(w, h, w, h - r);
+    g.quadraticCurveTo(w, 10, w - 8, 8);
+    g.lineTo(w - 12, 2);
+    g.lineTo(12, 2);
+    g.closePath();
+    g.fill({ color: bodyFill, alpha: bodyFillAlpha });
+    g.stroke({ width: 2.4, color: edgeColor, alpha: edgeAlpha });
+
+    // Neck collar + open receiving rim.
+    g.roundRect(10, 0, w - 20, 5, 2.5).fill({ color: edgeColor, alpha: 0.7 });
+    g.ellipse(w / 2, 3, (w - 22) / 2, 2.4).stroke({ width: 1.4, color: accent, alpha: 0.85 });
+
+    // Side stopper track (empty = open; renderFlask draws the stopper).
+    g.roundRect(w - 7, 22, 5, 18, 2).fill({ color: accent, alpha: 0.35 });
+
+    // Base shade + restrained glass highlights.
+    g.roundRect(5, h - 10, w - 10, 8, 3).fill({ color: 0xffffff, alpha: 0.2 });
+    g.roundRect(5, 16, 3, h - 38, 1.5).fill({ color: 0xffffff, alpha: 0.25 });
+    g.roundRect(w - 7, 20, 2, h - 44, 1).fill({ color: 0xffffff, alpha: 0.18 });
+  }
+
+  /**
+   * Derived flask cue: empty = open neutral; partial = closed stopper +
+   * subtle contained steam; ready = lifted stopper + warm bloom. No state.
+   */
+  renderFlask(cup: Cup | null) {
+    const g = this.flaskGraphics;
+    g.clear();
+    if (!this.isSteepingFlask || !cup) return;
+    const layers = cup.layers as TeaId[];
+    const ready = isSteepingFlaskReady(layers, this.constraint);
+    const partial = layers.length > 0 && layers.length < 4;
+    const w = this.width;
+    // Stopper: only present while partial (open/ready show the open neck).
+    if (partial) {
+      g.roundRect(w - 12, 18, 10, 5, 2).fill({ color: 0x9ad0e8, alpha: 0.9 });
+      g.moveTo(w / 2 - 5, 11).quadraticCurveTo(w / 2, 6, w / 2 + 5, 11).stroke({
+        width: 1.2,
+        color: 0xcfeaf5,
+        alpha: 0.55,
+      });
+    }
+    if (ready) {
+      // Short warm bloom + open stopper; derived every redraw.
+      g.ellipse(w / 2, 6, 10, 3.4).fill({ color: 0xffe2a8, alpha: 0.5 });
+      for (let i = -1; i <= 1; i++) {
+        g.moveTo(w / 2 + i * 6, 5).quadraticCurveTo(w / 2 + i * 8, -4, w / 2 + i * 9, -9).stroke({
+          width: 1.6,
+          color: 0xffe8c0,
+          alpha: 0.55,
+        });
+      }
+    }
+  }
+
+  /**
    * Named-serving destination motif (Gauntlet 2): a small restrained gold
    * porcelain-style medallion near the cup base with an accent dot in the
    * target tea's color. Rendered from the authoritative CupConstraint
@@ -2588,6 +2718,7 @@ export class CupView {
     this.renderIce(cup);
     this.renderCinnamon(cup);
     this.renderTeaBud(cup);
+    this.renderFlask(cup);
     // Sink glow lives in glowGraphics (behind the liquid, like the
     // selection ring); re-apply it on every liquid redraw unless a
     // selection ring is active (setSelection owns the layer then).
@@ -3144,7 +3275,7 @@ export class TeaSortView {
       // its visible ceramic is smaller — never shrink to the saucer. The
       // slim thermos keeps the same padded target (>=44px both axes).
       const padX =
-        view.isTeapot ? 22 : view.isSinkOnly || view.isTastingBowl || view.isThermos ? 20 : 16;
+        view.isTeapot ? 22 : view.isSinkOnly || view.isTastingBowl || view.isThermos || view.isSteepingFlask ? 20 : 16;
       const padBottom = view.isSinkOnly ? 40 : 32;
       view.container.hitArea = new Rectangle(-padX, -16, view.width + padX * 2, view.height + padBottom);
 
@@ -3594,7 +3725,7 @@ export class TeaSortView {
         // widen the touch padding so special vessels stay at least as
         // tappable (>=44px target for the narrower thermos too).
         const touchPadding =
-          view.isTeapot ? 26 : view.isSinkOnly || view.isTastingBowl || view.isThermos ? 24 : 20;
+          view.isTeapot ? 26 : view.isSinkOnly || view.isTastingBowl || view.isThermos || view.isSteepingFlask ? 24 : 20;
 
         if (
           clickPos.x >= x - touchPadding &&
@@ -3851,6 +3982,15 @@ export class TeaSortView {
           audioSynth.playInvalid();
           telegram.hapticError();
           this.callbacks.onInvalidMove?.(frozenPourHint(code));
+          return;
+        }
+        if (code === 'source-steeping-not-ready') {
+          this.lastInvalidTargetIndex = clickedIdx;
+          clickedView.triggerShake();
+          sourceView.triggerShake();
+          audioSynth.playSelect();
+          telegram.hapticSelection();
+          this.callbacks.onInvalidMove?.(steepingFlaskPourHint(code));
           return;
         }
         // Serving-order gate (Gauntlet 14 §§155-156): premature ②

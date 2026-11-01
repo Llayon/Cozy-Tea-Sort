@@ -67,6 +67,8 @@ export interface MechanicPlan {
   servingOrder: boolean;
   sharedTray: boolean;
   teaPair: boolean;
+  /** Gauntlet 20 derived source-readiness flask (optional keeps legacy plans byte-identical). */
+  steepingFlask?: boolean;
 }
 
 const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false, sharedTray: false, teaPair: false };
@@ -183,6 +185,52 @@ export const V2_CHALLENGE_DECK_IDS: readonly V2ChallengeMechanicId[] = [
 export const CHALLENGE_DECK_V2: readonly MechanicPlan[] = V2_CHALLENGE_DECK_IDS.map(planFromV2Id);
 
 export const CHALLENGE_DECK_V2_LENGTH = CHALLENGE_DECK_V2.length;
+
+/**
+ * Rollout V3 (Gauntlet 20): introduces the steeping flask at the first clean
+ * challenge boundary after the frozen G19 prefix. V2 is preserved through
+ * L554; L555-557 keep peak/relax/warmup. V3 starts at L558 and keeps the
+ * same 28-slot / 112-level cadence, replacing the second familiar Honey slot
+ * with the new standalone Flask plan.
+ */
+export const ROLLOUT_V3_FIRST_CHALLENGE_LEVEL = 558;
+
+export const V3_CHALLENGE_DECK_IDS: readonly (V2ChallengeMechanicId | 'steepingFlask')[] = [
+  'steepingFlask',
+  'frozen',
+  'sharedTray',
+  'honey',
+  'teaBloom',
+  'tasting',
+  'thermos',
+  'lemon',
+  'servingOrder',
+  'sink',
+  'targets',
+  'teaPair',
+  'strainer',
+  'cinnamon',
+  'teapotHoney',
+  'lemonHoney',
+  'teapotTasting',
+  'teapotSink',
+  'blend',
+  'teapotLemon',
+  'orderTasting',
+  'teapotTargets',
+  'teapotStrainer',
+  'tasting',
+  'lemon',
+  'sink',
+  'targets',
+  'servingOrder',
+];
+
+export const CHALLENGE_DECK_V3: readonly MechanicPlan[] = V3_CHALLENGE_DECK_IDS.map((id) =>
+  id === 'steepingFlask' ? { ...CLEAN, steepingFlask: true } : planFromV2Id(id),
+);
+
+export const CHALLENGE_DECK_V3_LENGTH = CHALLENGE_DECK_V3.length;
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -482,6 +530,18 @@ export function challengeMechanicPlanV2(levelNum: number): MechanicPlan {
   return { ...(CHALLENGE_DECK_V2[index % CHALLENGE_DECK_V2_LENGTH] as MechanicPlan) };
 }
 
+/** Rollout V3 challenge policy: explicit 28-slot deck from L558. */
+export function challengeMechanicPlanV3(levelNum: number): MechanicPlan {
+  const offset = levelNum - ROLLOUT_V3_FIRST_CHALLENGE_LEVEL;
+  if (!Number.isInteger(levelNum) || offset < 0 || offset % 4 !== 0) {
+    throw new Error(
+      `challengeMechanicPlanV3 expects a V3 challenge level (558 + 4n), got ${levelNum}`,
+    );
+  }
+  const index = offset / 4;
+  return { ...(CHALLENGE_DECK_V3[index % CHALLENGE_DECK_V3_LENGTH] as MechanicPlan) };
+}
+
 /**
  * Mechanic plan for any level: pinned table for 1–112, pinned first
  * exposures at 162/242/250/330, then the versioned deterministic rotation.
@@ -513,8 +573,10 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // Version boundary: V1 is frozen through L330; every V2 challenge level
-    // (334 + 4n) selects from the explicit 28-slot product deck.
+    // Version boundaries are explicit: V1 <=330, V2 334..554, V3 from 558.
+    if (levelNum >= ROLLOUT_V3_FIRST_CHALLENGE_LEVEL) {
+      return challengeMechanicPlanV3(levelNum);
+    }
     if (levelNum >= ROLLOUT_V2_FIRST_CHALLENGE_LEVEL) {
       return challengeMechanicPlanV2(levelNum);
     }
@@ -640,6 +702,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasServingOrder = plan.servingOrder;
   const hasSharedTray = plan.sharedTray === true;
   const hasTeaPair = plan.teaPair === true;
+  const hasSteepingFlask = plan.steepingFlask === true;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -861,6 +924,29 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
   }
 
+  // Gauntlet 20 standalone enforcement: steeping-flask challenge uses F0
+  // (4c/6v: four full mixed normal cups + one ordinary empty + one empty
+  // cap4 flask), no Mystery, no teapot. Palette is four eligible legacy teas
+  // (never reaction IDs).
+  if (plan.steepingFlask === true) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Заварочная колба • 6 сосудов';
+    if (levelNum === 558) {
+      colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
+    } else {
+      const quads: Array<[TeaId, TeaId, TeaId, TeaId]> = [
+        ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'],
+        ['lavender', 'saffron', 'buckwheat', 'matcha'],
+        ['karkade', 'milk_oolong', 'lavender', 'sea_buckthorn'],
+        ['saffron', 'buckwheat', 'matcha', 'karkade'],
+      ];
+      colors = [...(quads[Math.floor(levelNum / 4) % quads.length] as [TeaId, TeaId, TeaId, TeaId])];
+    }
+  }
+
   // Gauntlet 17 standalone enforcement: paired-tea challenge is always the
   // winning V6 layout (4c/6v, lengths 2,2,4,4,4,0, one empty), no Mystery,
   // no teapot. Both pair bowls are capacity 2. Palette is four eligible
@@ -923,6 +1009,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasServingOrder,
     hasSharedTray,
     hasTeaPair,
+    hasSteepingFlask,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

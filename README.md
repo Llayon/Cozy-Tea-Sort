@@ -43,6 +43,7 @@ src/game/logic/generator.ts       solver-validated generation, bounded retries +
 src/game/logic/targetTemplates.ts  offline-curated named-serving topologies (fast path)
 src/game/logic/sinkTemplates.ts    offline-curated guest-cup topologies (fast path)
 src/game/logic/tastingTemplates.ts offline-curated tasting-bowl topologies (fast path)
+src/game/logic/steepingFlaskTemplates.ts offline-curated steeping-flask F0 topologies (G20)
 src/game/logic/lemonTemplates.ts    offline-curated floating-lemon topologies (fast path, c0 fixed to sea_buckthorn)
 src/game/logic/difficulty.ts      solver-depth targets + acceptance bands per rhythm phase
 src/game/logic/progression.ts     pure win application (current vs highest, reward-once)
@@ -128,6 +129,14 @@ Exactly one bottom layer may be hidden (`hiddenCount = 1`) in a cup with ≥ 3 l
 - `N → N+1` happens only through the victory flow. The footer action ("Другой расклад") reshuffles the **same** level.
 - "New recipe/skin" banners appear only when the persistent collection actually gains an entry (replays stay silent).
 - Persisted (validated, never trusted blindly): highest unlocked, unlocked recipes/skins, equipped skin, mute. Refresh restarts the current puzzle but never regresses progression.
+
+## Steeping flask (G20)
+
+One standalone capacity-4 vessel may receive tea normally but can source
+only while full homogeneous. Readiness is derived from current layers; no
+dynamic ready flag exists. It must end empty. Production uses the F0
+4,4,4,4,0,0 topology and Rollout V3 (first Flask L558); see
+`docs/g20-steeping-flask.md`.
 
 ## Telegram behavior
 

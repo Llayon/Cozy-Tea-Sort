@@ -726,6 +726,15 @@ export type PairedTeaGroupId = 'tea-pair';
  *     `mode: 'normal'`, capacity 2, no target, no mustEndEmpty, no
  *     serveOrder, no sharedCapacityGroup (production validation rejects
  *     every other combination).
+ * - `steepingFlask` controls DERIVED SOURCE READINESS (Gauntlet 20 —
+ *   «Заварочная колба»):
+ *   - absent/false  : ordinary vessel.
+ *   - true          : static steeping-flask identity. The vessel may always
+ *     RECEIVE under ordinary rules, but may source ONLY while full to its
+ *     capacity and homogeneous. Readiness is derived from current layers —
+ *     never stored. Valid production shape: normal, capacity 4,
+ *     mustEndEmpty=true, no target/order/shared/pair fields. A malformed
+ *     contradictory flask never satisfies victory and never becomes ready.
  *
  * No Pixi/React types may ever appear in this module.
  */
@@ -765,6 +774,13 @@ export interface CupConstraint {
    * Static identity only — pair status derives from current contents.
    */
   pairedTeaGroup?: PairedTeaGroupId;
+  /**
+   * Steeping-flask identity (Gauntlet 20). Undefined/false = ordinary
+   * vessel. True = static capacity-4 / must-end-empty vessel whose SOURCE
+   * availability derives from its current contents (full homogeneous only).
+   * Static identity only — no ready/locked/chosen-tea state exists.
+   */
+  steepingFlask?: boolean;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -794,6 +810,14 @@ export const THERMOS_CONSTRAINT: CupConstraint = Object.freeze({
   mode: 'normal',
   capacity: THERMOS_CAPACITY,
   mustEndEmpty: true,
+}) as CupConstraint;
+
+/** Canonical steeping-flask (заварочная колба) constraint (Gauntlet 20). */
+export const STEEPING_FLASK_CONSTRAINT: CupConstraint = Object.freeze({
+  mode: 'normal',
+  capacity: STANDARD_CUP_CAPACITY,
+  mustEndEmpty: true,
+  steepingFlask: true,
 }) as CupConstraint;
 
 /**
@@ -864,6 +888,30 @@ export function isThermosCupConstraint(c: CupConstraint | undefined): boolean {
   );
 }
 
+/** True iff the static steeping-flask marker is present. */
+export function isSteepingFlaskConstraint(c: CupConstraint | undefined): boolean {
+  return c?.steepingFlask === true;
+}
+
+/**
+ * Exact valid production flask shape (fail-closed). Used by rules, request
+ * validation and readiness: a malformed marker must never behave like a
+ * valid flask. Explicit capacity 4 is required (not omitted) so the static
+ * identity is unambiguous; canonicalization still folds it to `C4:E:SF`.
+ */
+export function isValidSteepingFlaskConstraint(c: CupConstraint | undefined): boolean {
+  if (!c || c.steepingFlask !== true) return false;
+  return (
+    c.mode === 'normal' &&
+    c.capacity === STANDARD_CUP_CAPACITY &&
+    c.mustEndEmpty === true &&
+    c.targetTeaId === undefined &&
+    c.serveOrder === undefined &&
+    c.sharedCapacityGroup === undefined &&
+    c.pairedTeaGroup === undefined
+  );
+}
+
 /** Build `count` default (normal) constraints. */
 export function defaultCupConstraints(count: number): CupConstraint[] {
   return Array.from({ length: count }, () => ({ mode: 'normal' as CupMode }));
@@ -892,7 +940,7 @@ export function normalizeCupConstraints(
   return out;
 }
 
-/** Defensive copy of one constraint (all seven semantic fields). */
+/** Defensive copy of one constraint (all eight semantic fields). */
 export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   const out: CupConstraint = { mode: c.mode };
   if (c.targetTeaId !== undefined) out.targetTeaId = c.targetTeaId;
@@ -901,6 +949,7 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.serveOrder !== undefined) out.serveOrder = c.serveOrder;
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
+  if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
   return out;
 }
 
@@ -918,11 +967,13 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
  * (`N:_:G6`) so tray members permute with each other but never with
  * ordinary cups; a tea-pair bowl appends `:P` (`N:_:C2:D:P`) so the two
  * symmetric pair members permute with each other but never with ordinary
- * or tasting cap-2 vessels. Explicit defaults (`capacity: 4`,
- * `mustEndEmpty: false`) canonicalize identically to omitted fields, and
- * absent `serveOrder`/`sharedCapacityGroup`/`pairedTeaGroup` leave legacy
- * strings byte-identical (no `:O_` / `:G` / `:P` markers) — no state-key
- * fragmentation.
+ * or tasting cap-2 vessels. A steeping flask appends `:SF`
+ * (`N:_:C4:E:SF`) so it never collapses with a legacy cap4/end-empty
+ * vessel. Explicit defaults (`capacity: 4`, `mustEndEmpty: false`)
+ * canonicalize identically to omitted fields, and absent
+ * `serveOrder`/`sharedCapacityGroup`/`pairedTeaGroup`/`steepingFlask` leave
+ * legacy strings byte-identical (no `:O_` / `:G` / `:P` / `:SF` markers) —
+ * no state-key fragmentation.
  */
 export function cupConstraintSignature(c: CupConstraint): string {
   const modeSig = c.mode === 'source-only' ? 'SRC' : c.mode === 'sink-only' ? 'SNK' : 'N';
@@ -947,5 +998,9 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // pair members never collapse with ordinary/tasting cap-2 vessels and both
   // members stay symmetric. Absent group leaves legacy strings byte-identical.
   const pairSuffix = c.pairedTeaGroup === undefined ? '' : `:P`;
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}`;
+  // Steeping flask (G20): static source-readiness identity. Ready state is
+  // derived from layers, never encoded here. Absent/false leaves every
+  // legacy key byte-identical.
+  const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
 }

@@ -73,6 +73,26 @@ const batches = [
       'tests/g19-long-run-generation.test.ts',
     ],
   },
+  {
+    name: 'G20 steeping-flask kernel + canonical + solver + undo + view',
+    files: [
+      'tests/steeping-flask.test.ts',
+      'tests/steeping-flask-solver.test.ts',
+      'tests/steeping-flask-undo.test.ts',
+      'tests/steeping-flask-view.test.ts',
+    ],
+  },
+  {
+    name: 'G20 steeping-flask bank + production fast path',
+    files: [
+      'tests/steeping-flask-templates.test.ts',
+      'tests/steeping-flask-fastpath.test.ts',
+    ],
+  },
+  {
+    name: 'G20 rollout V3 + G19 freeze',
+    files: ['tests/steeping-flask-rollout.test.ts'],
+  },
   { name: 'teapot + target stress', files: ['tests/target-stress-teapot.test.ts'] },
   { name: 'target challenge stress', files: ['tests/target-stress-challenge.test.ts'] },
   { name: 'target peak stress', files: ['tests/target-stress-peak.test.ts'] },
