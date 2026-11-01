@@ -1,0 +1,54 @@
+{
+  "profile": "F7",
+  "requested": 2000,
+  "attempts": 2017,
+  "generated": 2000,
+  "canonicalDistinct": 2000,
+  "solvable": 2000,
+  "unsolvable": 0,
+  "truncated": 0,
+  "solvabilityRate": 1,
+  "l1": 2000,
+  "l2": 0,
+  "l2Density": 0,
+  "canonicalL2": 0,
+  "l3a": 0,
+  "l3b": 0,
+  "l3c": 0,
+  "directReady": 0,
+  "partialRelease": 0,
+  "partialReleaseRate": null,
+  "rebrew": 0,
+  "depths": {
+    "p50": 11,
+    "p95": 14,
+    "max": 15
+  },
+  "visited": {
+    "p50": 6199,
+    "p95": 12918,
+    "max": 14214
+  },
+  "solverMs": {
+    "p50": 381.7629999999863,
+    "p95": 821.9261999998707,
+    "max": 1337.6254000000044
+  },
+  "commitTiming": {
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "commitReadyGap": {
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "releaseShapes": {
+    "4->0": 0,
+    "4->1": 0,
+    "4->2": 0,
+    "4->3": 0
+  },
+  "l2Candidates": []
+}

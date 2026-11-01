@@ -1,0 +1,2041 @@
+{
+  "gauntlet": "G20",
+  "seeds": 200,
+  "wallMs": 18457,
+  "exceptions": 0,
+  "fallbacks": 0,
+  "distinctStarts": 157,
+  "generatorMs": {
+    "p50": 39.29649999999947,
+    "p90": 115.87329999999929,
+    "p95": 127.82839999999999,
+    "max": 298.8123999999989
+  },
+  "solverMs": {
+    "p50": 33.15375000000131,
+    "p95": 72.096,
+    "max": 94.11349999999948
+  },
+  "visited": {
+    "p50": 810,
+    "p95": 1711,
+    "max": 1711
+  },
+  "depth": {
+    "p50": 11,
+    "p95": 13,
+    "max": 13
+  },
+  "attempts": {
+    "p50": 1,
+    "p95": 2,
+    "max": 4
+  },
+  "solverCalls": {
+    "p50": 1,
+    "p95": 2,
+    "max": 4
+  },
+  "rows": [
+    {
+      "seed": 0,
+      "depth": 13,
+      "genMs": 127.83,
+      "solverMs": 90.14,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 1,
+      "depth": 9,
+      "genMs": 114.92,
+      "solverMs": 14.92,
+      "visited": 411,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 2,
+      "depth": 10,
+      "genMs": 29.46,
+      "solverMs": 35.8,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 3,
+      "depth": 9,
+      "genMs": 14.91,
+      "solverMs": 16.88,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 4,
+      "depth": 11,
+      "genMs": 123.06,
+      "solverMs": 34.14,
+      "visited": 1066,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 5,
+      "depth": 13,
+      "genMs": 189.75,
+      "solverMs": 45.36,
+      "visited": 1181,
+      "attempts": 3,
+      "solverCalls": 3,
+      "fallback": false
+    },
+    {
+      "seed": 6,
+      "depth": 11,
+      "genMs": 31.57,
+      "solverMs": 28.86,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 7,
+      "depth": 13,
+      "genMs": 126.82,
+      "solverMs": 63.31,
+      "visited": 1567,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 8,
+      "depth": 9,
+      "genMs": 12.64,
+      "solverMs": 13.09,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 9,
+      "depth": 9,
+      "genMs": 11.89,
+      "solverMs": 12.28,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 10,
+      "depth": 12,
+      "genMs": 29.51,
+      "solverMs": 32.53,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 11,
+      "depth": 13,
+      "genMs": 48.52,
+      "solverMs": 47.59,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 12,
+      "depth": 12,
+      "genMs": 40.96,
+      "solverMs": 29.59,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 13,
+      "depth": 10,
+      "genMs": 22.46,
+      "solverMs": 19.21,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 14,
+      "depth": 13,
+      "genMs": 44.5,
+      "solverMs": 47.76,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 15,
+      "depth": 12,
+      "genMs": 134.7,
+      "solverMs": 55.15,
+      "visited": 1360,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 16,
+      "depth": 13,
+      "genMs": 56.87,
+      "solverMs": 57.52,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 17,
+      "depth": 11,
+      "genMs": 29.28,
+      "solverMs": 33.69,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 18,
+      "depth": 12,
+      "genMs": 28.09,
+      "solverMs": 26.15,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 19,
+      "depth": 10,
+      "genMs": 81.48,
+      "solverMs": 18.9,
+      "visited": 580,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 20,
+      "depth": 11,
+      "genMs": 93.03,
+      "solverMs": 25.34,
+      "visited": 810,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 21,
+      "depth": 10,
+      "genMs": 18.3,
+      "solverMs": 18.8,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 22,
+      "depth": 13,
+      "genMs": 137.04,
+      "solverMs": 72.1,
+      "visited": 1711,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 23,
+      "depth": 10,
+      "genMs": 25.46,
+      "solverMs": 27.26,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 24,
+      "depth": 12,
+      "genMs": 31.66,
+      "solverMs": 29.6,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 25,
+      "depth": 10,
+      "genMs": 27.22,
+      "solverMs": 27.69,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 26,
+      "depth": 13,
+      "genMs": 67.33,
+      "solverMs": 58.57,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 27,
+      "depth": 9,
+      "genMs": 13.63,
+      "solverMs": 13.48,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 28,
+      "depth": 10,
+      "genMs": 106.89,
+      "solverMs": 32.52,
+      "visited": 760,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 29,
+      "depth": 13,
+      "genMs": 64.14,
+      "solverMs": 60.3,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 30,
+      "depth": 12,
+      "genMs": 45.84,
+      "solverMs": 45.55,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 31,
+      "depth": 13,
+      "genMs": 122.3,
+      "solverMs": 42.45,
+      "visited": 1181,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 32,
+      "depth": 12,
+      "genMs": 32.12,
+      "solverMs": 29.73,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 33,
+      "depth": 9,
+      "genMs": 13.84,
+      "solverMs": 12.47,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 34,
+      "depth": 12,
+      "genMs": 44.91,
+      "solverMs": 42.05,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 35,
+      "depth": 9,
+      "genMs": 12.12,
+      "solverMs": 14.47,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 36,
+      "depth": 13,
+      "genMs": 45.27,
+      "solverMs": 42.2,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 37,
+      "depth": 12,
+      "genMs": 55.42,
+      "solverMs": 62.39,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 38,
+      "depth": 9,
+      "genMs": 15.11,
+      "solverMs": 16.14,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 39,
+      "depth": 9,
+      "genMs": 15.34,
+      "solverMs": 17.79,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 40,
+      "depth": 10,
+      "genMs": 29.38,
+      "solverMs": 23.96,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 41,
+      "depth": 9,
+      "genMs": 15.83,
+      "solverMs": 14.66,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 42,
+      "depth": 9,
+      "genMs": 13.78,
+      "solverMs": 15.71,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 43,
+      "depth": 11,
+      "genMs": 32.77,
+      "solverMs": 30.83,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 44,
+      "depth": 11,
+      "genMs": 30.49,
+      "solverMs": 32.83,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 45,
+      "depth": 11,
+      "genMs": 33.89,
+      "solverMs": 29.86,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 46,
+      "depth": 10,
+      "genMs": 34.76,
+      "solverMs": 32.08,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 47,
+      "depth": 12,
+      "genMs": 43.97,
+      "solverMs": 39.5,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 48,
+      "depth": 10,
+      "genMs": 33.04,
+      "solverMs": 29.45,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 49,
+      "depth": 13,
+      "genMs": 49.53,
+      "solverMs": 46.8,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 50,
+      "depth": 11,
+      "genMs": 28.33,
+      "solverMs": 28.96,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 51,
+      "depth": 11,
+      "genMs": 27.84,
+      "solverMs": 39.32,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 52,
+      "depth": 11,
+      "genMs": 39.47,
+      "solverMs": 34.36,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 53,
+      "depth": 12,
+      "genMs": 34.92,
+      "solverMs": 34.97,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 54,
+      "depth": 9,
+      "genMs": 14.33,
+      "solverMs": 15.42,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 55,
+      "depth": 9,
+      "genMs": 17.22,
+      "solverMs": 14.75,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 56,
+      "depth": 9,
+      "genMs": 14.84,
+      "solverMs": 16.64,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 57,
+      "depth": 12,
+      "genMs": 66.84,
+      "solverMs": 62.51,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 58,
+      "depth": 9,
+      "genMs": 13.62,
+      "solverMs": 12.62,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 59,
+      "depth": 11,
+      "genMs": 40.36,
+      "solverMs": 34.36,
+      "visited": 1066,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 60,
+      "depth": 13,
+      "genMs": 115.87,
+      "solverMs": 50.07,
+      "visited": 1181,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 61,
+      "depth": 9,
+      "genMs": 17.79,
+      "solverMs": 14.6,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 62,
+      "depth": 11,
+      "genMs": 31.58,
+      "solverMs": 33.06,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 63,
+      "depth": 12,
+      "genMs": 30.2,
+      "solverMs": 28.91,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 64,
+      "depth": 12,
+      "genMs": 65.08,
+      "solverMs": 65.59,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 65,
+      "depth": 12,
+      "genMs": 47.69,
+      "solverMs": 49.97,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 66,
+      "depth": 12,
+      "genMs": 32.12,
+      "solverMs": 35.21,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 67,
+      "depth": 10,
+      "genMs": 33.06,
+      "solverMs": 27.86,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 68,
+      "depth": 13,
+      "genMs": 72.07,
+      "solverMs": 67.76,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 69,
+      "depth": 10,
+      "genMs": 23.7,
+      "solverMs": 19.24,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 70,
+      "depth": 12,
+      "genMs": 34.47,
+      "solverMs": 32.79,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 71,
+      "depth": 13,
+      "genMs": 70.82,
+      "solverMs": 68.12,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 72,
+      "depth": 12,
+      "genMs": 55.92,
+      "solverMs": 55.68,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 73,
+      "depth": 9,
+      "genMs": 15.47,
+      "solverMs": 13.87,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 74,
+      "depth": 10,
+      "genMs": 184.12,
+      "solverMs": 35.13,
+      "visited": 760,
+      "attempts": 3,
+      "solverCalls": 3,
+      "fallback": false
+    },
+    {
+      "seed": 75,
+      "depth": 11,
+      "genMs": 46.3,
+      "solverMs": 31.72,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 76,
+      "depth": 9,
+      "genMs": 11.75,
+      "solverMs": 18.52,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 77,
+      "depth": 13,
+      "genMs": 76.82,
+      "solverMs": 71.09,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 78,
+      "depth": 12,
+      "genMs": 75.52,
+      "solverMs": 81.19,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 79,
+      "depth": 11,
+      "genMs": 33.77,
+      "solverMs": 35.22,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 80,
+      "depth": 11,
+      "genMs": 28.33,
+      "solverMs": 33.59,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 81,
+      "depth": 10,
+      "genMs": 107.6,
+      "solverMs": 18.37,
+      "visited": 605,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 82,
+      "depth": 9,
+      "genMs": 18.31,
+      "solverMs": 19.14,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 83,
+      "depth": 10,
+      "genMs": 25.1,
+      "solverMs": 26.57,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 84,
+      "depth": 12,
+      "genMs": 160.67,
+      "solverMs": 73.49,
+      "visited": 1360,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 85,
+      "depth": 13,
+      "genMs": 81.52,
+      "solverMs": 72.69,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 86,
+      "depth": 12,
+      "genMs": 33.42,
+      "solverMs": 29.2,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 87,
+      "depth": 12,
+      "genMs": 49.43,
+      "solverMs": 56.32,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 88,
+      "depth": 9,
+      "genMs": 15.97,
+      "solverMs": 19.87,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 89,
+      "depth": 9,
+      "genMs": 20.8,
+      "solverMs": 12.91,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 90,
+      "depth": 10,
+      "genMs": 29.18,
+      "solverMs": 27.32,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 91,
+      "depth": 11,
+      "genMs": 39.56,
+      "solverMs": 40.16,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 92,
+      "depth": 9,
+      "genMs": 16.49,
+      "solverMs": 15.29,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 93,
+      "depth": 9,
+      "genMs": 14.08,
+      "solverMs": 15.6,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 94,
+      "depth": 10,
+      "genMs": 23.3,
+      "solverMs": 25.95,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 95,
+      "depth": 11,
+      "genMs": 29.76,
+      "solverMs": 50.79,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 96,
+      "depth": 13,
+      "genMs": 76.09,
+      "solverMs": 73.27,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 97,
+      "depth": 12,
+      "genMs": 38.2,
+      "solverMs": 44.24,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 98,
+      "depth": 12,
+      "genMs": 55.41,
+      "solverMs": 57.91,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 99,
+      "depth": 10,
+      "genMs": 23.83,
+      "solverMs": 21.01,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 100,
+      "depth": 13,
+      "genMs": 61.32,
+      "solverMs": 68.34,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 101,
+      "depth": 13,
+      "genMs": 44.11,
+      "solverMs": 44.22,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 102,
+      "depth": 11,
+      "genMs": 104.09,
+      "solverMs": 28.66,
+      "visited": 810,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 103,
+      "depth": 13,
+      "genMs": 71.23,
+      "solverMs": 72.4,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 104,
+      "depth": 11,
+      "genMs": 32.03,
+      "solverMs": 30.18,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 105,
+      "depth": 9,
+      "genMs": 13.4,
+      "solverMs": 12.77,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 106,
+      "depth": 12,
+      "genMs": 29.11,
+      "solverMs": 28.83,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 107,
+      "depth": 13,
+      "genMs": 47.95,
+      "solverMs": 49.27,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 108,
+      "depth": 12,
+      "genMs": 58.12,
+      "solverMs": 60.3,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 109,
+      "depth": 12,
+      "genMs": 36.45,
+      "solverMs": 38.8,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 110,
+      "depth": 10,
+      "genMs": 23.9,
+      "solverMs": 21.2,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 111,
+      "depth": 11,
+      "genMs": 34.96,
+      "solverMs": 35.85,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 112,
+      "depth": 11,
+      "genMs": 124.43,
+      "solverMs": 45.52,
+      "visited": 1066,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 113,
+      "depth": 12,
+      "genMs": 66.23,
+      "solverMs": 62.84,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 114,
+      "depth": 12,
+      "genMs": 37.66,
+      "solverMs": 28.02,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 115,
+      "depth": 10,
+      "genMs": 20.64,
+      "solverMs": 19.11,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 116,
+      "depth": 12,
+      "genMs": 45.64,
+      "solverMs": 50.95,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 117,
+      "depth": 11,
+      "genMs": 30.6,
+      "solverMs": 28.69,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 118,
+      "depth": 9,
+      "genMs": 13.05,
+      "solverMs": 14.63,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 119,
+      "depth": 13,
+      "genMs": 46.28,
+      "solverMs": 51.13,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 120,
+      "depth": 11,
+      "genMs": 37.71,
+      "solverMs": 36.97,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 121,
+      "depth": 9,
+      "genMs": 19.08,
+      "solverMs": 17.66,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 122,
+      "depth": 12,
+      "genMs": 72.23,
+      "solverMs": 66.75,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 123,
+      "depth": 9,
+      "genMs": 15.23,
+      "solverMs": 14.95,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 124,
+      "depth": 11,
+      "genMs": 39.63,
+      "solverMs": 37.93,
+      "visited": 1066,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 125,
+      "depth": 10,
+      "genMs": 21.51,
+      "solverMs": 24.05,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 126,
+      "depth": 13,
+      "genMs": 60.24,
+      "solverMs": 51.25,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 127,
+      "depth": 12,
+      "genMs": 151.72,
+      "solverMs": 56.5,
+      "visited": 1360,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 128,
+      "depth": 13,
+      "genMs": 66.05,
+      "solverMs": 65.52,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 129,
+      "depth": 10,
+      "genMs": 24.76,
+      "solverMs": 26.26,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 130,
+      "depth": 11,
+      "genMs": 122.19,
+      "solverMs": 31.58,
+      "visited": 838,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 131,
+      "depth": 13,
+      "genMs": 77.29,
+      "solverMs": 71.87,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 132,
+      "depth": 11,
+      "genMs": 109.84,
+      "solverMs": 34.5,
+      "visited": 810,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 133,
+      "depth": 11,
+      "genMs": 115.87,
+      "solverMs": 27.49,
+      "visited": 838,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 134,
+      "depth": 13,
+      "genMs": 76.28,
+      "solverMs": 73.97,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 135,
+      "depth": 10,
+      "genMs": 21.54,
+      "solverMs": 18.45,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 136,
+      "depth": 12,
+      "genMs": 296.39,
+      "solverMs": 31.03,
+      "visited": 896,
+      "attempts": 4,
+      "solverCalls": 4,
+      "fallback": false
+    },
+    {
+      "seed": 137,
+      "depth": 12,
+      "genMs": 113.03,
+      "solverMs": 27.61,
+      "visited": 773,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 138,
+      "depth": 13,
+      "genMs": 46.86,
+      "solverMs": 45.39,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 139,
+      "depth": 11,
+      "genMs": 116.69,
+      "solverMs": 35.25,
+      "visited": 838,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 140,
+      "depth": 11,
+      "genMs": 31.58,
+      "solverMs": 36.19,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 141,
+      "depth": 10,
+      "genMs": 24.41,
+      "solverMs": 22.74,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 142,
+      "depth": 13,
+      "genMs": 74.94,
+      "solverMs": 70.49,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 143,
+      "depth": 13,
+      "genMs": 68.52,
+      "solverMs": 72.29,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 144,
+      "depth": 12,
+      "genMs": 106.94,
+      "solverMs": 31.69,
+      "visited": 773,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 145,
+      "depth": 10,
+      "genMs": 22.69,
+      "solverMs": 28.32,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 146,
+      "depth": 12,
+      "genMs": 121.19,
+      "solverMs": 39.87,
+      "visited": 773,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 147,
+      "depth": 11,
+      "genMs": 45.34,
+      "solverMs": 54.35,
+      "visited": 1066,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 148,
+      "depth": 10,
+      "genMs": 26.53,
+      "solverMs": 22.81,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 149,
+      "depth": 12,
+      "genMs": 56.56,
+      "solverMs": 56.45,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 150,
+      "depth": 13,
+      "genMs": 66.58,
+      "solverMs": 70.2,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 151,
+      "depth": 11,
+      "genMs": 40.57,
+      "solverMs": 34.13,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 152,
+      "depth": 13,
+      "genMs": 73.38,
+      "solverMs": 71.2,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 153,
+      "depth": 10,
+      "genMs": 22.45,
+      "solverMs": 24.05,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 154,
+      "depth": 9,
+      "genMs": 13.88,
+      "solverMs": 13.39,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 155,
+      "depth": 10,
+      "genMs": 22.78,
+      "solverMs": 21.03,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 156,
+      "depth": 11,
+      "genMs": 32.45,
+      "solverMs": 30.19,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 157,
+      "depth": 10,
+      "genMs": 31.51,
+      "solverMs": 28.72,
+      "visited": 760,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 158,
+      "depth": 10,
+      "genMs": 28.11,
+      "solverMs": 21.96,
+      "visited": 580,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 159,
+      "depth": 11,
+      "genMs": 39.3,
+      "solverMs": 37.97,
+      "visited": 1066,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 160,
+      "depth": 9,
+      "genMs": 13.24,
+      "solverMs": 15.23,
+      "visited": 416,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 161,
+      "depth": 10,
+      "genMs": 20.91,
+      "solverMs": 17.9,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 162,
+      "depth": 12,
+      "genMs": 101.41,
+      "solverMs": 30.36,
+      "visited": 896,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 163,
+      "depth": 12,
+      "genMs": 46.93,
+      "solverMs": 48.87,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 164,
+      "depth": 12,
+      "genMs": 60.22,
+      "solverMs": 55.48,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 165,
+      "depth": 12,
+      "genMs": 30.96,
+      "solverMs": 31.94,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 166,
+      "depth": 13,
+      "genMs": 67.03,
+      "solverMs": 63.51,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 167,
+      "depth": 13,
+      "genMs": 43.7,
+      "solverMs": 48.88,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 168,
+      "depth": 11,
+      "genMs": 39.3,
+      "solverMs": 33.23,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 169,
+      "depth": 10,
+      "genMs": 25.25,
+      "solverMs": 21.39,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 170,
+      "depth": 12,
+      "genMs": 121.65,
+      "solverMs": 33.86,
+      "visited": 896,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 171,
+      "depth": 9,
+      "genMs": 92.25,
+      "solverMs": 19.43,
+      "visited": 416,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 172,
+      "depth": 13,
+      "genMs": 66.42,
+      "solverMs": 65.45,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 173,
+      "depth": 9,
+      "genMs": 15.74,
+      "solverMs": 13.31,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 174,
+      "depth": 13,
+      "genMs": 49.29,
+      "solverMs": 52.99,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 175,
+      "depth": 13,
+      "genMs": 72.84,
+      "solverMs": 68.25,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 176,
+      "depth": 13,
+      "genMs": 74.01,
+      "solverMs": 67.58,
+      "visited": 1567,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 177,
+      "depth": 11,
+      "genMs": 27.45,
+      "solverMs": 33.07,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 178,
+      "depth": 10,
+      "genMs": 19.17,
+      "solverMs": 23.07,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 179,
+      "depth": 12,
+      "genMs": 55.97,
+      "solverMs": 62.98,
+      "visited": 1360,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 180,
+      "depth": 12,
+      "genMs": 36.69,
+      "solverMs": 36.05,
+      "visited": 896,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 181,
+      "depth": 12,
+      "genMs": 33.63,
+      "solverMs": 26.68,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 182,
+      "depth": 11,
+      "genMs": 42.08,
+      "solverMs": 42.26,
+      "visited": 1066,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 183,
+      "depth": 12,
+      "genMs": 22.67,
+      "solverMs": 33.65,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 184,
+      "depth": 12,
+      "genMs": 36.46,
+      "solverMs": 35.51,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 185,
+      "depth": 12,
+      "genMs": 37.13,
+      "solverMs": 34.52,
+      "visited": 773,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 186,
+      "depth": 10,
+      "genMs": 23.03,
+      "solverMs": 27.7,
+      "visited": 605,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 187,
+      "depth": 9,
+      "genMs": 17.62,
+      "solverMs": 19.67,
+      "visited": 411,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 188,
+      "depth": 9,
+      "genMs": 100.71,
+      "solverMs": 13.89,
+      "visited": 416,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 189,
+      "depth": 9,
+      "genMs": 103.87,
+      "solverMs": 20.83,
+      "visited": 411,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 190,
+      "depth": 13,
+      "genMs": 62.88,
+      "solverMs": 56.5,
+      "visited": 1181,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 191,
+      "depth": 12,
+      "genMs": 124.78,
+      "solverMs": 32.62,
+      "visited": 773,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 192,
+      "depth": 11,
+      "genMs": 28.61,
+      "solverMs": 32.46,
+      "visited": 810,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 193,
+      "depth": 11,
+      "genMs": 39.58,
+      "solverMs": 33.61,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 194,
+      "depth": 11,
+      "genMs": 38.23,
+      "solverMs": 42.79,
+      "visited": 838,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 195,
+      "depth": 13,
+      "genMs": 174.13,
+      "solverMs": 79.48,
+      "visited": 1567,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 196,
+      "depth": 12,
+      "genMs": 65.71,
+      "solverMs": 53.96,
+      "visited": 1154,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 197,
+      "depth": 10,
+      "genMs": 132.8,
+      "solverMs": 37.41,
+      "visited": 760,
+      "attempts": 2,
+      "solverCalls": 2,
+      "fallback": false
+    },
+    {
+      "seed": 198,
+      "depth": 13,
+      "genMs": 93.11,
+      "solverMs": 94.11,
+      "visited": 1711,
+      "attempts": 1,
+      "solverCalls": 1,
+      "fallback": false
+    },
+    {
+      "seed": 199,
+      "depth": 10,
+      "genMs": 298.81,
+      "solverMs": 27.01,
+      "visited": 605,
+      "attempts": 4,
+      "solverCalls": 4,
+      "fallback": false
+    }
+  ]
+}
