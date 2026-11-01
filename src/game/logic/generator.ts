@@ -78,6 +78,7 @@ import {
   ICE_MELT_TEA,
   SINKING_INGREDIENT_TYPES,
   STANDARD_CUP_CAPACITY,
+  STEEPING_FLASK_CONSTRAINT,
   StrainerState,
   TASTING_BOWL_CAPACITY,
   TEA_UNITS_PER_COLOR,
@@ -97,8 +98,10 @@ import {
   emptyTeaBudSlots,
   floatingIngredientIndex,
   isReleaseStrainerAction,
+  isSteepingFlaskConstraint,
   isTastingCupConstraint,
   isThermosCupConstraint,
+  isValidSteepingFlaskConstraint,
   mustEndEmpty,
   normalizeCapacityObstacles,
   normalizeFloatingIngredients,
@@ -195,6 +198,12 @@ import {
   instantiateThermosTemplate,
 } from './thermosTemplates';
 import {
+  STEEPING_FLASK_TEMPLATE_ATTEMPTS,
+  STEEPING_FLASK_TEMPLATE_BANK,
+  SteepingFlaskTemplateKind,
+  instantiateSteepingFlaskTemplate,
+} from './steepingFlaskTemplates';
+import {
   CINNAMON_DEPTH_ACCEPT,
   CINNAMON_TEMPLATE_ATTEMPTS,
   CINNAMON_TEMPLATE_BANK,
@@ -267,7 +276,7 @@ import {
   sharedCapacityOccupancy,
   validateSharedCapacityConstraints,
 } from './sharedCapacity';
-import { validateMechanicCombination, validateSharedTrayCombination, validateTeaPairCombination } from './mechanicCompatibility';
+import { validateMechanicCombination, validateSharedTrayCombination, validateSteepingFlaskCombination, validateTeaPairCombination } from './mechanicCompatibility';
 import {
   depthDistance,
   RhythmPhase,
@@ -407,6 +416,15 @@ export interface GenerateRequest {
    * is generated or stored.
    */
   teaPairCount?: number;
+  /**
+   * Number of steeping-flask (заварочная колба) vessels requested (Gauntlet
+   * 20). 0 = classic level; 1 = exactly one standalone normal cap4 /
+   * must-end-empty flask inside the F0 topology (4c/6v, lengths
+   * 4,4,4,4,0,0). The flask starts empty; source readiness derives from
+   * current contents (full homogeneous only). Production supports only 0/1;
+   * every sibling special is rejected loudly.
+   */
+  steepingFlaskCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -593,6 +611,13 @@ export function requestedSharedTrayCount(req: GenerateRequest): number {
 /** Requested paired-tea group count, normalized (default 0). */
 export function requestedTeaPairCount(req: GenerateRequest): number {
   const v = (req as GenerateRequest).teaPairCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested steeping-flask count, normalized (default 0, clamped >= 0). */
+export function requestedSteepingFlaskCount(req: GenerateRequest): number {
+  const v = (req as GenerateRequest).steepingFlaskCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -1238,6 +1263,100 @@ export function validateTeaPairRequest(req: GenerateRequest): void {
 }
 
 /**
+ * Fail-fast request validation for the steeping flask (G20).
+ *
+ * Supported: exactly one standalone flask inside the F0 topology
+ * (4 colors, 6 vessels, 2 nominal empties, shape 4,4,4,4,0,0). Every sibling
+ * mechanic/composition is rejected loudly. The flask starts empty.
+ */
+export function validateSteepingFlaskRequest(req: GenerateRequest): void {
+  const raw = (req as GenerateRequest).steepingFlaskCount ?? 0;
+  if (raw === 0) return;
+  if (!Number.isInteger(raw) || raw !== 1) {
+    throw new Error(
+      `validateSteepingFlaskRequest: steepingFlaskCount ${String(raw)} unsupported (production 0 or 1)`,
+    );
+  }
+  const comboReasons = validateSteepingFlaskCombination({
+    steepingFlask: true,
+    servingOrder: requestedServeOrderCount(req) > 0,
+    mystery: req.hasMysteryLayer === true,
+    tastingCount: requestedTastingCupCount(req),
+    honey: requestedSinkingIngredient(req) !== undefined,
+    strainer: requestedHasStrainer(req),
+    blend: requestedBlendRecipeId(req) !== undefined,
+    sharedTray: requestedSharedTrayCount(req) > 0,
+    teaPair: requestedTeaPairCount(req) > 0,
+  });
+  if (comboReasons.length > 0) {
+    throw new Error(`validateSteepingFlaskRequest: ${comboReasons.join('; ')}`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateSteepingFlaskRequest: flask requires 4 colors, 6 vessels, 2 nominal empties, no teapot',
+    );
+  }
+  if (req.hasMysteryLayer) {
+    throw new Error('validateSteepingFlaskRequest: flask + mystery is out of scope for G20');
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + targets is out of scope for G20');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + sink-only is out of scope for G20');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + tasting bowl is out of scope for G20');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateSteepingFlaskRequest: flask + ${requestedFloatingIngredient(req)} is out of scope for G20`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateSteepingFlaskRequest: flask + ${requestedSinkingIngredient(req)} is out of scope for G20`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateSteepingFlaskRequest: flask + strainer is out of scope for G20');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + frozen cup is out of scope for G20');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + thermos is out of scope for G20');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + cinnamon is out of scope for G20');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + tea bud is out of scope for G20');
+  }
+  if (requestedBlendRecipeId(req) !== undefined) {
+    throw new Error('validateSteepingFlaskRequest: flask + blend is forbidden (G20; chemistry stays standalone)');
+  }
+  if (requestedServeOrderCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + serving order is out of scope for G20');
+  }
+  if (requestedSharedTrayCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + shared tray is out of scope for G20');
+  }
+  if (requestedTeaPairCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + tea pair is out of scope for G20');
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) {
+    throw new Error('validateSteepingFlaskRequest: palette must carry exactly 4 teas');
+  }
+  for (const t of palette) {
+    if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
+      throw new Error(`validateSteepingFlaskRequest: reaction ID ${t} not eligible for flask`);
+    }
+  }
+}
+
+/**
  * Fail-fast request validation for the catch-one strainer (programming
  * errors, not generation luck). Tight dedicated topologies only; rejects
  * loudly: lemon, sink, tasting, targets, multiple strainers (boolean).
@@ -1341,6 +1460,11 @@ export function countTastingCups(constraints: readonly CupConstraint[]): number 
 /** Count high-thermos vessels in a constraints array (Gauntlet 10). */
 export function countThermosCups(constraints: readonly CupConstraint[]): number {
   return constraints.filter(isThermosCupConstraint).length;
+}
+
+/** Count static steeping-flask markers (G20). */
+export function countSteepingFlasks(constraints: readonly CupConstraint[]): number {
+  return constraints.filter(isSteepingFlaskConstraint).length;
 }
 
 /**
@@ -2815,6 +2939,29 @@ function finalizeCandidate(
         !isTastingCupConstraint(c) &&
         cupCapacity(c) === STANDARD_CUP_CAPACITY &&
         (cups[i] as TeaId[]).length === 0,
+    ).length;
+    if (ordinaryEmpty < 1) return null;
+  }
+  // G20 steeping-flask invariant: exactly one valid standalone flask,
+  // starts empty, no sibling special, and one ordinary empty buffer.
+  const wantFlask = requestedSteepingFlaskCount(req);
+  if (countSteepingFlasks(normalized) !== wantFlask) return null;
+  if (wantFlask > 0) {
+    if (wantFlask > 1) return null;
+    if (wantTargets.length > 0 || wantSink > 0 || wantTasting > 0) return null;
+    if (requestedFloatingIngredient(req) !== undefined || requestedSinkingIngredient(req) !== undefined) return null;
+    if (requestedHasStrainer(req) || requestedFrozenCupCount(req) > 0 || requestedThermosCupCount(req) > 0) return null;
+    if (requestedCinnamonCupCount(req) > 0 || requestedTeaBudCount(req) > 0 || requestedBlendRecipeId(req) !== undefined) return null;
+    if (requestedServeOrderCount(req) > 0 || requestedSharedTrayCount(req) > 0 || requestedTeaPairCount(req) > 0) return null;
+    const flaskIndex = normalized.findIndex(isSteepingFlaskConstraint);
+    if (flaskIndex < 0) return null;
+    const flaskC = normalized[flaskIndex] as CupConstraint;
+    if (!isValidSteepingFlaskConstraint(flaskC)) return null;
+    const flaskCup = cups[flaskIndex] as TeaId[];
+    if (!flaskCup || flaskCup.length !== 0) return null;
+    if ((hiddenCounts[flaskIndex] ?? 0) !== 0) return null;
+    const ordinaryEmpty = normalized.filter(
+      (c, i) => c.mode === 'normal' && !isSteepingFlaskConstraint(c) && (cups[i] as TeaId[]).length === 0,
     ).length;
     if (ordinaryEmpty < 1) return null;
   }
@@ -4628,6 +4775,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateBlendRequest(req);
   validateServeOrderRequest(req);
   validateTeaPairRequest(req);
+  validateSteepingFlaskRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -4640,6 +4788,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantThermos = requestedThermosCupCount(req);
   const wantCinnamon = requestedCinnamonCupCount(req);
   const wantBud = requestedTeaBudCount(req);
+  const wantFlask = requestedSteepingFlaskCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
@@ -4653,7 +4802,8 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     `${wantBud > 0 ? ':tea-bloom' : ''}` +
     `${requestedBlendRecipeId(req) !== undefined ? ':blend' : ''}` +
     `${requestedServeOrderCount(req) !== 0 ? ':serving-order' : ''}${requestedSharedTrayCount(req) !== 0 ? ':shared-tray' : ''}` +
-    `${requestedTeaPairCount(req) !== 0 ? ':tea-pair' : ''}`;
+    `${requestedTeaPairCount(req) !== 0 ? ':tea-pair' : ''}` +
+    `${wantFlask !== 0 ? ':steeping-flask' : ''}`;
 
   const shapeEntries: Array<{ cups: TeaId[][]; constraints: CupConstraint[]; lemonHost?: number | null; honeyHost?: number | null; frozenHost?: number | null; thermosHost?: number | null; cinnamonHost?: number | null; teaBudHost?: number | null }> = [];
   if (requestedTeaPairCount(req) !== 0) {
@@ -4683,6 +4833,20 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   // role mapping — recorded depths hold exactly).
   if (wantCinnamon > 0) {
     shapeEntries.push(...cinnamonFallbackEntries(req));
+  }
+  // Dedicated steeping-flask fallback (identity role mapping — recorded
+  // depth holds exactly).
+  if (wantFlask > 0) {
+    const tpl = STEEPING_FLASK_TEMPLATE_BANK['steeping-flask'][0];
+    if (tpl) {
+      const palette = req.colors.slice(0, req.numColors);
+      if (palette.length === req.numColors) {
+        const inst = instantiateSteepingFlaskTemplate(tpl, palette, [...palette]);
+        const constraints = defaultCupConstraints(inst.cups.length);
+        constraints[inst.flaskSlot] = cloneCupConstraint(STEEPING_FLASK_CONSTRAINT);
+        shapeEntries.push({ cups: inst.cups, constraints });
+      }
+    }
   }
   // Dedicated thermos shapes go first for thermos requests (identity role
   // mapping — recorded depths hold exactly).
@@ -6120,6 +6284,73 @@ function generateFromServingOrderCompositionBank(
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
  * Anything else keeps the existing paths (validation throws for bad combos).
  */
+export function steepingFlaskTemplateKindFor(req: GenerateRequest): SteepingFlaskTemplateKind | null {
+  if (requestedSteepingFlaskCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedTeaBudCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (requestedServeOrderCount(req) > 0) return null;
+  if (requestedSharedTrayCount(req) > 0) return null;
+  if (requestedTeaPairCount(req) > 0) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'steeping-flask';
+  }
+  return null;
+}
+
+/**
+ * Bounded steeping-flask fast path (G20): seeded template choice → seeded
+ * full permutation of c0..c3 roles (a bijection, so bank depth holds) →
+ * static flask constraint → one finalize validation. At most
+ * STEEPING_FLASK_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
+ */
+function generateFromSteepingFlaskTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = steepingFlaskTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = STEEPING_FLASK_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < STEEPING_FLASK_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateSteepingFlaskTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    constraints[inst.flaskSlot] = cloneCupConstraint(STEEPING_FLASK_CONSTRAINT);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      inst.cups.map(() => 0),
+      `${seedStr}#steeping-flask:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 export function thermosTemplateKindFor(req: GenerateRequest): ThermosTemplateKind | null {
   if (requestedThermosCupCount(req) !== 1) return null;
   if (requestedTargetTeas(req).length > 0) return null;
@@ -6278,6 +6509,7 @@ export function generateLevel(
   validateBlendRequest(req);
   validateServeOrderRequest(req);
   validateTeaPairRequest(req);
+  validateSteepingFlaskRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -6367,6 +6599,14 @@ export function generateLevel(
   // fast path or the validated fallback ladder.
   if (frozenCupTemplateKindFor(req) !== null) {
     const fast = generateFromFrozenCupTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical steeping-flask configs skip the random scan entirely (G20):
+  // bounded attempts, never a 150-deal scan.
+  if (steepingFlaskTemplateKindFor(req) !== null) {
+    const fast = generateFromSteepingFlaskTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -6642,6 +6882,30 @@ export function validateLevelStructure(
   const gotTastingOnly = constraints.filter(isTastingCupConstraint).length;
   if (gotTastingOnly !== wantTastingOnly) {
     reasons.push(`expected ${wantTastingOnly} tasting vessels, got ${gotTastingOnly} (AB)`);
+  }
+  const wantFlask = requestedSteepingFlaskCount(req);
+  const gotFlask = constraints.filter(isSteepingFlaskConstraint).length;
+  if (gotFlask !== wantFlask) {
+    reasons.push(`expected ${wantFlask} steeping flasks, got ${gotFlask} (G20)`);
+  }
+  if (wantFlask > 0) {
+    if (wantFlask > 1) reasons.push(`steeping flask production max one, got ${wantFlask}`);
+    const flaskIndex = constraints.findIndex(isSteepingFlaskConstraint);
+    if (flaskIndex >= 0) {
+      const c = constraints[flaskIndex] as CupConstraint;
+      if (!isValidSteepingFlaskConstraint(c)) reasons.push(`flask ${flaskIndex} has malformed constraint`);
+      if ((level.cups[flaskIndex] as TeaId[]).length !== 0) reasons.push(`flask ${flaskIndex} must start empty`);
+      if ((level.hiddenCounts[flaskIndex] ?? 0) !== 0) reasons.push(`flask ${flaskIndex} must not hide mystery`);
+      const ordinaryEmpty = constraints.filter(
+        (cc, i) =>
+          cc?.mode === 'normal' &&
+          !isSteepingFlaskConstraint(cc) &&
+          (level.cups[i] as TeaId[]).length === 0,
+      ).length;
+      if (ordinaryEmpty < 1) reasons.push('steeping flask requires one ordinary empty buffer');
+    } else {
+      reasons.push('steeping flask request has no flask constraint');
+    }
   }
   level.cups.forEach((cup, i) => {
     if (constraints[i]?.mode === 'source-only') {

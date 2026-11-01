@@ -29,6 +29,8 @@ export function generateRequestForLevelConfig(cfg: LevelConfig): GenerateRequest
     serveOrderCount: cfg.hasServingOrder ? 2 : 0,
     sharedTrayCount: cfg.hasSharedTray ? 1 : 0,
     teaPairCount: cfg.hasTeaPair ? 1 : 0,
+    // Keep legacy request payloads byte-identical: field absent unless active.
+    ...(cfg.hasSteepingFlask ? { steepingFlaskCount: 1 } : {}),
     targetTeaIds: [...cfg.targetTeaIds],
     phase: cfg.phase,
   };

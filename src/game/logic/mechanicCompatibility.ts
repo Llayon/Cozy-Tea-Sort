@@ -50,7 +50,8 @@ export type CompositionMechanicId =
   | 'strainer'
   | 'blend'
   | 'sharedTray'
-  | 'teaPair';
+  | 'teaPair'
+  | 'steepingFlask';
 
 export type CompatibilityVerdict = 'allow' | 'forbid' | 'research';
 
@@ -158,6 +159,50 @@ const POLICY: Record<string, MechanicCompatibility> = {
     sameLevel: 'research',
     sameCup: 'forbid',
     reason: 'tea pair + shared tray is unproven and statically contradictory on one vessel',
+  },
+  // G20 steeping flask: production is STANDALONE. Source readiness is a
+  // derived operational commitment; chemistry/relational/shared/order
+  // combinations are unproven, and every same-cup combination contradicts
+  // the flask's exact static shape.
+  'blend+steepingFlask': {
+    sameLevel: 'forbid',
+    sameCup: 'forbid',
+    reason: 'steeping flask + blend is forbidden (chemistry stays standalone)',
+  },
+  'servingOrder+steepingFlask': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'steeping flask + serving order is unproven (G20 production is standalone)',
+  },
+  'mystery+steepingFlask': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'steeping flask + mystery is unproven (G20 production is standalone)',
+  },
+  'sharedTray+steepingFlask': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'steeping flask + shared tray is unproven (G20 production is standalone)',
+  },
+  'steepingFlask+tasting': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'different must-end-empty vessel roles; no proven composition',
+  },
+  'honey+steepingFlask': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'steeping flask + honey is unproven (G20 production is standalone)',
+  },
+  'steepingFlask+strainer': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'steeping flask + strainer is unproven (G20 production is standalone)',
+  },
+  'steepingFlask+teaPair': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'steeping flask + tea pair is unproven (G20 production is standalone)',
   },
 };
 
@@ -295,6 +340,42 @@ export function validateTeaPairCombination(flags: {
       reasons.push('tea pair + blend is forbidden (G17 §60; chemistry stays standalone)');
     } else {
       reasons.push(`tea pair + ${p} is out of scope (G17 production is standalone)`);
+    }
+  }
+  return reasons;
+}
+
+/**
+ * Validate a steeping-flask request class (G20, pure, no RNG/mutation).
+ * Production G20 is STANDALONE: every composition partner is rejected.
+ */
+export function validateSteepingFlaskCombination(flags: {
+  steepingFlask: boolean;
+  servingOrder: boolean;
+  mystery: boolean;
+  tastingCount: number;
+  honey: boolean;
+  strainer: boolean;
+  blend: boolean;
+  sharedTray: boolean;
+  teaPair: boolean;
+}): string[] {
+  const reasons: string[] = [];
+  if (!flags.steepingFlask) return reasons;
+  const partners: string[] = [];
+  if (flags.servingOrder) partners.push('serving order');
+  if (flags.mystery) partners.push('mystery');
+  if (flags.tastingCount > 0) partners.push('tasting');
+  if (flags.honey) partners.push('honey');
+  if (flags.strainer) partners.push('strainer');
+  if (flags.blend) partners.push('blend');
+  if (flags.sharedTray) partners.push('shared tray');
+  if (flags.teaPair) partners.push('tea pair');
+  for (const p of partners) {
+    if (p === 'blend') {
+      reasons.push('steeping flask + blend is forbidden (G20 §59; chemistry stays standalone)');
+    } else {
+      reasons.push(`steeping flask + ${p} is out of scope (G20 production is standalone)`);
     }
   }
   return reasons;

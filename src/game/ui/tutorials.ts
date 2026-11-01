@@ -30,7 +30,8 @@ export type TutorialId =
   | 'servingOrder'
   | 'orderTasting'
   | 'sharedTray'
-  | 'teaPair';
+  | 'teaPair'
+  | 'steepingFlask';
 
 export interface TutorialTone {
   background: string;
@@ -68,6 +69,7 @@ const TONE = {
   blend: { background: '#2E2118', border: '#7A5A3E', text: '#F0D9B8', icon: '#D8A05E' },
   serving: { background: '#232A1E', border: '#5A6B4E', text: '#DCE8C8', icon: '#B8C898' },
   teaPair: { background: '#2B2020', border: '#7A4E58', text: '#F2D8DE', icon: '#D8A0AC' },
+  steeping: { background: '#1B2830', border: '#3E5A68', text: '#C9E4F0', icon: '#8AC9E8' },
 } as const satisfies Record<string, TutorialTone>;
 
 export const TUTORIALS: readonly TutorialDefinition[] = [
@@ -240,6 +242,16 @@ export const TUTORIALS: readonly TutorialDefinition[] = [
     text: 'Парные пиалы должны закончить с одним и тем же чаем. Какой именно — решаешь по ходу.',
     tone: TONE.teaPair,
     matches: (c) => c.hasTeaPair === true,
+  },
+  {
+    id: 'steepingFlask',
+    level: 558,
+    bannerId: 'steeping-flask-tutorial-hint',
+    mechanic: 'steepingFlask',
+    concept: 'flask sources only when full and homogeneous, and ends empty',
+    text: 'В колбе чай должен сначала завариться. Наливай в неё как обычно, но переливать из неё можно только когда она заполнена до краёв. К концу колба должна остаться пустой.',
+    tone: TONE.steeping,
+    matches: (c) => c.hasSteepingFlask === true,
   },
 ];
 

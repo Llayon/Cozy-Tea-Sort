@@ -78,6 +78,8 @@ export interface LevelConfig {
   hasSharedTray?: boolean;
   /** True when this level includes the paired-tea goal (Gauntlet 17, authored 2,2,4,4,4,0 topology). */
   hasTeaPair?: boolean;
+  /** True when this level includes the steeping flask (Gauntlet 20, F0 4,4,4,4,0,0 topology). */
+  hasSteepingFlask?: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

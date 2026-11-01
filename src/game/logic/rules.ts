@@ -30,6 +30,13 @@
  *   during play (temporary wrong colors are legal);
  * - at victory it MUST hold exactly full homogeneous `targetTeaId`.
  *
+ * Steeping flask (Gauntlet 20 — «Заварочная колба»):
+ * - normal cap4 / must-end-empty vessel;
+ * - receives under ordinary rules;
+ * - may source ONLY while full 4/4 homogeneous (`source-steeping-not-ready`
+ *   otherwise), derived from layers — no stored ready flag;
+ * - partial release is legal and automatically re-locks the source gate.
+ *
  * Variable capacity (Gauntlet 4 — tasting bowl):
  * - capacity lives on the constraint (`cupCapacity`), NOT in a global.
  *   A tasting bowl (capacity 2, must-end-empty) pours like a normal cup
@@ -84,6 +91,8 @@ import {
   emptyStrainerState,
   isPlaceStrainerAction,
   isReleaseStrainerAction,
+  isSteepingFlaskConstraint,
+  isValidSteepingFlaskConstraint,
   mustEndEmpty,
   normalizeCapacityObstacles,
   normalizeCupConstraints,
@@ -256,6 +265,7 @@ export type PourRejectCode =
   | 'out-of-range'
   | 'source-empty'
   | 'source-sink-only'
+  | 'source-steeping-not-ready'
   | 'source-frozen'
   | 'source-served'
   | 'target-full'
@@ -298,6 +308,24 @@ export type StrainerReleaseRejectCode =
  */
 export function canActAsSource(c: CupConstraint | undefined): boolean {
   return (c?.mode ?? 'normal') !== 'sink-only';
+}
+
+/**
+ * SINGLE derived steeping-flask readiness truth (Gauntlet 20).
+ *
+ * Ready iff the static marker is a VALID production flask and the current
+ * layers are exactly `capacity` (4) homogeneous tea layers. Empty, partial,
+ * mixed-full and malformed constraints all return false. No dynamic ready
+ * flag is ever stored.
+ */
+export function isSteepingFlaskReady(
+  layers: readonly TeaId[],
+  c: CupConstraint | undefined,
+): boolean {
+  if (!isValidSteepingFlaskConstraint(c)) return false;
+  if (layers.length !== STANDARD_CUP_CAPACITY) return false;
+  const first = layers[0];
+  return layers.every((layer) => layer === first);
 }
 
 export function topLayerOf(layers: TeaId[]): TeaId | null {
@@ -346,6 +374,13 @@ export function isCompleteCup(layers: TeaId[]): boolean {
  * rejects them outright).
  */
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  // Gauntlet 20: steeping flask must end empty, and a malformed marker must
+  // never accidentally satisfy victory (fail closed before any generic
+  // must-end-empty branch).
+  if (isSteepingFlaskConstraint(c)) {
+    if (!isValidSteepingFlaskConstraint(c)) return false;
+    return layers.length === 0;
+  }
   // Gauntlet 17: pair members have NO local finality. Even a full
   // homogeneous [X,X] is only meaningful relationally (matched partner).
   if (c?.pairedTeaGroup !== undefined) return false;
@@ -502,6 +537,17 @@ function teaRejectCodeBetween(
   const source = cups[fromIdx] as TeaId[];
   const target = cups[toIdx] as TeaId[];
   if (source.length === 0) return 'source-empty';
+  // Gauntlet 20 source-readiness gate (derived, never stored): a steeping
+  // flask may source only when full homogeneous. Priority is deliberately
+  // after addressing/role/empty handling and before destination
+  // capacity/color detail. Malformed flask markers fail closed.
+  const srcConstraint = constraints?.[fromIdx];
+  if (
+    isSteepingFlaskConstraint(srcConstraint) &&
+    !isSteepingFlaskReady(source, srcConstraint)
+  ) {
+    return 'source-steeping-not-ready';
+  }
   // "Full" is relative to the DESTINATION vessel's EFFECTIVE capacity
   // (a 2/2 bowl is full; a 2/2 active cinnamon cup is full).
   const destCap = obstacles
