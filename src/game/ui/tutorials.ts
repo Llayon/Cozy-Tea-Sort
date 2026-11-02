@@ -31,7 +31,8 @@ export type TutorialId =
   | 'orderTasting'
   | 'sharedTray'
   | 'teaPair'
-  | 'steepingFlask';
+  | 'steepingFlask'
+  | 'steepingFlaskSharedTray';
 
 export interface TutorialTone {
   background: string;
@@ -252,6 +253,16 @@ export const TUTORIALS: readonly TutorialDefinition[] = [
     text: 'В колбе чай должен сначала завариться. Наливай в неё как обычно, но переливать из неё можно только когда она заполнена до краёв. К концу колба должна остаться пустой.',
     tone: TONE.steeping,
     matches: (c) => c.hasSteepingFlask === true,
+  },
+  {
+    id: 'steepingFlaskSharedTray',
+    level: 874,
+    bannerId: 'flask-tray-tutorial-hint',
+    mechanic: 'steepingFlaskSharedTray',
+    concept: 'flask readiness and the shared tray budget both remain active',
+    text: 'На подносе по-прежнему всего 6 мест. Из заварочной колбы можно переливать только когда она полная.',
+    tone: TONE.steeping,
+    matches: (c) => c.hasSteepingFlask === true && c.hasSharedTray === true,
   },
 ];
 

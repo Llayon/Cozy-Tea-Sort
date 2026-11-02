@@ -233,6 +233,27 @@ export const CHALLENGE_DECK_V3: readonly MechanicPlan[] = V3_CHALLENGE_DECK_IDS.
 export const CHALLENGE_DECK_V3_LENGTH = CHALLENGE_DECK_V3.length;
 
 /**
+ * Rollout V4 (Gauntlet 21): after two complete V3 decks, replace only V3
+ * slot 23 (second standalone Tasting) with the one shipped FLASK_TRAY
+ * composition. Slots 0–22 and 24–27 remain byte-identical to V3.
+ */
+export const ROLLOUT_V4_FIRST_CHALLENGE_LEVEL = 782;
+
+export const V4_WINNER_PLAN: MechanicPlan = {
+  ...CLEAN,
+  steepingFlask: true,
+  sharedTray: true,
+};
+
+export const CHALLENGE_DECK_V4: readonly MechanicPlan[] = [
+  ...CHALLENGE_DECK_V3.slice(0, 23),
+  { ...V4_WINNER_PLAN },
+  ...CHALLENGE_DECK_V3.slice(24),
+];
+
+export const CHALLENGE_DECK_V4_LENGTH = CHALLENGE_DECK_V4.length;
+
+/**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
  * 1 warmup clean · 2 challenge clean · 3 peak mystery · 4 relax clean ·
  * 5 warmup clean · 6 challenge TEAPOT · 7 peak TEAPOT+mystery · 8 relax clean ·
@@ -542,6 +563,18 @@ export function challengeMechanicPlanV3(levelNum: number): MechanicPlan {
   return { ...(CHALLENGE_DECK_V3[index % CHALLENGE_DECK_V3_LENGTH] as MechanicPlan) };
 }
 
+/** Rollout V4 challenge policy: explicit 28-slot deck from L782. */
+export function challengeMechanicPlanV4(levelNum: number): MechanicPlan {
+  const offset = levelNum - ROLLOUT_V4_FIRST_CHALLENGE_LEVEL;
+  if (!Number.isInteger(levelNum) || offset < 0 || offset % 4 !== 0) {
+    throw new Error(
+      `challengeMechanicPlanV4 expects a V4 challenge level (782 + 4n), got ${levelNum}`,
+    );
+  }
+  const index = offset / 4;
+  return { ...(CHALLENGE_DECK_V4[index % CHALLENGE_DECK_V4_LENGTH] as MechanicPlan) };
+}
+
 /**
  * Mechanic plan for any level: pinned table for 1–112, pinned first
  * exposures at 162/242/250/330, then the versioned deterministic rotation.
@@ -573,7 +606,11 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   const cycleNumber = Math.floor((levelNum - 1) / 4) + 1;
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
-    // Version boundaries are explicit: V1 <=330, V2 334..554, V3 from 558.
+    // Version boundaries are explicit: V1 <=330, V2 334..554, V3 558..778,
+    // V4 from 782.
+    if (levelNum >= ROLLOUT_V4_FIRST_CHALLENGE_LEVEL) {
+      return challengeMechanicPlanV4(levelNum);
+    }
     if (levelNum >= ROLLOUT_V3_FIRST_CHALLENGE_LEVEL) {
       return challengeMechanicPlanV3(levelNum);
     }
@@ -935,6 +972,27 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasSourceOnlyTeapot = false;
     phaseSubtitle = 'Заварочная колба • 6 сосудов';
     if (levelNum === 558) {
+      colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
+    } else {
+      const quads: Array<[TeaId, TeaId, TeaId, TeaId]> = [
+        ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'],
+        ['lavender', 'saffron', 'buckwheat', 'matcha'],
+        ['karkade', 'milk_oolong', 'lavender', 'sea_buckthorn'],
+        ['saffron', 'buckwheat', 'matcha', 'karkade'],
+      ];
+      colors = [...(quads[Math.floor(levelNum / 4) % quads.length] as [TeaId, TeaId, TeaId, TeaId])];
+    }
+  }
+
+  // Gauntlet 21 winner: FLASK_TRAY composition uses the E6 4c/6v
+  // 4,4,3,3,2,0 topology (tray 3+3, empty flask), challenge-only.
+  if (hasSharedTray && hasSteepingFlask) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Колба + поднос • 6 сосудов';
+    if (levelNum === 874) {
       colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
     } else {
       const quads: Array<[TeaId, TeaId, TeaId, TeaId]> = [

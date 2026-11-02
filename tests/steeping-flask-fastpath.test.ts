@@ -116,7 +116,6 @@ describe('G20 request contract', () => {
       { teaBudCount: 1 },
       { blendRecipeId: 'milk-tea' },
       { serveOrderCount: 2 },
-      { sharedTrayCount: 1 },
       { teaPairCount: 1 },
       { hasMysteryLayer: true },
     ];

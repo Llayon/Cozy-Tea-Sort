@@ -107,7 +107,12 @@ describe('plan sweep 155–1500: tray only challenge-phase standalone', () => {
       const plan = mechanicPlanForLevel(l) as unknown as Record<string, boolean | undefined>;
       if (plan.sharedTray) {
         hits.push(l);
-        // Standalone: no partner mechanic on the same board.
+        // G21 winner: shared tray + steeping flask is the only allowed
+        // partner; every other shared-tray plan stays standalone.
+        const flaskCombo = plan.steepingFlask === true;
+        if (flaskCombo) {
+          expect((l - 874) % 112).toBe(0);
+        }
         expect(plan.servingOrder ?? false).toBe(false);
         expect(plan.mystery ?? false).toBe(false);
         expect(plan.tasting ?? false).toBe(false);

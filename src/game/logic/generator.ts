@@ -127,6 +127,7 @@ import {
   isHomogeneous,
   isInFinalState,
   isPuzzleWonState,
+  isSteepingFlaskReady,
   isWonState,
   pourCountState,
   pourRejectCodeState,
@@ -203,6 +204,13 @@ import {
   SteepingFlaskTemplateKind,
   instantiateSteepingFlaskTemplate,
 } from './steepingFlaskTemplates';
+import {
+  STEEPING_FLASK_SHARED_TRAY_DEPTH_ACCEPT,
+  STEEPING_FLASK_SHARED_TRAY_TEMPLATE_ATTEMPTS,
+  STEEPING_FLASK_SHARED_TRAY_TEMPLATE_BANK,
+  SteepingFlaskSharedTrayKind,
+  instantiateSteepingFlaskSharedTrayTemplate,
+} from './steepingFlaskSharedTrayTemplates';
 import {
   CINNAMON_DEPTH_ACCEPT,
   CINNAMON_TEMPLATE_ATTEMPTS,
@@ -1277,17 +1285,21 @@ export function validateSteepingFlaskRequest(req: GenerateRequest): void {
       `validateSteepingFlaskRequest: steepingFlaskCount ${String(raw)} unsupported (production 0 or 1)`,
     );
   }
-  const comboReasons = validateSteepingFlaskCombination({
-    steepingFlask: true,
-    servingOrder: requestedServeOrderCount(req) > 0,
-    mystery: req.hasMysteryLayer === true,
-    tastingCount: requestedTastingCupCount(req),
-    honey: requestedSinkingIngredient(req) !== undefined,
-    strainer: requestedHasStrainer(req),
-    blend: requestedBlendRecipeId(req) !== undefined,
-    sharedTray: requestedSharedTrayCount(req) > 0,
-    teaPair: requestedTeaPairCount(req) > 0,
-  });
+  const allowSharedTray = requestedSharedTrayCount(req) === 1;
+  const comboReasons = validateSteepingFlaskCombination(
+    {
+      steepingFlask: true,
+      servingOrder: requestedServeOrderCount(req) > 0,
+      mystery: req.hasMysteryLayer === true,
+      tastingCount: requestedTastingCupCount(req),
+      honey: requestedSinkingIngredient(req) !== undefined,
+      strainer: requestedHasStrainer(req),
+      blend: requestedBlendRecipeId(req) !== undefined,
+      sharedTray: requestedSharedTrayCount(req) > 0,
+      teaPair: requestedTeaPairCount(req) > 0,
+    },
+    { allowSharedTray },
+  );
   if (comboReasons.length > 0) {
     throw new Error(`validateSteepingFlaskRequest: ${comboReasons.join('; ')}`);
   }
@@ -1339,7 +1351,7 @@ export function validateSteepingFlaskRequest(req: GenerateRequest): void {
   if (requestedServeOrderCount(req) > 0) {
     throw new Error('validateSteepingFlaskRequest: flask + serving order is out of scope for G20');
   }
-  if (requestedSharedTrayCount(req) > 0) {
+  if (requestedSharedTrayCount(req) > 0 && !allowSharedTray) {
     throw new Error('validateSteepingFlaskRequest: flask + shared tray is out of scope for G20');
   }
   if (requestedTeaPairCount(req) > 0) {
@@ -2345,6 +2357,92 @@ export function analyzeSharedTrayParticipation(
   return out;
 }
 
+export interface SteepingFlaskParticipation {
+  commitDepth: number | null;
+  pressureDepth: number | null;
+  readyDepth: number | null;
+  releaseDepth: number | null;
+  emptyDepth: number | null;
+  partialRelease: boolean;
+  cleanDecant: boolean;
+  win: boolean;
+}
+
+/**
+ * G21 runtime analysis of the G20 flask contract inside a composition.
+ * Derived only; no state. The flask marker is the only difference from its
+ * plain control (cap4/mustEndEmpty stays).
+ */
+export function analyzeSteepingFlaskParticipation(
+  startCups: TeaId[][],
+  solution: readonly SolverAction[],
+  cupConstraints: readonly CupConstraint[],
+): SteepingFlaskParticipation {
+  const out: SteepingFlaskParticipation = {
+    commitDepth: null,
+    pressureDepth: null,
+    readyDepth: null,
+    releaseDepth: null,
+    emptyDepth: null,
+    partialRelease: false,
+    cleanDecant: false,
+    win: false,
+  };
+  const flaskIndex = cupConstraints.findIndex(isSteepingFlaskConstraint);
+  if (flaskIndex < 0) return out;
+  const control = cupConstraints.map((c) => {
+    const n = cloneCupConstraint(c);
+    delete (n as { steepingFlask?: unknown }).steepingFlask;
+    return n;
+  });
+  const emptyRow = (n: number): null[] => Array.from({ length: n }, () => null);
+  const st = (cups: TeaId[][]) => ({ cups, floatingIngredients: emptyRow(cups.length) });
+  const pressure = (cups: TeaId[][]): boolean => {
+    const cur = st(cups);
+    for (let to = 0; to < cups.length; to++) {
+      if (to === flaskIndex) continue;
+      if (pourRejectCodeState(cur, flaskIndex, to, cupConstraints) !== 'source-steeping-not-ready') continue;
+      if (pourRejectCodeState(cur, flaskIndex, to, control) !== 'ok') continue;
+      if (pourCountState(cur, flaskIndex, to, control) > 0) return true;
+    }
+    return false;
+  };
+  let cups = startCups.map((c) => [...c]);
+  for (let d = 0; d <= solution.length; d++) {
+    const before = cups[flaskIndex] as TeaId[];
+    if (before.length >= 1 && before.length <= 3 && before.every((t) => t === before[0]) && out.pressureDepth === null) {
+      if (pressure(cups)) out.pressureDepth = d;
+    }
+    if (d === solution.length) break;
+    const action = solution[d] as SolverAction;
+    if (action.kind === 'pour') {
+      const wasReady = isSteepingFlaskReady(before, cupConstraints[flaskIndex]);
+      const res = applyPourState(st(cups), action.from as number, action.to as number, cupConstraints);
+      if (!res) return out;
+      cups = res.state.cups as TeaId[][];
+      const after = cups[flaskIndex] as TeaId[];
+      if (before.length === 0 && after.length >= 1 && after.length <= 3 && after.every((t) => t === after[0]) && out.commitDepth === null) {
+        out.commitDepth = d + 1;
+      }
+      if (!wasReady && isSteepingFlaskReady(after, cupConstraints[flaskIndex]) && out.readyDepth === null) {
+        out.readyDepth = d + 1;
+      }
+      if (action.from === flaskIndex && wasReady && out.releaseDepth === null) {
+        out.releaseDepth = d + 1;
+        if (after.length >= 1 && after.length <= 3) out.partialRelease = true;
+        if (after.length === 0) out.cleanDecant = true;
+      }
+      if (out.releaseDepth !== null && after.length === 0 && out.emptyDepth === null) out.emptyDepth = d + 1;
+    } else {
+      const res = applyPuzzleActionState(st(cups), action, cupConstraints);
+      if (!res) return out;
+      cups = res.state.cups as TeaId[][];
+    }
+  }
+  out.win = isPuzzleWonState(st(cups), cupConstraints);
+  return out;
+}
+
 /**
  * Multi-ingredient interaction trace (Gauntlet 8 §38, ANALYSIS ONLY —
  * never gameplay state). Replays a solution and counts, at deterministic
@@ -2952,7 +3050,7 @@ function finalizeCandidate(
     if (requestedFloatingIngredient(req) !== undefined || requestedSinkingIngredient(req) !== undefined) return null;
     if (requestedHasStrainer(req) || requestedFrozenCupCount(req) > 0 || requestedThermosCupCount(req) > 0) return null;
     if (requestedCinnamonCupCount(req) > 0 || requestedTeaBudCount(req) > 0 || requestedBlendRecipeId(req) !== undefined) return null;
-    if (requestedServeOrderCount(req) > 0 || requestedSharedTrayCount(req) > 0 || requestedTeaPairCount(req) > 0) return null;
+    if (requestedServeOrderCount(req) > 0 || requestedSharedTrayCount(req) > 1 || requestedTeaPairCount(req) > 0) return null;
     const flaskIndex = normalized.findIndex(isSteepingFlaskConstraint);
     if (flaskIndex < 0) return null;
     const flaskC = normalized[flaskIndex] as CupConstraint;
@@ -2963,7 +3061,7 @@ function finalizeCandidate(
     const ordinaryEmpty = normalized.filter(
       (c, i) => c.mode === 'normal' && !isSteepingFlaskConstraint(c) && (cups[i] as TeaId[]).length === 0,
     ).length;
-    if (ordinaryEmpty < 1) return null;
+    if (ordinaryEmpty < 1 && requestedSharedTrayCount(req) !== 1) return null;
   }
   // AN: every vessel holds at most ITS OWN capacity (tasting: 2).
   for (let i = 0; i < cups.length; i++) {
@@ -3729,6 +3827,97 @@ function finalizeCandidate(
       if (!validateLevelStructure(level, req).ok) return null;
       return level;
     }
+  }
+  // G21 FLASK_TRAY winner: exact flask + tray composition. The optimal
+  // replay must exercise BOTH derived contracts (flask commit/pressure/ready/
+  // release/empty and tray pressure/release/refill) and win. No controls at
+  // runtime; C3/C3X remain offline evidence.
+  if (requestedSteepingFlaskCount(req) === 1 && requestedSharedTrayCount(req) === 1) {
+    const flaskIndex = normalized.findIndex(isSteepingFlaskConstraint);
+    if (flaskIndex < 0) return null;
+    const sharedReasons = validateSharedCapacityConstraints(normalized);
+    if (sharedReasons.length > 0) return null;
+    const trayMembers = normalized
+      .map((c, i) => (c?.sharedCapacityGroup === 'tea-tray' ? i : -1))
+      .filter((i) => i >= 0);
+    if (trayMembers.length !== 2) return null;
+    const comboCounts = cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(comboCounts) !== JSON.stringify([0, 2, 3, 3, 4, 4])) return null;
+    const comboOcc = trayMembers.reduce((sum, i) => sum + (cups[i] as TeaId[]).length, 0);
+    if (comboOcc !== 6) return null;
+    for (const cup of cups) {
+      const arr = cup as TeaId[];
+      if (arr.length > 0 && !arr.some((t) => t !== arr[0])) return null;
+    }
+    if (presentIds.length > 0 || sinkPresent.length > 0 || strainerState.present) return null;
+    if (countSinkOnly(normalized) > 0) return null;
+    if (normalized.some((c) => c.targetTeaId !== undefined)) return null;
+    if (countTastingCups(normalized) > 0) return null;
+    if (icePresent.length > 0 || countThermosCups(normalized) > 0) return null;
+    if (obstacles.some((s) => s !== null) || buds.some((s) => s !== null)) return null;
+    if (requestedBlendRecipeId(req) !== undefined || requestedServeOrderCount(req) !== 0) return null;
+    if (hasServeOrder(normalized) || hasPairedTea(normalized)) return null;
+    if (stats) stats.solverCalls++;
+    const comboSolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+    });
+    if (!comboSolved.solvable || comboSolved.truncated || comboSolved.minMoves === undefined) return null;
+    if (
+      comboSolved.minMoves < STEEPING_FLASK_SHARED_TRAY_DEPTH_ACCEPT.min ||
+      comboSolved.minMoves > STEEPING_FLASK_SHARED_TRAY_DEPTH_ACCEPT.max
+    ) {
+      return null;
+    }
+    const comboSolution = (comboSolved.solution ?? []) as SolverAction[];
+    const flaskTrace = analyzeSteepingFlaskParticipation(cups, comboSolution, normalized);
+    const trayTrace = analyzeSharedTrayParticipation(cups, comboSolution, normalized);
+    if (!flaskTrace.win || !trayTrace.win) return null;
+    if (
+      flaskTrace.commitDepth === null ||
+      flaskTrace.pressureDepth === null ||
+      flaskTrace.readyDepth === null ||
+      flaskTrace.releaseDepth === null ||
+      flaskTrace.emptyDepth === null ||
+      !(flaskTrace.commitDepth <= flaskTrace.pressureDepth) ||
+      !(flaskTrace.pressureDepth < flaskTrace.readyDepth) ||
+      !(flaskTrace.readyDepth < flaskTrace.releaseDepth) ||
+      !(flaskTrace.releaseDepth <= flaskTrace.emptyDepth)
+    ) {
+      return null;
+    }
+    if (
+      trayTrace.firstPressureDepth === null ||
+      trayTrace.firstReleaseDepth === null ||
+      trayTrace.firstRefillDepth === null ||
+      !(trayTrace.firstPressureDepth < trayTrace.firstReleaseDepth) ||
+      !(trayTrace.firstReleaseDepth < trayTrace.firstRefillDepth)
+    ) {
+      return null;
+    }
+    const comboFinal = applySolutionState(
+      { cups, floatingIngredients: slots },
+      comboSolution,
+      normalized,
+    );
+    if (!comboFinal || !isPuzzleWonState(comboFinal, normalized)) return null;
+    const level: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      iceSlots: ice,
+      capacityObstacles: obstacles,
+      teaBudSlots: buds,
+      seed,
+      minMoves: comboSolved.minMoves,
+      visitedStates: comboSolved.visitedStates,
+    };
+    if (!validateLevelStructure(level, req).ok) return null;
+    return level;
   }
   // JI–JD: shared-tray production gate (Gauntlet 16). Group budget is
   // structural capacity, not rescue — no plain-control comparison at runtime
@@ -4789,6 +4978,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   const wantCinnamon = requestedCinnamonCupCount(req);
   const wantBud = requestedTeaBudCount(req);
   const wantFlask = requestedSteepingFlaskCount(req);
+  const wantShared = requestedSharedTrayCount(req);
   const tag =
     `fallback:${req.phase}:${req.numColors}c${wantSourceOnly > 0 ? ':teapot' : ''}` +
     `${req.hasMysteryLayer ? ':mystery' : ''}${wantTargets.length > 0 ? `:target${wantTargets.length}` : ''}` +
@@ -4816,7 +5006,22 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
     shapeEntries.push(...servingOrderTastingFallbackEntries(req));
     shapeEntries.push(...servingOrderFallbackEntries(req));
   }
-  if (requestedSharedTrayCount(req) !== 0) {
+  if (wantFlask === 1 && wantShared === 1) {
+    const tpl = STEEPING_FLASK_SHARED_TRAY_TEMPLATE_BANK['flask-tray'][0];
+    if (tpl) {
+      const palette = req.colors.slice(0, req.numColors);
+      if (palette.length === req.numColors) {
+        const inst = instantiateSteepingFlaskSharedTrayTemplate(tpl, palette, [...palette]);
+        const constraints = defaultCupConstraints(inst.cups.length);
+        for (const member of inst.trayMembers) {
+          constraints[member] = { mode: 'normal', sharedCapacityGroup: 'tea-tray' };
+        }
+        constraints[inst.flaskSlot] = cloneCupConstraint(STEEPING_FLASK_CONSTRAINT);
+        shapeEntries.push({ cups: inst.cups, constraints });
+      }
+    }
+  }
+  if (wantShared !== 0 && wantFlask === 0) {
     shapeEntries.push(...sharedTrayFallbackEntries(req));
   }
   // Dedicated blend shapes go first for blend requests (palette fillers in
@@ -4836,7 +5041,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   }
   // Dedicated steeping-flask fallback (identity role mapping — recorded
   // depth holds exactly).
-  if (wantFlask > 0) {
+  if (wantFlask > 0 && wantShared === 0) {
     const tpl = STEEPING_FLASK_TEMPLATE_BANK['steeping-flask'][0];
     if (tpl) {
       const palette = req.colors.slice(0, req.numColors);
@@ -5962,6 +6167,7 @@ export const TEA_PAIR_ELIGIBLE_TEAS: readonly TeaId[] = [
  */
 export function sharedTrayTemplateKindFor(req: GenerateRequest): SharedTrayTemplateKind | null {
   if (requestedSharedTrayCount(req) !== 1) return null;
+  if (requestedSteepingFlaskCount(req) !== 0) return null;
   if (requestedServeOrderCount(req) !== 0) return null;
   if (requestedTeaBudCount(req) !== 0) return null;
   if (requestedTargetTeas(req).length > 0) return null;
@@ -6284,6 +6490,36 @@ function generateFromServingOrderCompositionBank(
  * 6 vessels, 2 nominal empties, no Mystery, no teapot, no sibling special.
  * Anything else keeps the existing paths (validation throws for bad combos).
  */
+/**
+ * Match the G21 winner composition exactly: one steeping flask + one
+ * shared tray, 4 colors / 6 vessels / 2 nominal empties, no other special.
+ * No generic “any two” composition engine.
+ */
+export function steepingFlaskSharedTrayTemplateKindFor(
+  req: GenerateRequest,
+): SteepingFlaskSharedTrayKind | null {
+  if (requestedSteepingFlaskCount(req) !== 1 || requestedSharedTrayCount(req) !== 1) return null;
+  if (requestedServeOrderCount(req) !== 0) return null;
+  if (requestedTeaPairCount(req) !== 0) return null;
+  if (requestedTeaBudCount(req) !== 0) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (req.numColors !== 4 || req.emptyCups !== 2 || req.hasMysteryLayer) return null;
+  if (requestedSourceOnlyCount(req) !== 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  if (!palette.every((t) => (SHARED_TRAY_ELIGIBLE_TEAS as readonly string[]).includes(t))) return null;
+  return 'flask-tray';
+}
+
 export function steepingFlaskTemplateKindFor(req: GenerateRequest): SteepingFlaskTemplateKind | null {
   if (requestedSteepingFlaskCount(req) !== 1) return null;
   if (requestedTargetTeas(req).length > 0) return null;
@@ -6312,6 +6548,48 @@ export function steepingFlaskTemplateKindFor(req: GenerateRequest): SteepingFlas
  * static flask constraint → one finalize validation. At most
  * STEEPING_FLASK_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
  */
+function generateFromSteepingFlaskSharedTrayTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = steepingFlaskSharedTrayTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = STEEPING_FLASK_SHARED_TRAY_TEMPLATE_BANK[kind];
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < STEEPING_FLASK_SHARED_TRAY_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateSteepingFlaskSharedTrayTemplate(tpl, palette, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    for (const member of inst.trayMembers) {
+      constraints[member] = { mode: 'normal', sharedCapacityGroup: 'tea-tray' };
+    }
+    constraints[inst.flaskSlot] = cloneCupConstraint(STEEPING_FLASK_CONSTRAINT);
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      inst.cups.map(() => 0),
+      `${seedStr}#flask-tray:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 function generateFromSteepingFlaskTemplateBank(
   req: GenerateRequest,
   seedStr: string,
@@ -6599,6 +6877,13 @@ export function generateLevel(
   // fast path or the validated fallback ladder.
   if (frozenCupTemplateKindFor(req) !== null) {
     const fast = generateFromFrozenCupTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // G21 winner FLASK_TRAY: bounded curated bank, exact composition only.
+  if (steepingFlaskSharedTrayTemplateKindFor(req) !== null) {
+    const fast = generateFromSteepingFlaskSharedTrayTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -6902,9 +7187,31 @@ export function validateLevelStructure(
           !isSteepingFlaskConstraint(cc) &&
           (level.cups[i] as TeaId[]).length === 0,
       ).length;
-      if (ordinaryEmpty < 1) reasons.push('steeping flask requires one ordinary empty buffer');
+      if (ordinaryEmpty < 1 && requestedSharedTrayCount(req) !== 1) {
+        reasons.push('steeping flask requires one ordinary empty buffer');
+      }
     } else {
       reasons.push('steeping flask request has no flask constraint');
+    }
+  }
+  if (wantFlask > 0 && requestedSharedTrayCount(req) > 0) {
+    if (requestedSharedTrayCount(req) !== 1) {
+      reasons.push(`flask-tray production max one shared tray, got ${requestedSharedTrayCount(req)}`);
+    }
+    for (const r of validateSharedCapacityConstraints(constraints)) reasons.push(r);
+    const trayMembers = constraints
+      .map((c, i) => (c?.sharedCapacityGroup === 'tea-tray' ? i : -1))
+      .filter((i) => i >= 0);
+    if (trayMembers.length !== 2) reasons.push(`flask-tray expected 2 tray members, got ${trayMembers.length}`);
+    const comboCounts = level.cups.map((c) => c.length).sort((a, b) => a - b);
+    if (JSON.stringify(comboCounts) !== JSON.stringify([0, 2, 3, 3, 4, 4])) {
+      reasons.push(`flask-tray topology must be 4,4,3,3,2,0, got ${comboCounts.join(',')}`);
+    }
+    if (trayMembers.reduce((sum, i) => sum + (level.cups[i] as TeaId[]).length, 0) !== 6) {
+      reasons.push('flask-tray must start at 6/6 tray occupancy');
+    }
+    if (hasServeOrder(constraints) || hasPairedTea(constraints) || hasSharedCapacity(constraints) === false) {
+      reasons.push('flask-tray must keep both static identities and no third composition');
     }
   }
   level.cups.forEach((cup, i) => {

@@ -180,9 +180,10 @@ const POLICY: Record<string, MechanicCompatibility> = {
     reason: 'steeping flask + mystery is unproven (G20 production is standalone)',
   },
   'sharedTray+steepingFlask': {
-    sameLevel: 'research',
+    sameLevel: 'allow',
     sameCup: 'forbid',
-    reason: 'steeping flask + shared tray is unproven (G20 production is standalone)',
+    reason:
+      'G21 FLASK_TRAY: separate vessels, flask source-readiness + tray 6-slot budget; production winner',
   },
   'steepingFlask+tasting': {
     sameLevel: 'research',
@@ -347,19 +348,23 @@ export function validateTeaPairCombination(flags: {
 
 /**
  * Validate a steeping-flask request class (G20, pure, no RNG/mutation).
- * Production G20 is STANDALONE: every composition partner is rejected.
+ * Shared tray is allowed only for the exact G21 FLASK_TRAY production class;
+ * every other composition partner remains rejected.
  */
-export function validateSteepingFlaskCombination(flags: {
-  steepingFlask: boolean;
-  servingOrder: boolean;
-  mystery: boolean;
-  tastingCount: number;
-  honey: boolean;
-  strainer: boolean;
-  blend: boolean;
-  sharedTray: boolean;
-  teaPair: boolean;
-}): string[] {
+export function validateSteepingFlaskCombination(
+  flags: {
+    steepingFlask: boolean;
+    servingOrder: boolean;
+    mystery: boolean;
+    tastingCount: number;
+    honey: boolean;
+    strainer: boolean;
+    blend: boolean;
+    sharedTray: boolean;
+    teaPair: boolean;
+  },
+  opts: { allowSharedTray?: boolean } = {},
+): string[] {
   const reasons: string[] = [];
   if (!flags.steepingFlask) return reasons;
   const partners: string[] = [];
@@ -369,7 +374,7 @@ export function validateSteepingFlaskCombination(flags: {
   if (flags.honey) partners.push('honey');
   if (flags.strainer) partners.push('strainer');
   if (flags.blend) partners.push('blend');
-  if (flags.sharedTray) partners.push('shared tray');
+  if (flags.sharedTray && opts.allowSharedTray !== true) partners.push('shared tray');
   if (flags.teaPair) partners.push('tea pair');
   for (const p of partners) {
     if (p === 'blend') {

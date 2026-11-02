@@ -116,8 +116,10 @@ describe('G20 V3 boundary / G19 freeze', () => {
     expect(g20.boundary).toEqual({ v3FirstChallengeLevel: 558, deckLength: 28 });
     expect(g20.deck).toEqual([...EXPECTED_V3_IDS]);
     expect(g20.levels).toHaveLength(1043);
+    const frozen = g20.levels.filter((row) => row.level <= 873);
+    expect(frozen).toHaveLength(316);
     const diffs: string[] = [];
-    for (const row of g20.levels) {
+    for (const row of frozen) {
       const cfg = getLevelConfig(row.level);
       const actualHash = semanticConfigHash(row.level);
       const actualPlan = key(mechanicPlanForLevel(row.level));
@@ -190,8 +192,8 @@ describe('G20 V3 boundary / G19 freeze', () => {
     }
   });
 
-  it('10 complete V3 decks repeat exactly (280 slots / 1120 levels)', () => {
-    for (let deck = 0; deck < 10; deck++) {
+  it('the two complete V3 decks before V4 repeat exactly (56 slots)', () => {
+    for (let deck = 0; deck < 2; deck++) {
       for (let i = 0; i < 28; i++) {
         const level = 558 + 4 * (deck * 28 + i);
         expect(mechanicPlanForLevel(level), `deck ${deck} slot ${i} L${level}`).toEqual(
@@ -268,10 +270,10 @@ describe('G20 V3 recurrence', () => {
 });
 
 describe('G20 V3 plan-space safety', () => {
-  it('challenge plans 558-10000 are exactly the V3 deck; no unsupported plan', () => {
+  it('challenge plans 558-778 are exactly the V3 deck; no unsupported plan', () => {
     const allowed = new Set(CHALLENGE_DECK_V3.map(key));
     expect(allowed.size).toBe(23); // 22 existing + flask
-    for (let level = 558; level <= 10000; level++) {
+    for (let level = 558; level <= 778; level++) {
       if (getLevelConfig(level).phase !== 'challenge') continue;
       expect(allowed.has(key(mechanicPlanForLevel(level))), `L${level}`).toBe(true);
     }
@@ -304,7 +306,11 @@ describe('G20 V3 plan-space safety', () => {
       sameLevel: 'forbid',
       sameCup: 'forbid',
     });
-    for (const other of ['sharedTray', 'teaPair', 'servingOrder', 'tasting', 'mystery', 'honey', 'strainer'] as const) {
+    expect(mechanicCompatibility('steepingFlask', 'sharedTray')).toMatchObject({
+      sameLevel: 'allow',
+      sameCup: 'forbid',
+    });
+    for (const other of ['teaPair', 'servingOrder', 'tasting', 'mystery', 'honey', 'strainer'] as const) {
       expect(mechanicCompatibility('steepingFlask', other)).toMatchObject({
         sameLevel: 'research',
         sameCup: 'forbid',
