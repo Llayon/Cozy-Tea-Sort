@@ -1,0 +1,63 @@
+{
+  "E7": {
+    "id": "E7",
+    "label": "FLASK_TRAY",
+    "mechanics": [
+      "flask",
+      "tray"
+    ],
+    "topology": [
+      4,
+      4,
+      3,
+      3,
+      2,
+      0,
+      0
+    ],
+    "sampled": 1000,
+    "solvable": 1000,
+    "unsolvable": 0,
+    "truncated": 0,
+    "solvabilityRate": 1,
+    "l1": 1000,
+    "c2": 0,
+    "c2Rate": 0,
+    "canonicalC2": 0,
+    "c3": 0,
+    "c3Rate": 0,
+    "canonicalC3": 0,
+    "c3x": 0,
+    "c3xRate": 0,
+    "canonicalC3x": 0,
+    "c4": 0,
+    "oneSidedInvalidation": 0,
+    "depth": {
+      "p50": 11,
+      "p95": 13,
+      "max": 14
+    },
+    "visited": {
+      "p50": 27178.5,
+      "p95": 46906,
+      "max": 50406
+    },
+    "solverMs": {
+      "p50": 2323.27919999999,
+      "p95": 4728.7809000000125,
+      "max": 7644.124599999981
+    },
+    "stateMultiplier": {
+      "p50": null,
+      "p95": null,
+      "max": null
+    },
+    "controls": {
+      "fullDepthP50": null,
+      "depthP50": null,
+      "minMovesP50": null
+    },
+    "wallMs": 2451390,
+    "c2Records": []
+  }
+}

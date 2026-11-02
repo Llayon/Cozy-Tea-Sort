@@ -1,0 +1,63 @@
+{
+  "D6": {
+    "id": "D6",
+    "label": "FLASK_PAIR",
+    "mechanics": [
+      "flask",
+      "pair"
+    ],
+    "topology": [
+      2,
+      2,
+      4,
+      4,
+      4,
+      0
+    ],
+    "sampled": 5000,
+    "solvable": 4760,
+    "unsolvable": 240,
+    "truncated": 0,
+    "solvabilityRate": 0.952,
+    "l1": 4760,
+    "c2": 2092,
+    "c2Rate": 0.4184,
+    "canonicalC2": 2090,
+    "c3": 0,
+    "c3Rate": 0,
+    "canonicalC3": 0,
+    "c3x": 0,
+    "c3xRate": 0,
+    "canonicalC3x": 0,
+    "c4": 0,
+    "oneSidedInvalidation": 672,
+    "depth": {
+      "p50": 13,
+      "p95": 15,
+      "max": 17
+    },
+    "visited": {
+      "p50": 206.5,
+      "p95": 378,
+      "max": 664
+    },
+    "solverMs": {
+      "p50": 9.028749999994034,
+      "p95": 19.85859999999957,
+      "max": 40.421400000000176
+    },
+    "stateMultiplier": {
+      "p50": 0.8346796082774195,
+      "p95": 1,
+      "max": 1
+    },
+    "controls": {
+      "fullDepthP50": 12,
+      "depthP50": 12,
+      "minMovesP50": 12
+    },
+    "wallMs": 102510,
+    "c2Examples": [],
+    "recordsTrimmed": true
+  }
+}

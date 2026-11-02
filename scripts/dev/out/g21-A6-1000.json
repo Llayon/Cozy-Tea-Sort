@@ -1,0 +1,464 @@
+{
+  "A6": {
+    "id": "A6",
+    "label": "FLASK_ORDER",
+    "mechanics": [
+      "flask",
+      "order"
+    ],
+    "topology": [
+      4,
+      4,
+      4,
+      4,
+      0,
+      0
+    ],
+    "sampled": 1000,
+    "solvable": 1000,
+    "unsolvable": 0,
+    "truncated": 0,
+    "solvabilityRate": 1,
+    "l1": 1000,
+    "c2": 205,
+    "c2Rate": 0.205,
+    "canonicalC2": 205,
+    "c3": 69,
+    "c3Rate": 0.069,
+    "canonicalC3": 69,
+    "c3x": 165,
+    "c3xRate": 0.165,
+    "canonicalC3x": 165,
+    "c4": 0,
+    "oneSidedInvalidation": 40,
+    "depth": {
+      "p50": 12,
+      "p95": 15,
+      "max": 16
+    },
+    "visited": {
+      "p50": 3032.5,
+      "p95": 5082,
+      "max": 6136
+    },
+    "solverMs": {
+      "p50": 158.17885000000024,
+      "p95": 293.7143999999971,
+      "max": 411.4233999999997
+    },
+    "stateMultiplier": {
+      "p50": 0.9966917293233083,
+      "p95": 1.1503972758229284,
+      "max": 1.2404371584699454
+    },
+    "controls": {
+      "fullDepthP50": 13,
+      "depthP50": 12,
+      "minMovesP50": 12
+    },
+    "wallMs": 217765,
+    "c2Examples": [
+      {
+        "seed": 0,
+        "depth": 14,
+        "first": "pour:0→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 5,
+            "serve1Depth": 10,
+            "serve2Depth": 11,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 2,
+            "commitTea": "matcha",
+            "pressureDepth": 6,
+            "readyDepth": 9,
+            "releaseDepth": 11,
+            "emptyDepth": 11,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 1730
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:1→5",
+            "invalidated": true,
+            "visited": 5346
+          }
+        ],
+        "c3": true,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 0.8529741863075196,
+        "key": "N:_:|karkade,milk_oolong,sea_buckthorn,matcha|milk_oolong,matcha,karkade,sea_buckthorn||N:_:C4:E:SF:||N:_:O1:milk_oolong,matcha,milk_oolong,sea_buckthorn||N:_:O2:sea_buckthorn,matcha,karkade,karkade"
+      },
+      {
+        "seed": 4,
+        "depth": 13,
+        "first": "pour:1→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 9,
+            "serve1Depth": 11,
+            "serve2Depth": 12,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 2,
+            "commitTea": "matcha",
+            "pressureDepth": 3,
+            "readyDepth": 6,
+            "releaseDepth": 13,
+            "emptyDepth": 13,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:1→4",
+            "invalidated": true,
+            "visited": 1343
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 3710
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 0.9380053908355795,
+        "key": "N:_:|karkade,sea_buckthorn,sea_buckthorn,milk_oolong|milk_oolong,sea_buckthorn,karkade,matcha||N:_:C4:E:SF:||N:_:O1:karkade,matcha,milk_oolong,sea_buckthorn||N:_:O2:milk_oolong,matcha,matcha,karkade"
+      },
+      {
+        "seed": 7,
+        "depth": 14,
+        "first": "pour:0→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 9,
+            "serve1Depth": 12,
+            "serve2Depth": 13,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 2,
+            "commitTea": "sea_buckthorn",
+            "pressureDepth": 3,
+            "readyDepth": 12,
+            "releaseDepth": 14,
+            "emptyDepth": 14,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 14,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 1796
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 4362
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 0.9277854195323246,
+        "key": "N:_:|matcha,sea_buckthorn,karkade,sea_buckthorn|milk_oolong,sea_buckthorn,sea_buckthorn,milk_oolong||N:_:C4:E:SF:||N:_:O1:milk_oolong,matcha,karkade,matcha||N:_:O2:karkade,matcha,milk_oolong,karkade"
+      },
+      {
+        "seed": 10,
+        "depth": 10,
+        "first": "pour:1→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 5,
+            "serve1Depth": 8,
+            "serve2Depth": 9,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 4,
+            "commitTea": "sea_buckthorn",
+            "pressureDepth": 7,
+            "readyDepth": 8,
+            "releaseDepth": 9,
+            "emptyDepth": 9,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 10,
+            "first": "pour:1→4",
+            "invalidated": true,
+            "visited": 690
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 9,
+            "first": "pour:1→4",
+            "invalidated": true,
+            "visited": 1738
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.0983889528193325,
+        "key": "N:_:|karkade,matcha,matcha,milk_oolong|matcha,matcha,sea_buckthorn,karkade||N:_:C4:E:SF:||N:_:O1:sea_buckthorn,milk_oolong,sea_buckthorn,sea_buckthorn||N:_:O2:karkade,karkade,milk_oolong,milk_oolong"
+      },
+      {
+        "seed": 13,
+        "depth": 12,
+        "first": "pour:0→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 6,
+            "serve1Depth": 8,
+            "serve2Depth": 9,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 2,
+            "commitTea": "matcha",
+            "pressureDepth": 3,
+            "readyDepth": 8,
+            "releaseDepth": 12,
+            "emptyDepth": 12,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 845
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 2093
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.0917343526039178,
+        "key": "N:_:|karkade,karkade,milk_oolong,sea_buckthorn|milk_oolong,matcha,matcha,karkade||N:_:C4:E:SF:||N:_:O1:sea_buckthorn,matcha,sea_buckthorn,sea_buckthorn||N:_:O2:milk_oolong,milk_oolong,matcha,karkade"
+      },
+      {
+        "seed": 18,
+        "depth": 15,
+        "first": "pour:1→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 12,
+            "serve1Depth": 13,
+            "serve2Depth": 14,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 2,
+            "commitTea": "sea_buckthorn",
+            "pressureDepth": 4,
+            "readyDepth": 12,
+            "releaseDepth": 15,
+            "emptyDepth": 15,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 14,
+            "first": "pour:1→4",
+            "invalidated": true,
+            "visited": 2598
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 14,
+            "first": "pour:1→5",
+            "invalidated": true,
+            "visited": 6380
+          }
+        ],
+        "c3": true,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 0.9590909090909091,
+        "key": "N:_:|matcha,sea_buckthorn,milk_oolong,karkade|milk_oolong,matcha,milk_oolong,karkade||N:_:C4:E:SF:||N:_:O1:milk_oolong,sea_buckthorn,matcha,sea_buckthorn||N:_:O2:karkade,sea_buckthorn,karkade,matcha"
+      },
+      {
+        "seed": 22,
+        "depth": 12,
+        "first": "pour:0→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 7,
+            "serve1Depth": 9,
+            "serve2Depth": 11,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 2,
+            "commitTea": "sea_buckthorn",
+            "pressureDepth": 4,
+            "readyDepth": 11,
+            "releaseDepth": 12,
+            "emptyDepth": 12,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:0→4",
+            "invalidated": false,
+            "visited": 1147
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 2486
+          }
+        ],
+        "c3": false,
+        "c3x": false,
+        "c4": false,
+        "stateMultiplier": 1.1005631536604987,
+        "key": "N:_:|matcha,sea_buckthorn,sea_buckthorn,matcha|sea_buckthorn,milk_oolong,matcha,sea_buckthorn||N:_:C4:E:SF:||N:_:O1:milk_oolong,milk_oolong,matcha,karkade||N:_:O2:karkade,milk_oolong,karkade,karkade"
+      },
+      {
+        "seed": 32,
+        "depth": 13,
+        "first": "pour:0→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 6,
+            "serve1Depth": 8,
+            "serve2Depth": 9,
+            "prefix": 2,
+            "win": true
+          },
+          "flask": {
+            "active": true,
+            "commitDepth": 3,
+            "commitTea": "milk_oolong",
+            "pressureDepth": 5,
+            "readyDepth": 11,
+            "releaseDepth": 13,
+            "emptyDepth": 13,
+            "partialRelease": false,
+            "cleanDecant": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 1368
+          },
+          {
+            "name": "flask",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 3325
+          }
+        ],
+        "c3": true,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 0.9966917293233083,
+        "key": "N:_:|matcha,milk_oolong,karkade,matcha|sea_buckthorn,matcha,milk_oolong,karkade||N:_:C4:E:SF:||N:_:O1:sea_buckthorn,sea_buckthorn,milk_oolong,matcha||N:_:O2:karkade,karkade,milk_oolong,sea_buckthorn"
+      }
+    ],
+    "recordsTrimmed": true
+  }
+}

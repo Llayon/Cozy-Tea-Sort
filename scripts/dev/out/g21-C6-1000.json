@@ -1,0 +1,182 @@
+{
+  "C6": {
+    "id": "C6",
+    "label": "PAIR_TASTING",
+    "mechanics": [
+      "pair",
+      "tasting"
+    ],
+    "topology": [
+      2,
+      2,
+      4,
+      4,
+      4,
+      0
+    ],
+    "sampled": 1000,
+    "solvable": 9,
+    "unsolvable": 991,
+    "truncated": 0,
+    "solvabilityRate": 0.009,
+    "l1": 9,
+    "c2": 1,
+    "c2Rate": 0.001,
+    "canonicalC2": 1,
+    "c3": 0,
+    "c3Rate": 0,
+    "canonicalC3": 0,
+    "c3x": 0,
+    "c3xRate": 0,
+    "canonicalC3x": 0,
+    "c4": 0,
+    "oneSidedInvalidation": 0,
+    "depth": {
+      "p50": 9,
+      "p95": 11,
+      "max": 11
+    },
+    "visited": {
+      "p50": 68,
+      "p95": 138,
+      "max": 232
+    },
+    "solverMs": {
+      "p50": 2.2419000000000437,
+      "p95": 5.17410000000018,
+      "max": 10.00200000000001
+    },
+    "stateMultiplier": {
+      "p50": 1,
+      "p95": 1,
+      "max": 1
+    },
+    "controls": {
+      "fullDepthP50": 9,
+      "depthP50": 9,
+      "minMovesP50": 9
+    },
+    "wallMs": 2507,
+    "c2Records": [
+      {
+        "seed": 516,
+        "depth": 9,
+        "first": "pour:1→5",
+        "mechanics": {
+          "pair": {
+            "win": true,
+            "solved": true,
+            "moveCount": 9,
+            "statuses": [
+              {
+                "kind": "uncommitted"
+              },
+              {
+                "kind": "uncommitted"
+              },
+              {
+                "kind": "committed",
+                "tea": "milk_oolong",
+                "anchorIndex": 1,
+                "partnerIndex": 0
+              },
+              {
+                "kind": "committed",
+                "tea": "milk_oolong",
+                "anchorIndex": 1,
+                "partnerIndex": 0
+              },
+              {
+                "kind": "committed",
+                "tea": "milk_oolong",
+                "anchorIndex": 1,
+                "partnerIndex": 0
+              },
+              {
+                "kind": "matched",
+                "tea": "milk_oolong"
+              },
+              {
+                "kind": "matched",
+                "tea": "milk_oolong"
+              },
+              {
+                "kind": "matched",
+                "tea": "milk_oolong"
+              },
+              {
+                "kind": "matched",
+                "tea": "milk_oolong"
+              },
+              {
+                "kind": "matched",
+                "tea": "milk_oolong"
+              }
+            ],
+            "commitEvents": [
+              {
+                "tea": "milk_oolong",
+                "depth": 2
+              }
+            ],
+            "firstCommitTea": "milk_oolong",
+            "firstCommitDepth": 2,
+            "firstPressureDepth": 2,
+            "matchedDepth": 5,
+            "finalTea": "milk_oolong",
+            "finalRole": 3,
+            "stable": {
+              "tea": "milk_oolong",
+              "commitDepth": 2,
+              "pressureDepth": 2,
+              "matchDepth": 5,
+              "gap": 3
+            },
+            "l1": true,
+            "l2": true,
+            "commitRatio": 0.2222222222222222,
+            "anchorSwitch": false,
+            "distinctCommitTeas": 1,
+            "conflictStates": 0,
+            "conflictRecoveryGaps": [],
+            "matchedSameTea": true
+          },
+          "tasting": {
+            "active": true,
+            "inflows": 2,
+            "outflows": 1,
+            "maxOccupancy": 2,
+            "firstInDepth": 1,
+            "firstOutDepth": 9,
+            "emptiedDepth": 9,
+            "finalEmpty": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "pair",
+            "solvable": true,
+            "minMoves": 9,
+            "first": "pour:1→5",
+            "invalidated": false,
+            "visited": 60
+          },
+          {
+            "name": "tasting",
+            "solvable": true,
+            "minMoves": 9,
+            "first": "pour:1→5",
+            "invalidated": false,
+            "visited": 60
+          }
+        ],
+        "c3": false,
+        "c3x": false,
+        "c4": false,
+        "stateMultiplier": 1,
+        "key": "N:_:karkade,karkade,matcha,milk_oolong|matcha,matcha,karkade,sea_buckthorn|sea_buckthorn,sea_buckthorn,matcha,milk_oolong||N:_:C2:D:P:milk_oolong,karkade|milk_oolong,sea_buckthorn||N:_:C2:E:"
+      }
+    ]
+  }
+}
