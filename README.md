@@ -138,7 +138,7 @@ dynamic ready flag exists. It must end empty. Production uses the F0
 4,4,4,4,0,0 topology and Rollout V3 (first Flask L558); see
 `docs/g20-steeping-flask.md`.
 
-## Telegram behavior
+## Flask + shared tray (G21)\n\nResearch-first composition winner: one empty steeping flask plus one shared\ntray (4,4,3,3,2,0). Both existing identities remain active on separate\nvessels; no ComboState, no new action, no third mechanic. Rollout V4 starts\nat L782 and replaces only V3 slot 23 at L874. See\n`docs/g21-composition-research.md`.\n\n## Telegram behavior
 
 `telegram.init()` is idempotent; every haptic call is try/caught with a `navigator.vibrate` fallback. Haptic failures never break gameplay, and input handlers fire each haptic exactly once.
 

@@ -265,7 +265,11 @@ describe('G20 compatibility policy', () => {
       sameLevel: 'forbid',
       sameCup: 'forbid',
     });
-    for (const other of ['sharedTray', 'teaPair', 'servingOrder', 'tasting', 'mystery', 'honey', 'strainer'] as const) {
+    expect(mechanicCompatibility('steepingFlask', 'sharedTray')).toMatchObject({
+      sameLevel: 'allow',
+      sameCup: 'forbid',
+    });
+    for (const other of ['teaPair', 'servingOrder', 'tasting', 'mystery', 'honey', 'strainer'] as const) {
       expect(mechanicCompatibility('steepingFlask', other)).toMatchObject({
         sameLevel: 'research',
         sameCup: 'forbid',

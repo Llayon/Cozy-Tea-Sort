@@ -1,0 +1,863 @@
+{
+  "gauntlet": "G21",
+  "candidate": "E6 FLASK_TRAY",
+  "candidates": 50,
+  "rootConstructive": 50,
+  "solvableFirst": 50,
+  "optimalFirst": 50,
+  "fatalFirstMoves": 0,
+  "totalFirstMoves": 300,
+  "doomedCandidates": 0,
+  "rows": [
+    {
+      "template": "flask-tray-10-23",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 10,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-23",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 10,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-23",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 10,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-23",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 10,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-23",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 10,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-23",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 10,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-174",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 10,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-174",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 10,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-174",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 10,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-174",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 10,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-174",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 10,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-10-174",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 10,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-60",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-60",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-60",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-60",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-60",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-60",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-72",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 11,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-72",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 11,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-72",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 11,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-72",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 11,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-72",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 11,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-72",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 11,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-73",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-73",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-73",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-73",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-73",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-11-73",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 11,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-7",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 12,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-7",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 12,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-7",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 12,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-7",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 12,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-7",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 12,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-7",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 12,
+      "rootConstructive": 5,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-11",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 12,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-11",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 12,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-11",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 12,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-11",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 12,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-11",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 12,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-11",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 12,
+      "rootConstructive": 7,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-13",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 12,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-13",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 12,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-13",
+      "perm": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "depth": 12,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-13",
+      "perm": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "depth": 12,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-13",
+      "perm": [
+        1,
+        2,
+        3,
+        0
+      ],
+      "depth": 12,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-12-13",
+      "perm": [
+        3,
+        0,
+        2,
+        1
+      ],
+      "depth": 12,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-13-10",
+      "perm": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "depth": 13,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    },
+    {
+      "template": "flask-tray-13-10",
+      "perm": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "depth": 13,
+      "rootConstructive": 6,
+      "solvableFirst": true,
+      "optimalFirst": true,
+      "fatalFirstMoves": 0,
+      "doomed": false,
+      "c3": true,
+      "c3x": true
+    }
+  ]
+}

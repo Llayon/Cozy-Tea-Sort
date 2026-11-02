@@ -1,0 +1,1847 @@
+{
+  "gauntlet": "G21",
+  "seeds": 200,
+  "wallMs": 56466,
+  "exceptions": 0,
+  "fallbacks": 0,
+  "distinctStarts": 137,
+  "generatorMs": {
+    "p50": 101.4766499999987,
+    "p90": 184.47170000000187,
+    "p95": 191.18970000000263,
+    "max": 254.40460000000166
+  },
+  "solverMs": {
+    "p50": 101.04715000000033,
+    "p95": 188.5867999999973,
+    "max": 226.11599999999817
+  },
+  "visited": {
+    "p50": 2424,
+    "p95": 4183,
+    "max": 4183
+  },
+  "depth": {
+    "p50": 12,
+    "p95": 14,
+    "max": 14
+  },
+  "attempts": {
+    "p50": 1,
+    "p95": 1,
+    "max": 1
+  },
+  "solverCalls": {
+    "p50": 1,
+    "p95": 1,
+    "max": 1
+  },
+  "stateMultiplier": {
+    "n": 50,
+    "p50": 0.9219294821753838,
+    "p95": 1.1076040172166428,
+    "max": 1.1076040172166428
+  },
+  "rows": [
+    {
+      "seed": 0,
+      "depth": 13,
+      "genMs": 204.39,
+      "solverMs": 197.33,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 1,
+      "depth": 10,
+      "genMs": 68.67,
+      "solverMs": 64.39,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 2,
+      "depth": 11,
+      "genMs": 91.37,
+      "solverMs": 83.9,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 3,
+      "depth": 10,
+      "genMs": 57.12,
+      "solverMs": 59.01,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 4,
+      "depth": 12,
+      "genMs": 96.55,
+      "solverMs": 101.66,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 5,
+      "depth": 11,
+      "genMs": 85.35,
+      "solverMs": 82.42,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 6,
+      "depth": 13,
+      "genMs": 186.48,
+      "solverMs": 173.72,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 7,
+      "depth": 10,
+      "genMs": 58.87,
+      "solverMs": 57.68,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 8,
+      "depth": 11,
+      "genMs": 88.48,
+      "solverMs": 87.46,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 9,
+      "depth": 11,
+      "genMs": 82.92,
+      "solverMs": 77.92,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 10,
+      "depth": 12,
+      "genMs": 112.24,
+      "solverMs": 109.9,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 11,
+      "depth": 13,
+      "genMs": 149.97,
+      "solverMs": 151.14,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 12,
+      "depth": 13,
+      "genMs": 159.58,
+      "solverMs": 162.01,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 13,
+      "depth": 11,
+      "genMs": 78.68,
+      "solverMs": 78.85,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 14,
+      "depth": 14,
+      "genMs": 176.93,
+      "solverMs": 177.19,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 15,
+      "depth": 13,
+      "genMs": 193.48,
+      "solverMs": 200.41,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 16,
+      "depth": 12,
+      "genMs": 109.53,
+      "solverMs": 103.76,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 17,
+      "depth": 14,
+      "genMs": 201.03,
+      "solverMs": 172.63,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 18,
+      "depth": 10,
+      "genMs": 58.26,
+      "solverMs": 55.01,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 19,
+      "depth": 10,
+      "genMs": 60.84,
+      "solverMs": 57.35,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 20,
+      "depth": 12,
+      "genMs": 101.74,
+      "solverMs": 95.41,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 21,
+      "depth": 12,
+      "genMs": 109.11,
+      "solverMs": 112.65,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 22,
+      "depth": 11,
+      "genMs": 89.26,
+      "solverMs": 86.92,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 23,
+      "depth": 10,
+      "genMs": 55.18,
+      "solverMs": 56.91,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 24,
+      "depth": 12,
+      "genMs": 93.32,
+      "solverMs": 93.72,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 25,
+      "depth": 12,
+      "genMs": 90.78,
+      "solverMs": 89.89,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 26,
+      "depth": 10,
+      "genMs": 63.47,
+      "solverMs": 57.73,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 27,
+      "depth": 13,
+      "genMs": 158.13,
+      "solverMs": 153,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 28,
+      "depth": 13,
+      "genMs": 185.78,
+      "solverMs": 195.51,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 29,
+      "depth": 13,
+      "genMs": 188.25,
+      "solverMs": 187.97,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 30,
+      "depth": 14,
+      "genMs": 169.51,
+      "solverMs": 168.9,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 31,
+      "depth": 11,
+      "genMs": 105.34,
+      "solverMs": 108.89,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 32,
+      "depth": 13,
+      "genMs": 147.66,
+      "solverMs": 146.31,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 33,
+      "depth": 10,
+      "genMs": 58.5,
+      "solverMs": 56.99,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 34,
+      "depth": 14,
+      "genMs": 185.75,
+      "solverMs": 179.74,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 35,
+      "depth": 12,
+      "genMs": 97.46,
+      "solverMs": 92.48,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 36,
+      "depth": 14,
+      "genMs": 179.19,
+      "solverMs": 175.67,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 37,
+      "depth": 14,
+      "genMs": 169.51,
+      "solverMs": 167.33,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 38,
+      "depth": 11,
+      "genMs": 109.57,
+      "solverMs": 105.83,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 39,
+      "depth": 14,
+      "genMs": 179.41,
+      "solverMs": 173.81,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 40,
+      "depth": 14,
+      "genMs": 199.62,
+      "solverMs": 198.37,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 41,
+      "depth": 10,
+      "genMs": 57.44,
+      "solverMs": 56.06,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 42,
+      "depth": 11,
+      "genMs": 85.4,
+      "solverMs": 92.62,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 43,
+      "depth": 11,
+      "genMs": 94.61,
+      "solverMs": 98.08,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 44,
+      "depth": 10,
+      "genMs": 62.34,
+      "solverMs": 58.09,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 45,
+      "depth": 12,
+      "genMs": 106.92,
+      "solverMs": 108,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 46,
+      "depth": 10,
+      "genMs": 59.46,
+      "solverMs": 59.37,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 47,
+      "depth": 12,
+      "genMs": 92.27,
+      "solverMs": 90.15,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 48,
+      "depth": 13,
+      "genMs": 145.12,
+      "solverMs": 144.2,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 49,
+      "depth": 13,
+      "genMs": 149.62,
+      "solverMs": 153.86,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 50,
+      "depth": 11,
+      "genMs": 87.71,
+      "solverMs": 89.74,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 51,
+      "depth": 14,
+      "genMs": 187.14,
+      "solverMs": 174.85,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 52,
+      "depth": 10,
+      "genMs": 61.22,
+      "solverMs": 59.74,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 53,
+      "depth": 12,
+      "genMs": 93.8,
+      "solverMs": 92.62,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 54,
+      "depth": 13,
+      "genMs": 151.36,
+      "solverMs": 143.3,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 55,
+      "depth": 14,
+      "genMs": 174.25,
+      "solverMs": 174.34,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 56,
+      "depth": 12,
+      "genMs": 106.51,
+      "solverMs": 109.48,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 57,
+      "depth": 11,
+      "genMs": 103.97,
+      "solverMs": 104.64,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 58,
+      "depth": 11,
+      "genMs": 87.76,
+      "solverMs": 78.08,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 59,
+      "depth": 11,
+      "genMs": 87.1,
+      "solverMs": 85.95,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 60,
+      "depth": 11,
+      "genMs": 98.88,
+      "solverMs": 103.59,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 61,
+      "depth": 12,
+      "genMs": 98.34,
+      "solverMs": 95.21,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 62,
+      "depth": 13,
+      "genMs": 147.98,
+      "solverMs": 150.38,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 63,
+      "depth": 13,
+      "genMs": 153.46,
+      "solverMs": 148.14,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 64,
+      "depth": 12,
+      "genMs": 95.12,
+      "solverMs": 95.27,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 65,
+      "depth": 11,
+      "genMs": 101.4,
+      "solverMs": 103.43,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 66,
+      "depth": 10,
+      "genMs": 60.88,
+      "solverMs": 61.58,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 67,
+      "depth": 10,
+      "genMs": 54.37,
+      "solverMs": 57.41,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 68,
+      "depth": 14,
+      "genMs": 183.24,
+      "solverMs": 179.07,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 69,
+      "depth": 13,
+      "genMs": 148.91,
+      "solverMs": 146.41,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 70,
+      "depth": 11,
+      "genMs": 85.39,
+      "solverMs": 91.99,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 71,
+      "depth": 14,
+      "genMs": 163.16,
+      "solverMs": 170.01,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 72,
+      "depth": 11,
+      "genMs": 111.54,
+      "solverMs": 101.86,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 73,
+      "depth": 11,
+      "genMs": 86.57,
+      "solverMs": 79.71,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 74,
+      "depth": 14,
+      "genMs": 185.15,
+      "solverMs": 177.17,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 75,
+      "depth": 10,
+      "genMs": 59.15,
+      "solverMs": 56.27,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 76,
+      "depth": 10,
+      "genMs": 63.32,
+      "solverMs": 56.63,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 77,
+      "depth": 12,
+      "genMs": 110.56,
+      "solverMs": 110.55,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 78,
+      "depth": 11,
+      "genMs": 93.85,
+      "solverMs": 86.1,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 79,
+      "depth": 13,
+      "genMs": 199.01,
+      "solverMs": 182.32,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 80,
+      "depth": 12,
+      "genMs": 99.8,
+      "solverMs": 99.47,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 81,
+      "depth": 13,
+      "genMs": 147.79,
+      "solverMs": 147.38,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 82,
+      "depth": 13,
+      "genMs": 153.04,
+      "solverMs": 157.61,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 83,
+      "depth": 14,
+      "genMs": 183.57,
+      "solverMs": 176.55,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 84,
+      "depth": 10,
+      "genMs": 55.79,
+      "solverMs": 54.91,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 85,
+      "depth": 12,
+      "genMs": 99.42,
+      "solverMs": 100.77,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 86,
+      "depth": 12,
+      "genMs": 104.77,
+      "solverMs": 100.54,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 87,
+      "depth": 11,
+      "genMs": 78.08,
+      "solverMs": 78.3,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 88,
+      "depth": 11,
+      "genMs": 87.22,
+      "solverMs": 84.56,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 89,
+      "depth": 10,
+      "genMs": 57.88,
+      "solverMs": 59.46,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 90,
+      "depth": 12,
+      "genMs": 94.62,
+      "solverMs": 87.58,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 91,
+      "depth": 11,
+      "genMs": 108.67,
+      "solverMs": 100.75,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 92,
+      "depth": 14,
+      "genMs": 254.4,
+      "solverMs": 226.12,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 93,
+      "depth": 11,
+      "genMs": 119.28,
+      "solverMs": 127.16,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 94,
+      "depth": 12,
+      "genMs": 126.54,
+      "solverMs": 113.72,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 95,
+      "depth": 12,
+      "genMs": 130.1,
+      "solverMs": 117.83,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 96,
+      "depth": 10,
+      "genMs": 68.03,
+      "solverMs": 76.13,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 97,
+      "depth": 13,
+      "genMs": 229.1,
+      "solverMs": 211.66,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 98,
+      "depth": 10,
+      "genMs": 59.16,
+      "solverMs": 59.72,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 99,
+      "depth": 13,
+      "genMs": 197.72,
+      "solverMs": 182.58,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 100,
+      "depth": 13,
+      "genMs": 142.37,
+      "solverMs": 153.81,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 101,
+      "depth": 14,
+      "genMs": 165.08,
+      "solverMs": 176.17,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 102,
+      "depth": 10,
+      "genMs": 61.97,
+      "solverMs": 55.07,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 103,
+      "depth": 12,
+      "genMs": 104.38,
+      "solverMs": 106.65,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 104,
+      "depth": 10,
+      "genMs": 53.83,
+      "solverMs": 53.72,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 105,
+      "depth": 10,
+      "genMs": 53.48,
+      "solverMs": 54.02,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 106,
+      "depth": 10,
+      "genMs": 57.3,
+      "solverMs": 53.43,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 107,
+      "depth": 12,
+      "genMs": 113.03,
+      "solverMs": 110.87,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 108,
+      "depth": 14,
+      "genMs": 175.79,
+      "solverMs": 167.37,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 109,
+      "depth": 12,
+      "genMs": 110.26,
+      "solverMs": 102.49,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 110,
+      "depth": 12,
+      "genMs": 92.89,
+      "solverMs": 87.98,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 111,
+      "depth": 13,
+      "genMs": 146.19,
+      "solverMs": 153.01,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 112,
+      "depth": 13,
+      "genMs": 179.41,
+      "solverMs": 175.16,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 113,
+      "depth": 11,
+      "genMs": 102.93,
+      "solverMs": 102.41,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 114,
+      "depth": 14,
+      "genMs": 171.49,
+      "solverMs": 166.7,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 115,
+      "depth": 11,
+      "genMs": 85.69,
+      "solverMs": 106.95,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 116,
+      "depth": 12,
+      "genMs": 97.01,
+      "solverMs": 87.03,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 117,
+      "depth": 12,
+      "genMs": 101.56,
+      "solverMs": 99.4,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 118,
+      "depth": 12,
+      "genMs": 96.59,
+      "solverMs": 99.08,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 119,
+      "depth": 11,
+      "genMs": 80.76,
+      "solverMs": 77.96,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 120,
+      "depth": 11,
+      "genMs": 86.32,
+      "solverMs": 88.48,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 121,
+      "depth": 10,
+      "genMs": 61.84,
+      "solverMs": 60.17,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 122,
+      "depth": 10,
+      "genMs": 57.54,
+      "solverMs": 57.02,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 123,
+      "depth": 12,
+      "genMs": 110.57,
+      "solverMs": 113.19,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 124,
+      "depth": 12,
+      "genMs": 101.14,
+      "solverMs": 97.73,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 125,
+      "depth": 12,
+      "genMs": 94.36,
+      "solverMs": 86.63,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 126,
+      "depth": 14,
+      "genMs": 170.78,
+      "solverMs": 166.08,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 127,
+      "depth": 12,
+      "genMs": 104.02,
+      "solverMs": 105.55,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 128,
+      "depth": 10,
+      "genMs": 56.21,
+      "solverMs": 60.74,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 129,
+      "depth": 12,
+      "genMs": 99.34,
+      "solverMs": 100.19,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 130,
+      "depth": 12,
+      "genMs": 99.16,
+      "solverMs": 91.01,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 131,
+      "depth": 14,
+      "genMs": 181.91,
+      "solverMs": 185.3,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 132,
+      "depth": 13,
+      "genMs": 151.83,
+      "solverMs": 144.82,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 133,
+      "depth": 12,
+      "genMs": 112.31,
+      "solverMs": 110.15,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 134,
+      "depth": 14,
+      "genMs": 162.76,
+      "solverMs": 168.94,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 135,
+      "depth": 13,
+      "genMs": 189.07,
+      "solverMs": 207.72,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 136,
+      "depth": 12,
+      "genMs": 99.45,
+      "solverMs": 101.32,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 137,
+      "depth": 14,
+      "genMs": 173.63,
+      "solverMs": 163.89,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 138,
+      "depth": 12,
+      "genMs": 98.34,
+      "solverMs": 100.19,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 139,
+      "depth": 10,
+      "genMs": 61.23,
+      "solverMs": 57.5,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 140,
+      "depth": 12,
+      "genMs": 105.06,
+      "solverMs": 112.16,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 141,
+      "depth": 13,
+      "genMs": 197.28,
+      "solverMs": 179.61,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 142,
+      "depth": 14,
+      "genMs": 176.4,
+      "solverMs": 170.74,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 143,
+      "depth": 11,
+      "genMs": 80.63,
+      "solverMs": 72.36,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 144,
+      "depth": 12,
+      "genMs": 91.83,
+      "solverMs": 89.98,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 145,
+      "depth": 11,
+      "genMs": 86.8,
+      "solverMs": 88.96,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 146,
+      "depth": 12,
+      "genMs": 99.14,
+      "solverMs": 101.84,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 147,
+      "depth": 11,
+      "genMs": 103.79,
+      "solverMs": 101.33,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 148,
+      "depth": 11,
+      "genMs": 79.39,
+      "solverMs": 78.38,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 149,
+      "depth": 13,
+      "genMs": 150.37,
+      "solverMs": 153.42,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 150,
+      "depth": 10,
+      "genMs": 57.09,
+      "solverMs": 56.35,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 151,
+      "depth": 13,
+      "genMs": 183.11,
+      "solverMs": 182.2,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 152,
+      "depth": 11,
+      "genMs": 80.48,
+      "solverMs": 82.02,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 153,
+      "depth": 11,
+      "genMs": 90.6,
+      "solverMs": 85.61,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 154,
+      "depth": 11,
+      "genMs": 86.85,
+      "solverMs": 85.38,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 155,
+      "depth": 10,
+      "genMs": 60.17,
+      "solverMs": 57.21,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 156,
+      "depth": 12,
+      "genMs": 99.82,
+      "solverMs": 94.74,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 157,
+      "depth": 13,
+      "genMs": 184.93,
+      "solverMs": 182.67,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 158,
+      "depth": 10,
+      "genMs": 61.82,
+      "solverMs": 51.19,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 159,
+      "depth": 11,
+      "genMs": 95.77,
+      "solverMs": 101.79,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 160,
+      "depth": 12,
+      "genMs": 104.25,
+      "solverMs": 98.67,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 161,
+      "depth": 14,
+      "genMs": 182.07,
+      "solverMs": 177.85,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 162,
+      "depth": 13,
+      "genMs": 191.19,
+      "solverMs": 190.13,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 163,
+      "depth": 14,
+      "genMs": 175.23,
+      "solverMs": 163.15,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 164,
+      "depth": 12,
+      "genMs": 94.93,
+      "solverMs": 94.09,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 165,
+      "depth": 11,
+      "genMs": 100.81,
+      "solverMs": 94.68,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 166,
+      "depth": 11,
+      "genMs": 82.29,
+      "solverMs": 82.13,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 167,
+      "depth": 12,
+      "genMs": 100.23,
+      "solverMs": 95.34,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 168,
+      "depth": 11,
+      "genMs": 80.64,
+      "solverMs": 78.3,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 169,
+      "depth": 10,
+      "genMs": 58.53,
+      "solverMs": 57.97,
+      "visited": 1544,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 170,
+      "depth": 11,
+      "genMs": 90.98,
+      "solverMs": 79.2,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 171,
+      "depth": 13,
+      "genMs": 185.08,
+      "solverMs": 189.68,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 172,
+      "depth": 12,
+      "genMs": 104.88,
+      "solverMs": 108.32,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 173,
+      "depth": 11,
+      "genMs": 79.53,
+      "solverMs": 80.11,
+      "visited": 1914,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 174,
+      "depth": 12,
+      "genMs": 112.46,
+      "solverMs": 107.47,
+      "visited": 2519,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 175,
+      "depth": 13,
+      "genMs": 184.47,
+      "solverMs": 188.59,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 176,
+      "depth": 14,
+      "genMs": 178.52,
+      "solverMs": 174.18,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 177,
+      "depth": 14,
+      "genMs": 182.55,
+      "solverMs": 172.07,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 178,
+      "depth": 12,
+      "genMs": 94.31,
+      "solverMs": 91.63,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 179,
+      "depth": 11,
+      "genMs": 83.02,
+      "solverMs": 88.3,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 180,
+      "depth": 11,
+      "genMs": 105.74,
+      "solverMs": 99.89,
+      "visited": 2432,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 181,
+      "depth": 12,
+      "genMs": 87.8,
+      "solverMs": 88.57,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 182,
+      "depth": 13,
+      "genMs": 183.69,
+      "solverMs": 186.99,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 183,
+      "depth": 12,
+      "genMs": 103.39,
+      "solverMs": 103.44,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 184,
+      "depth": 10,
+      "genMs": 62.16,
+      "solverMs": 61.88,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 185,
+      "depth": 10,
+      "genMs": 61,
+      "solverMs": 58.38,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 186,
+      "depth": 10,
+      "genMs": 58.68,
+      "solverMs": 56.27,
+      "visited": 1556,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 187,
+      "depth": 14,
+      "genMs": 169.43,
+      "solverMs": 162.47,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 188,
+      "depth": 13,
+      "genMs": 149.5,
+      "solverMs": 153.47,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 189,
+      "depth": 12,
+      "genMs": 98.06,
+      "solverMs": 119.71,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 190,
+      "depth": 12,
+      "genMs": 115.09,
+      "solverMs": 98.1,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 191,
+      "depth": 12,
+      "genMs": 96.53,
+      "solverMs": 99.12,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 192,
+      "depth": 11,
+      "genMs": 95.19,
+      "solverMs": 82.3,
+      "visited": 2172,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 193,
+      "depth": 12,
+      "genMs": 109,
+      "solverMs": 94.6,
+      "visited": 2424,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 194,
+      "depth": 13,
+      "genMs": 223.4,
+      "solverMs": 208.8,
+      "visited": 4183,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 195,
+      "depth": 14,
+      "genMs": 168.23,
+      "solverMs": 161.15,
+      "visited": 3836,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 196,
+      "depth": 12,
+      "genMs": 98.96,
+      "solverMs": 92.91,
+      "visited": 2249,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 197,
+      "depth": 13,
+      "genMs": 149.06,
+      "solverMs": 149.7,
+      "visited": 3463,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 198,
+      "depth": 14,
+      "genMs": 180.71,
+      "solverMs": 171.78,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    },
+    {
+      "seed": 199,
+      "depth": 14,
+      "genMs": 181.44,
+      "solverMs": 181.57,
+      "visited": 3891,
+      "attempts": 1,
+      "fallback": false
+    }
+  ]
+}

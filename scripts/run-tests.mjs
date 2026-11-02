@@ -93,6 +93,23 @@ const batches = [
     name: 'G20 rollout V3 + G19 freeze',
     files: ['tests/steeping-flask-rollout.test.ts'],
   },
+  {
+    name: 'G21 composition compatibility + view + undo + rollout',
+    files: [
+      'tests/composition2-compatibility.test.ts',
+      'tests/composition2-view.test.ts',
+      'tests/composition2-undo.test.ts',
+      'tests/composition2-rollout.test.ts',
+    ],
+  },
+  {
+    name: 'G21 composition template bank',
+    files: ['tests/composition2-templates.test.ts'],
+  },
+  {
+    name: 'G21 composition production stress',
+    files: ['tests/composition2-fastpath.test.ts'],
+  },
   { name: 'teapot + target stress', files: ['tests/target-stress-teapot.test.ts'] },
   { name: 'target challenge stress', files: ['tests/target-stress-challenge.test.ts'] },
   { name: 'target peak stress', files: ['tests/target-stress-peak.test.ts'] },

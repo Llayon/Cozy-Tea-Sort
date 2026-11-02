@@ -1,0 +1,432 @@
+{
+  "B6": {
+    "id": "B6",
+    "label": "TRAY_ORDER",
+    "mechanics": [
+      "tray",
+      "order"
+    ],
+    "topology": [
+      4,
+      4,
+      3,
+      3,
+      2,
+      0
+    ],
+    "sampled": 1000,
+    "solvable": 1000,
+    "unsolvable": 0,
+    "truncated": 0,
+    "solvabilityRate": 1,
+    "l1": 1000,
+    "c2": 250,
+    "c2Rate": 0.25,
+    "canonicalC2": 250,
+    "c3": 43,
+    "c3Rate": 0.043,
+    "canonicalC3": 43,
+    "c3x": 205,
+    "c3xRate": 0.205,
+    "canonicalC3x": 205,
+    "c4": 0,
+    "oneSidedInvalidation": 41,
+    "depth": {
+      "p50": 12,
+      "p95": 14,
+      "max": 14
+    },
+    "visited": {
+      "p50": 2264.5,
+      "p95": 3900,
+      "max": 4915
+    },
+    "solverMs": {
+      "p50": 105.70254999999725,
+      "p95": 191.0407,
+      "max": 309.434500000003
+    },
+    "stateMultiplier": {
+      "p50": 1.235032569578053,
+      "p95": 1.6398728428701181,
+      "max": 1.9732954545454546
+    },
+    "controls": {
+      "fullDepthP50": 12,
+      "depthP50": 12,
+      "minMovesP50": 12
+    },
+    "wallMs": 151008,
+    "c2Examples": [
+      {
+        "seed": 2,
+        "depth": 10,
+        "first": "pour:0→5",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 6,
+            "serve1Depth": 7,
+            "serve2Depth": 8,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 0,
+            "releaseDepth": 2,
+            "refillDepth": 3,
+            "crossMemberReuse": false,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 10,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 1206
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 10,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 945
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.3043117744610282,
+        "key": "N:_:|karkade,sea_buckthorn||N:_:G6:matcha,matcha,sea_buckthorn|milk_oolong,milk_oolong,karkade||N:_:O1:milk_oolong,karkade,matcha,matcha||N:_:O2:sea_buckthorn,karkade,sea_buckthorn,milk_oolong"
+      },
+      {
+        "seed": 10,
+        "depth": 11,
+        "first": "pour:0→5",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 7,
+            "serve1Depth": 8,
+            "serve2Depth": 9,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 0,
+            "releaseDepth": 4,
+            "refillDepth": 5,
+            "crossMemberReuse": false,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 10,
+            "first": "pour:2→3",
+            "invalidated": true,
+            "visited": 1110
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 1231
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.4768480909829407,
+        "key": "N:_:|milk_oolong,matcha||N:_:G6:karkade,sea_buckthorn,matcha|sea_buckthorn,sea_buckthorn,matcha||N:_:O1:karkade,sea_buckthorn,milk_oolong,milk_oolong||N:_:O2:karkade,karkade,matcha,milk_oolong"
+      },
+      {
+        "seed": 18,
+        "depth": 11,
+        "first": "pour:1→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 7,
+            "serve1Depth": 8,
+            "serve2Depth": 9,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 0,
+            "releaseDepth": 4,
+            "refillDepth": 6,
+            "crossMemberReuse": false,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 1681
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:1→3",
+            "invalidated": true,
+            "visited": 2185
+          }
+        ],
+        "c3": true,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.240274599542334,
+        "key": "N:_:|milk_oolong,sea_buckthorn||N:_:G6:karkade,milk_oolong,karkade|matcha,karkade,sea_buckthorn||N:_:O1:matcha,milk_oolong,milk_oolong,sea_buckthorn||N:_:O2:sea_buckthorn,karkade,matcha,matcha"
+      },
+      {
+        "seed": 21,
+        "depth": 11,
+        "first": "pour:0→5",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 5,
+            "serve1Depth": 7,
+            "serve2Depth": 8,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 0,
+            "releaseDepth": 3,
+            "refillDepth": 6,
+            "crossMemberReuse": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 1022
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:0→3",
+            "invalidated": true,
+            "visited": 1648
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.0400485436893203,
+        "key": "N:_:|karkade,milk_oolong||N:_:G6:karkade,sea_buckthorn,matcha|matcha,sea_buckthorn,karkade||N:_:O1:milk_oolong,matcha,karkade,matcha||N:_:O2:sea_buckthorn,sea_buckthorn,milk_oolong,milk_oolong"
+      },
+      {
+        "seed": 25,
+        "depth": 12,
+        "first": "pour:1→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 8,
+            "serve1Depth": 9,
+            "serve2Depth": 10,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 0,
+            "releaseDepth": 3,
+            "refillDepth": 4,
+            "crossMemberReuse": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:1→4",
+            "invalidated": false,
+            "visited": 1405
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:1→2",
+            "invalidated": true,
+            "visited": 1281
+          }
+        ],
+        "c3": false,
+        "c3x": false,
+        "c4": false,
+        "stateMultiplier": 1.6441281138790036,
+        "key": "N:_:|karkade,matcha||N:_:G6:karkade,karkade,matcha|milk_oolong,sea_buckthorn,sea_buckthorn||N:_:O1:milk_oolong,sea_buckthorn,matcha,milk_oolong||N:_:O2:milk_oolong,karkade,sea_buckthorn,matcha"
+      },
+      {
+        "seed": 28,
+        "depth": 12,
+        "first": "pour:0→4",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 4,
+            "serve1Depth": 9,
+            "serve2Depth": 10,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 3,
+            "releaseDepth": 5,
+            "refillDepth": 8,
+            "crossMemberReuse": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:0→4",
+            "invalidated": false,
+            "visited": 1621
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 12,
+            "first": "pour:0→4",
+            "invalidated": true,
+            "visited": 1561
+          }
+        ],
+        "c3": false,
+        "c3x": false,
+        "c4": false,
+        "stateMultiplier": 1.3047501542257867,
+        "key": "N:_:|sea_buckthorn,milk_oolong||N:_:G6:karkade,karkade,matcha|sea_buckthorn,matcha,karkade||N:_:O1:karkade,matcha,sea_buckthorn,milk_oolong||N:_:O2:milk_oolong,matcha,milk_oolong,sea_buckthorn"
+      },
+      {
+        "seed": 35,
+        "depth": 13,
+        "first": "pour:0→5",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 9,
+            "serve1Depth": 10,
+            "serve2Depth": 12,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 0,
+            "releaseDepth": 4,
+            "refillDepth": 6,
+            "crossMemberReuse": true,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 2644
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 13,
+            "first": "pour:0→5",
+            "invalidated": true,
+            "visited": 3058
+          }
+        ],
+        "c3": false,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.1530412034009156,
+        "key": "N:_:|matcha,karkade||N:_:G6:karkade,milk_oolong,karkade|matcha,sea_buckthorn,matcha||N:_:O1:sea_buckthorn,matcha,sea_buckthorn,milk_oolong||N:_:O2:karkade,milk_oolong,sea_buckthorn,milk_oolong"
+      },
+      {
+        "seed": 36,
+        "depth": 12,
+        "first": "pour:0→5",
+        "mechanics": {
+          "order": {
+            "active": true,
+            "pressureDepth": 8,
+            "serve1Depth": 9,
+            "serve2Depth": 10,
+            "prefix": 2,
+            "win": true
+          },
+          "tray": {
+            "active": true,
+            "pressureDepth": 4,
+            "releaseDepth": 5,
+            "refillDepth": 7,
+            "crossMemberReuse": false,
+            "win": true
+          }
+        },
+        "controls": [
+          {
+            "name": "tray",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:1→5",
+            "invalidated": true,
+            "visited": 801
+          },
+          {
+            "name": "order",
+            "solvable": true,
+            "minMoves": 11,
+            "first": "pour:2→3",
+            "invalidated": true,
+            "visited": 1577
+          }
+        ],
+        "c3": true,
+        "c3x": true,
+        "c4": false,
+        "stateMultiplier": 1.3690551680405834,
+        "key": "N:_:|matcha,karkade||N:_:G6:milk_oolong,matcha,milk_oolong|sea_buckthorn,sea_buckthorn,milk_oolong||N:_:O1:matcha,karkade,karkade,matcha||N:_:O2:karkade,sea_buckthorn,milk_oolong,sea_buckthorn"
+      }
+    ],
+    "recordsTrimmed": true
+  }
+}
