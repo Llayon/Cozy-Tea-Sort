@@ -28,11 +28,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const batches = [
   {
-    name: 'base suite (14 files)',
+    name: 'base suite (15 files)',
     files: [
       'tests/rules.test.ts',
       'tests/solver.test.ts',
       'tests/undo.test.ts',
+      'tests/layered-infusion.test.ts',
       'tests/rng.test.ts',
       'tests/progression.test.ts',
       'tests/progression-guards.test.ts',

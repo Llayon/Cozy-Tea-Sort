@@ -37,6 +37,18 @@
  *   otherwise), derived from layers — no stored ready flag;
  * - partial release is legal and automatically re-locks the source gate.
  *
+ * Layered infusion (G23 research — ordered recipe):
+ * - static `layerRecipe` on one normal vessel, bottom → top;
+ * - destination accepts ONLY the next expected TeaId (ordinary color match
+ *   does not apply across distinct recipe layers);
+ * - transfer is bounded by the remaining consecutive recipe count (with
+ *   distinct recipes this is always one layer per pour), so a source with a
+ *   longer same-tea top run is partially consumed;
+ * - progress and victory derive ONLY from current layers; no cursor state;
+ * - the vessel may source under ordinary rules, so draining and re-filling
+ *   is legal and simply recomputes the expected position;
+ * - malformed recipes fail closed (`target-recipe-invalid`, never victory).
+ *
  * Variable capacity (Gauntlet 4 — tasting bowl):
  * - capacity lives on the constraint (`cupCapacity`), NOT in a global.
  *   A tasting bowl (capacity 2, must-end-empty) pours like a normal cup
@@ -92,7 +104,9 @@ import {
   isPlaceStrainerAction,
   isReleaseStrainerAction,
   isSteepingFlaskConstraint,
+  isValidLayeredInfusionConstraint,
   isValidSteepingFlaskConstraint,
+  layerRecipeExpectedTea,
   mustEndEmpty,
   normalizeCapacityObstacles,
   normalizeCupConstraints,
@@ -168,6 +182,7 @@ function isBlendCompositionBlocked(
       if (!c) continue;
       if (c.mode !== 'normal') return true;
       if (c.targetTeaId !== undefined) return true;
+      if (c.layerRecipe !== undefined) return true;
       if (cupCapacity(c) !== STANDARD_CUP_CAPACITY) return true;
       if (mustEndEmpty(c)) return true;
     }
@@ -270,6 +285,8 @@ export type PourRejectCode =
   | 'source-served'
   | 'target-full'
   | 'target-source-only'
+  | 'target-recipe-invalid'
+  | 'target-recipe-wrong-layer'
   | 'target-floating-occupied'
   | 'target-sinking-occupied'
   | 'target-frozen-needs-hot'
@@ -381,6 +398,16 @@ export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefin
     if (!isValidSteepingFlaskConstraint(c)) return false;
     return layers.length === 0;
   }
+  // G23 Layered Infusion: a recipe cup is complete ONLY when its actual
+  // bottom→top layer array equals the static recipe exactly. Malformed
+  // recipes never satisfy (fail closed); partial or over-poured prefixes
+  // never win. Progress is derived from current layers, never stored.
+  if (c?.layerRecipe !== undefined) {
+    if (!isValidLayeredInfusionConstraint(c)) return false;
+    const recipe = c.layerRecipe as readonly TeaId[];
+    if (layers.length !== recipe.length) return false;
+    return layers.every((layer, idx) => layer === recipe[idx]);
+  }
   // Gauntlet 17: pair members have NO local finality. Even a full
   // homogeneous [X,X] is only meaningful relationally (matched partner).
   if (c?.pairedTeaGroup !== undefined) return false;
@@ -449,6 +476,13 @@ export function isInFinalState(
   teaBud?: TeaBudSlot | undefined | null,
   blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
+  // G23 Layered Infusion: a FULL exact recipe is final; any partial prefix
+  // (including one homogeneous layer) is still progress. Distinct layers
+  // mean the generic homogeneous check must not decide this vessel.
+  if (c?.layerRecipe !== undefined) {
+    if (obstacle != null || teaBud != null) return false;
+    return cupEndStateSatisfied(layers, c);
+  }
   // G17 pair members are NEVER locally final, even at 2/2 homogeneous: the
   // partner may still need a different tea, so reopening stays legal and
   // searchable. Goal finality is relational, not per-vessel.
@@ -553,6 +587,21 @@ function teaRejectCodeBetween(
   const destCap = obstacles
     ? effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx])
     : cupCapacity(constraints?.[toIdx]);
+  // G23 Layered Infusion destination gate (single pour truth): unlike a
+  // named target, this binds DURING play. The next expected TeaId derives
+  // from static recipe + current layer count. Ordinary top-color matching
+  // does not apply across distinct recipe layers; wrong tea / malformed
+  // recipe / impossible position fail closed. A full cup still reports
+  // `target-full` first (no fifth layer).
+  const dstConstraint = constraints?.[toIdx];
+  if (dstConstraint?.layerRecipe !== undefined) {
+    if (!isValidLayeredInfusionConstraint(dstConstraint)) return 'target-recipe-invalid';
+    if (target.length >= destCap) return 'target-full';
+    const expected = layerRecipeExpectedTea(dstConstraint, target.length);
+    if (expected === null) return 'target-recipe-invalid';
+    if (topLayerOf(source) !== expected) return 'target-recipe-wrong-layer';
+    return 'ok';
+  }
   if (target.length >= destCap) return 'target-full';
   // Meaningless loop: moving a FULL homogeneous cup that already satisfies
   // its own end-state rule into an empty cup of the same identical
@@ -604,6 +653,29 @@ export function isStrainedCatchSource(state: ReadonlyPuzzleState, fromIdx: numbe
 }
 
 /**
+ * G23 Layered Infusion transfer bound: how many of the next expected recipe
+ * occurrences may enter right now. Null = not a recipe destination (no
+ * extra bound). Invalid recipes return 0 (fail closed). For the supported
+ * distinct recipes this is exactly one layer, which makes a source with a
+ * longer same-tea top run release only the needed part.
+ */
+function layerRecipeTransferLimit(
+  c: CupConstraint | undefined,
+  targetLength: number,
+): number | null {
+  if (c?.layerRecipe === undefined) return null;
+  if (!isValidLayeredInfusionConstraint(c)) return 0;
+  const recipe = c.layerRecipe as readonly TeaId[];
+  if (!Number.isInteger(targetLength) || targetLength < 0 || targetLength >= recipe.length) {
+    return 0;
+  }
+  const expected = recipe[targetLength];
+  let count = 0;
+  for (let i = targetLength; i < recipe.length && recipe[i] === expected; i++) count++;
+  return count;
+}
+
+/**
  * Ordinary transfer count ignoring any attached tool (the `m` in the
  * catch-one spec): min(top run, destination free) when the ordinary tea
  * pour is legal, else 0. Used to gate strained pours (m >= 2) and to
@@ -651,6 +723,12 @@ export function unstrainedPourCountState(
     effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
   );
   if (m <= 0) return 0;
+  // G23 recipe bound: never pour past the currently expected ingredient run.
+  const recipeLimit = layerRecipeTransferLimit(constraints?.[toIdx], target.length);
+  if (recipeLimit !== null) {
+    m = Math.min(m, recipeLimit);
+    if (m <= 0) return 0;
+  }
   // Shared-capacity bound (G16 §§15-18): outside → tray member inflow is
   // additionally bounded by group free space. Inside-group moves preserve
   // the total and are exempt (null). Outside → outside has no group rule.
@@ -831,11 +909,16 @@ export function pourRejectCodeState(
   }
   if (s.heldTea !== null && s.attachedCupIndex !== null) return 'strainer-loaded';
   if (s.heldTea === null && s.attachedCupIndex === fromIdx) {
-    const m = Math.min(
+    let m = Math.min(
       topCountOf(state.cups[fromIdx] as TeaId[]),
       effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) -
         (state.cups[toIdx] as TeaId[]).length,
     );
+    const recipeLimit = layerRecipeTransferLimit(
+      constraints?.[toIdx],
+      (state.cups[toIdx] as TeaId[]).length,
+    );
+    if (recipeLimit !== null) m = Math.min(m, recipeLimit);
     if (m < 2) return 'strainer-needs-two-layers';
   }
   {
@@ -916,6 +999,12 @@ export function pourCountState(
     topCountOf(source),
     effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
   );
+  // G23 recipe bound: same single limit as unstrainedPourCountState.
+  const recipeLimit = layerRecipeTransferLimit(constraints?.[toIdx], target.length);
+  if (recipeLimit !== null) {
+    m = Math.min(m, recipeLimit);
+    if (m <= 0) return 0;
+  }
   // Shared-capacity bound (G16 §§18-19): outside → tray inflow is
   // additionally bounded by group free space (partial m=1 legal, never
   // reject the whole pour when mShared>0). Inside-group exempt.
@@ -1637,6 +1726,13 @@ export function targetCupState(
  * present, and at least one completed vessel exists.
  */
 function teaWonState(cups: readonly TeaId[][], constraints?: readonly CupConstraint[]): boolean {
+  // Fail closed for malformed recipes even if another constraint branch
+  // (e.g. a contradictory pair field) might otherwise declare completion.
+  if (constraints) {
+    for (const c of constraints) {
+      if (c?.layerRecipe !== undefined && !isValidLayeredInfusionConstraint(c)) return false;
+    }
+  }
   let completed = 0;
   let pairPresent = false;
   for (let i = 0; i < cups.length; i++) {
@@ -1868,6 +1964,18 @@ export function isPuzzleDeadlockedState(
  * When `constraints` is omitted (or all normal), this is exactly the
  * legacy key (all encodings sorted together).
  */
+/**
+ * G23 canonical vessel signature: recipe-bearing vessels additionally
+ * encode their PHYSICAL cup index, so different positions of the special
+ * cup are distinct canonical keys as required by the contract. Recipe-free
+ * vessels call `cupConstraintSignature` verbatim, keeping every legacy key
+ * byte-identical.
+ */
+function canonicalVesselSignature(c: CupConstraint, idx: number): string {
+  const sig = cupConstraintSignature(c);
+  return c.layerRecipe !== undefined ? `${sig}@${idx}` : sig;
+}
+
 function teaCanonicalKey(cups: readonly TeaId[][], constraints?: readonly CupConstraint[]): string {
   if (!constraints) {
     const parts = cups.map((c) => c.join(','));
@@ -1877,7 +1985,7 @@ function teaCanonicalKey(cups: readonly TeaId[][], constraints?: readonly CupCon
   const normalized = normalizeCupConstraints(constraints, cups.length);
   const groups = new Map<string, string[]>();
   cups.forEach((cup, idx) => {
-    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
     const enc = cup.join(',');
     const arr = groups.get(sig);
     if (arr) arr.push(enc);
@@ -1930,7 +2038,7 @@ export function canonicalPuzzleKeyNoHoney(
     const normalized = normalizeCupConstraints(constraints, state.cups.length);
     const groups = new Map<string, string[]>();
     state.cups.forEach((cup, idx) => {
-      const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+      const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
       const marker = slots[idx] ?? '_';
       const enc = `${cup.join(',')}#${marker}`;
       const arr = groups.get(sig);
@@ -1956,7 +2064,7 @@ export function canonicalPuzzleKeyNoHoney(
   const normalized = normalizeCupConstraints(constraints, state.cups.length);
   const groups = new Map<string, string[]>();
   state.cups.forEach((cup, idx) => {
-    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
     const lemonMarker = slots[idx] ?? '_';
     const toolMarker = strainer.attachedCupIndex === idx ? 'STR' : '_';
     const enc = hasLemon
@@ -1997,7 +2105,7 @@ function groupedHoneyKey(
   const normalized = normalizeCupConstraints(constraints, state.cups.length);
   const groups = new Map<string, string[]>();
   state.cups.forEach((cup, idx) => {
-    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
     const lemonMarker = slots[idx] ?? '_';
     const sinkMarker = sinkSlots[idx] ?? '_';
     let enc = hasLemon ? `${cup.join(',')}#${lemonMarker}` : cup.join(',');
@@ -2040,7 +2148,7 @@ function groupedIceKey(
   const normalized = normalizeCupConstraints(constraints, state.cups.length);
   const groups = new Map<string, string[]>();
   state.cups.forEach((cup, idx) => {
-    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
     const lemonMarker = slots[idx] ?? '_';
     const sinkMarker = sinkSlots[idx] ?? '_';
     const iceMarker = iceArr[idx] ?? '_';
@@ -2087,7 +2195,7 @@ function groupedCapacityKey(
   const normalized = normalizeCupConstraints(constraints, state.cups.length);
   const groups = new Map<string, string[]>();
   state.cups.forEach((cup, idx) => {
-    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
     const lemonMarker = slots[idx] ?? '_';
     const sinkMarker = sinkSlots[idx] ?? '_';
     const iceMarker = iceArr[idx] ?? '_';
@@ -2136,7 +2244,7 @@ function groupedTeaBudKey(
   const normalized = normalizeCupConstraints(constraints, state.cups.length);
   const groups = new Map<string, string[]>();
   state.cups.forEach((cup, idx) => {
-    const sig = cupConstraintSignature(normalized[idx] as CupConstraint);
+    const sig = canonicalVesselSignature(normalized[idx] as CupConstraint, idx);
     const lemonMarker = slots[idx] ?? '_';
     const sinkMarker = sinkSlots[idx] ?? '_';
     const iceMarker = iceArr[idx] ?? '_';

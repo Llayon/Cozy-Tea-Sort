@@ -1,0 +1,522 @@
+{
+  "gauntlet": "G23",
+  "kind": "layered-infusion-preflight",
+  "sourceBaseline": "428755b6ba4a3dc6ec7cca87b3cbeb2b8d1a13c6",
+  "generatedAt": "2026-11-04T09:28:01.065Z",
+  "seedFamily": "g23-layered-infusion:<index>",
+  "request": {
+    "numColors": 4,
+    "colors": [
+      "matcha",
+      "sea_buckthorn",
+      "karkade",
+      "milk_oolong"
+    ],
+    "emptyCups": 2,
+    "hasMysteryLayer": false,
+    "phase": "peak"
+  },
+  "countPerProfile": 5,
+  "elapsedMs": 593.698,
+  "arithmeticProof": {
+    "teaUnitsPerColor": 4,
+    "teaColors": 4,
+    "totalTea": 16,
+    "l2RecipeLayers": 2,
+    "l3RecipeLayers": 3,
+    "ordinaryTeaAfterL2": 14,
+    "ordinaryTeaAfterL3": 13,
+    "ordinaryCupEndState": "empty or full homogeneous capacity 4",
+    "requiredOrdinaryTotalMultipleOf": 4,
+    "l2Remainder": 2,
+    "l3Remainder": 1,
+    "conclusion": "no board in the frozen topology can satisfy both the special recipe and ordinary cup completion"
+  },
+  "profiles": [
+    {
+      "profile": "L2",
+      "sampleCount": 5,
+      "distinctSeeds": 5,
+      "solvable": 0,
+      "unsolvable": 5,
+      "truncated": 0,
+      "arithmeticSolvable": 0,
+      "reverseSolvable": 0,
+      "reverseUnsolvable": 5,
+      "reverseTruncated": 0,
+      "specialPositionHistogram": {
+        "0": 2,
+        "1": 1,
+        "3": 1,
+        "5": 1
+      },
+      "recipeHistogram": {
+        "matcha>sea_buckthorn": 1,
+        "matcha>karkade": 1,
+        "matcha>milk_oolong": 1,
+        "sea_buckthorn>matcha": 1,
+        "sea_buckthorn>karkade": 1
+      },
+      "baseLengthHistogram": {
+        "0,0,4,4,4,4": 2,
+        "0,4,4,4,4,0": 1,
+        "0,4,4,0,4,4": 1,
+        "4,0,4,4,0,4": 1
+      }
+    },
+    {
+      "profile": "L3",
+      "sampleCount": 5,
+      "distinctSeeds": 5,
+      "solvable": 0,
+      "unsolvable": 5,
+      "truncated": 0,
+      "arithmeticSolvable": 0,
+      "reverseSolvable": 0,
+      "reverseUnsolvable": 5,
+      "reverseTruncated": 0,
+      "specialPositionHistogram": {
+        "0": 2,
+        "1": 1,
+        "3": 1,
+        "5": 1
+      },
+      "recipeHistogram": {
+        "matcha>sea_buckthorn>karkade": 1,
+        "matcha>sea_buckthorn>milk_oolong": 1,
+        "matcha>karkade>sea_buckthorn": 1,
+        "matcha>karkade>milk_oolong": 1,
+        "matcha>milk_oolong>sea_buckthorn": 1
+      },
+      "baseLengthHistogram": {
+        "0,0,4,4,4,4": 2,
+        "0,4,4,4,4,0": 1,
+        "0,4,4,0,4,4": 1,
+        "4,0,4,4,0,4": 1
+      }
+    }
+  ],
+  "rows": [
+    {
+      "index": 0,
+      "seed": "g23-layered-infusion:0",
+      "profile": "L2",
+      "recipe": [
+        "matcha",
+        "sea_buckthorn"
+      ],
+      "reverseRecipe": [
+        "sea_buckthorn",
+        "matcha"
+      ],
+      "specialIndex": 0,
+      "recipeLength": 2,
+      "baseMinMoves": 12,
+      "baseVisitedStates": 613,
+      "baseLengths": [
+        0,
+        0,
+        4,
+        4,
+        4,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 14,
+      "ordinaryTeaMod4": 2,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 427,
+        "truncated": false,
+        "ms": 38.796
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 427,
+        "truncated": false,
+        "ms": 29.614
+      }
+    },
+    {
+      "index": 0,
+      "seed": "g23-layered-infusion:0",
+      "profile": "L3",
+      "recipe": [
+        "matcha",
+        "sea_buckthorn",
+        "karkade"
+      ],
+      "reverseRecipe": [
+        "karkade",
+        "sea_buckthorn",
+        "matcha"
+      ],
+      "specialIndex": 0,
+      "recipeLength": 3,
+      "baseMinMoves": 12,
+      "baseVisitedStates": 613,
+      "baseLengths": [
+        0,
+        0,
+        4,
+        4,
+        4,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 13,
+      "ordinaryTeaMod4": 1,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 647,
+        "truncated": false,
+        "ms": 37.459
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 434,
+        "truncated": false,
+        "ms": 26.626
+      }
+    },
+    {
+      "index": 1,
+      "seed": "g23-layered-infusion:1",
+      "profile": "L2",
+      "recipe": [
+        "matcha",
+        "karkade"
+      ],
+      "reverseRecipe": [
+        "karkade",
+        "matcha"
+      ],
+      "specialIndex": 5,
+      "recipeLength": 2,
+      "baseMinMoves": 11,
+      "baseVisitedStates": 340,
+      "baseLengths": [
+        0,
+        4,
+        4,
+        4,
+        4,
+        0
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 14,
+      "ordinaryTeaMod4": 2,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 111,
+        "truncated": false,
+        "ms": 7.136
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 172,
+        "truncated": false,
+        "ms": 8.203
+      }
+    },
+    {
+      "index": 1,
+      "seed": "g23-layered-infusion:1",
+      "profile": "L3",
+      "recipe": [
+        "matcha",
+        "sea_buckthorn",
+        "milk_oolong"
+      ],
+      "reverseRecipe": [
+        "milk_oolong",
+        "sea_buckthorn",
+        "matcha"
+      ],
+      "specialIndex": 5,
+      "recipeLength": 3,
+      "baseMinMoves": 11,
+      "baseVisitedStates": 340,
+      "baseLengths": [
+        0,
+        4,
+        4,
+        4,
+        4,
+        0
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 13,
+      "ordinaryTeaMod4": 1,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 346,
+        "truncated": false,
+        "ms": 17.618
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 427,
+        "truncated": false,
+        "ms": 20.747
+      }
+    },
+    {
+      "index": 2,
+      "seed": "g23-layered-infusion:2",
+      "profile": "L2",
+      "recipe": [
+        "matcha",
+        "milk_oolong"
+      ],
+      "reverseRecipe": [
+        "milk_oolong",
+        "matcha"
+      ],
+      "specialIndex": 0,
+      "recipeLength": 2,
+      "baseMinMoves": 11,
+      "baseVisitedStates": 377,
+      "baseLengths": [
+        0,
+        0,
+        4,
+        4,
+        4,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 14,
+      "ordinaryTeaMod4": 2,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 215,
+        "truncated": false,
+        "ms": 9.138
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 222,
+        "truncated": false,
+        "ms": 12.346
+      }
+    },
+    {
+      "index": 2,
+      "seed": "g23-layered-infusion:2",
+      "profile": "L3",
+      "recipe": [
+        "matcha",
+        "karkade",
+        "sea_buckthorn"
+      ],
+      "reverseRecipe": [
+        "sea_buckthorn",
+        "karkade",
+        "matcha"
+      ],
+      "specialIndex": 0,
+      "recipeLength": 3,
+      "baseMinMoves": 11,
+      "baseVisitedStates": 377,
+      "baseLengths": [
+        0,
+        0,
+        4,
+        4,
+        4,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 13,
+      "ordinaryTeaMod4": 1,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 588,
+        "truncated": false,
+        "ms": 39.156
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 590,
+        "truncated": false,
+        "ms": 32.325
+      }
+    },
+    {
+      "index": 3,
+      "seed": "g23-layered-infusion:3",
+      "profile": "L2",
+      "recipe": [
+        "sea_buckthorn",
+        "matcha"
+      ],
+      "reverseRecipe": [
+        "matcha",
+        "sea_buckthorn"
+      ],
+      "specialIndex": 3,
+      "recipeLength": 2,
+      "baseMinMoves": 12,
+      "baseVisitedStates": 520,
+      "baseLengths": [
+        0,
+        4,
+        4,
+        0,
+        4,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 14,
+      "ordinaryTeaMod4": 2,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 352,
+        "truncated": false,
+        "ms": 17.253
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 365,
+        "truncated": false,
+        "ms": 16.981
+      }
+    },
+    {
+      "index": 3,
+      "seed": "g23-layered-infusion:3",
+      "profile": "L3",
+      "recipe": [
+        "matcha",
+        "karkade",
+        "milk_oolong"
+      ],
+      "reverseRecipe": [
+        "milk_oolong",
+        "karkade",
+        "matcha"
+      ],
+      "specialIndex": 3,
+      "recipeLength": 3,
+      "baseMinMoves": 12,
+      "baseVisitedStates": 520,
+      "baseLengths": [
+        0,
+        4,
+        4,
+        0,
+        4,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 13,
+      "ordinaryTeaMod4": 1,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 640,
+        "truncated": false,
+        "ms": 31.829
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 414,
+        "truncated": false,
+        "ms": 21.333
+      }
+    },
+    {
+      "index": 4,
+      "seed": "g23-layered-infusion:4",
+      "profile": "L2",
+      "recipe": [
+        "sea_buckthorn",
+        "karkade"
+      ],
+      "reverseRecipe": [
+        "karkade",
+        "sea_buckthorn"
+      ],
+      "specialIndex": 1,
+      "recipeLength": 2,
+      "baseMinMoves": 12,
+      "baseVisitedStates": 383,
+      "baseLengths": [
+        4,
+        0,
+        4,
+        4,
+        0,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 14,
+      "ordinaryTeaMod4": 2,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 230,
+        "truncated": false,
+        "ms": 9.117
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 204,
+        "truncated": false,
+        "ms": 7.522
+      }
+    },
+    {
+      "index": 4,
+      "seed": "g23-layered-infusion:4",
+      "profile": "L3",
+      "recipe": [
+        "matcha",
+        "milk_oolong",
+        "sea_buckthorn"
+      ],
+      "reverseRecipe": [
+        "sea_buckthorn",
+        "milk_oolong",
+        "matcha"
+      ],
+      "specialIndex": 1,
+      "recipeLength": 3,
+      "baseMinMoves": 12,
+      "baseVisitedStates": 383,
+      "baseLengths": [
+        4,
+        0,
+        4,
+        4,
+        0,
+        4
+      ],
+      "teaTotal": 16,
+      "ordinaryTeaAfterRecipe": 13,
+      "ordinaryTeaMod4": 1,
+      "arithmeticSolvable": false,
+      "forward": {
+        "solvable": false,
+        "visitedStates": 493,
+        "truncated": false,
+        "ms": 26.36
+      },
+      "reverse": {
+        "solvable": false,
+        "visitedStates": 559,
+        "truncated": false,
+        "ms": 27.778
+      }
+    }
+  ],
+  "payloadSha256": "105f107f42074e675d881f230ec726a16693e291de3ee1cc47cfbc0f0488e65a"
+}

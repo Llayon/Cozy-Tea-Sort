@@ -735,10 +735,24 @@ export type PairedTeaGroupId = 'tea-pair';
  *     never stored. Valid production shape: normal, capacity 4,
  *     mustEndEmpty=true, no target/order/shared/pair fields. A malformed
  *     contradictory flask never satisfies victory and never becomes ready.
+ * - `layerRecipe` controls ORDERED DESTINATION IDENTITY (G23 research —
+ *   Layered Infusion):
+ *   - absent        : ordinary vessel.
+ *   - present       : static ordered recipe, bottom → top. The vessel starts
+ *     empty, accepts only the next expected TeaId, and victory requires the
+ *     exact layer array. There is NO recipe cursor, progress or chosen tea:
+ *     expected position derives from current layers. Valid research shape:
+ *     normal, capacity 2/3 equal to recipe length, 2/3 distinct known TeaIds,
+ *     no target/must-end-empty/order/shared/pair/flask fields. Malformed
+ *     recipes fail closed everywhere (destination, victory, canonical).
  *
  * No Pixi/React types may ever appear in this module.
  */
 export type CupMode = 'normal' | 'source-only' | 'sink-only';
+
+/** Supported G23 research recipe sizes (bottom → top). */
+export const LAYERED_INFUSION_MIN_RECIPE = 2;
+export const LAYERED_INFUSION_MAX_RECIPE = 3;
 
 export interface CupConstraint {
   mode: CupMode;
@@ -781,6 +795,12 @@ export interface CupConstraint {
    * Static identity only — no ready/locked/chosen-tea state exists.
    */
   steepingFlask?: boolean;
+  /**
+   * Ordered layered-infusion recipe (G23 research), bottom → top. Undefined
+   * = ordinary vessel. Static identity only — expected progress derives
+   * from current layers; no recipe cursor/progress/completed state exists.
+   */
+  layerRecipe?: readonly TeaId[];
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -908,8 +928,61 @@ export function isValidSteepingFlaskConstraint(c: CupConstraint | undefined): bo
     c.targetTeaId === undefined &&
     c.serveOrder === undefined &&
     c.sharedCapacityGroup === undefined &&
-    c.pairedTeaGroup === undefined
+    c.pairedTeaGroup === undefined &&
+    c.layerRecipe === undefined
   );
+}
+
+/**
+ * True iff the static ordered-recipe marker is present (valid or malformed).
+ * Used to fail closed without treating malformed data as an ordinary cup.
+ */
+export function hasLayerRecipe(c: CupConstraint | undefined): boolean {
+  return c?.layerRecipe !== undefined;
+}
+
+/**
+ * Exact valid G23 Layered Infusion shape (fail-closed):
+ * normal flow, explicit capacity equal to recipe length (2/3), 2/3 distinct
+ * known TeaIds, and no contradictory end-state/order/shared/pair/flask
+ * fields. Progress is NEVER encoded here.
+ */
+export function isValidLayeredInfusionConstraint(c: CupConstraint | undefined): boolean {
+  if (!c || c.layerRecipe === undefined) return false;
+  if (!Array.isArray(c.layerRecipe)) return false;
+  const recipe = c.layerRecipe;
+  if (recipe.length < LAYERED_INFUSION_MIN_RECIPE || recipe.length > LAYERED_INFUSION_MAX_RECIPE) {
+    return false;
+  }
+  if (c.mode !== 'normal') return false;
+  if (c.capacity !== recipe.length) return false;
+  if (c.targetTeaId !== undefined || mustEndEmpty(c)) return false;
+  if (c.serveOrder !== undefined || c.sharedCapacityGroup !== undefined) return false;
+  if (c.pairedTeaGroup !== undefined || c.steepingFlask === true) return false;
+  const seen = new Set<string>();
+  for (const tea of recipe) {
+    if (typeof tea !== 'string') return false;
+    if (!Object.prototype.hasOwnProperty.call(TEA_TYPES, tea)) return false;
+    if (seen.has(tea)) return false;
+    seen.add(tea);
+  }
+  return true;
+}
+
+/**
+ * The next expected TeaId at the current layer count, or null when the
+ * recipe is invalid or already complete. Derived ONLY from static recipe +
+ * current contents (no cursor state).
+ */
+export function layerRecipeExpectedTea(
+  c: CupConstraint | undefined,
+  currentLayers: number,
+): TeaId | null {
+  if (!isValidLayeredInfusionConstraint(c)) return null;
+  const recipe = c?.layerRecipe as readonly TeaId[];
+  if (!Number.isInteger(currentLayers) || currentLayers < 0) return null;
+  if (currentLayers >= recipe.length) return null;
+  return recipe[currentLayers] as TeaId;
 }
 
 /** Build `count` default (normal) constraints. */
@@ -950,6 +1023,7 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
+  if (c.layerRecipe !== undefined) out.layerRecipe = [...c.layerRecipe];
   return out;
 }
 
@@ -1002,5 +1076,16 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // derived from layers, never encoded here. Absent/false leaves every
   // legacy key byte-identical.
   const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
+  // Layered infusion (G23 research): the full static recipe is part of the
+  // vessel identity, so two-layer vs three-layer recipes and different
+  // ordered sequences can never collapse. Malformed values still earn a
+  // distinct fail-closed marker. Absent leaves every legacy key identical.
+  let recipeSuffix = '';
+  if (c.layerRecipe !== undefined) {
+    const recipe = c.layerRecipe;
+    const length = Array.isArray(recipe) ? recipe.length : -1;
+    const sequence = Array.isArray(recipe) ? recipe.join('>') : String(recipe);
+    recipeSuffix = `:LR${String(length)}:${sequence}`;
+  }
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}${recipeSuffix}`;
 }

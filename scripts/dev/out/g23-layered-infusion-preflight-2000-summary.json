@@ -1,0 +1,220 @@
+{
+  "gauntlet": "G23",
+  "kind": "layered-infusion-preflight",
+  "sourceBaseline": "428755b6ba4a3dc6ec7cca87b3cbeb2b8d1a13c6",
+  "generatedAt": "2026-11-04T09:32:17.656Z",
+  "seedFamily": "g23-layered-infusion:<index>",
+  "request": {
+    "numColors": 4,
+    "colors": [
+      "matcha",
+      "sea_buckthorn",
+      "karkade",
+      "milk_oolong"
+    ],
+    "emptyCups": 2,
+    "hasMysteryLayer": false,
+    "phase": "peak"
+  },
+  "countPerProfile": 2000,
+  "elapsedMs": 211757.36,
+  "arithmeticProof": {
+    "teaUnitsPerColor": 4,
+    "teaColors": 4,
+    "totalTea": 16,
+    "l2RecipeLayers": 2,
+    "l3RecipeLayers": 3,
+    "ordinaryTeaAfterL2": 14,
+    "ordinaryTeaAfterL3": 13,
+    "ordinaryCupEndState": "empty or full homogeneous capacity 4",
+    "requiredOrdinaryTotalMultipleOf": 4,
+    "l2Remainder": 2,
+    "l3Remainder": 1,
+    "conclusion": "no board in the frozen topology can satisfy both the special recipe and ordinary cup completion"
+  },
+  "profiles": [
+    {
+      "profile": "L2",
+      "sampleCount": 2000,
+      "distinctSeeds": 2000,
+      "solvable": 0,
+      "unsolvable": 2000,
+      "truncated": 0,
+      "arithmeticSolvable": 0,
+      "canonicalUniqueStarts": 2000,
+      "canonicalVariety200": 1,
+      "baseDepthHistogram": {
+        "10": 390,
+        "11": 499,
+        "12": 580,
+        "13": 395,
+        "14": 136
+      },
+      "baseMinMoves": {
+        "p50": 12,
+        "p95": 14,
+        "max": 14
+      },
+      "solverMs": {
+        "p50": 13.189,
+        "p95": 23.774,
+        "max": 47.038
+      },
+      "visitedStates": {
+        "p50": 302,
+        "p95": 507,
+        "max": 704
+      },
+      "reverseSolvable": 0,
+      "reverseUnsolvable": 2000,
+      "reverseTruncated": 0,
+      "reverseSolverMs": {
+        "p50": 13.16,
+        "p95": 23.844,
+        "max": 53.291
+      },
+      "reverseVisitedStates": {
+        "p50": 303,
+        "p95": 507,
+        "max": 717
+      },
+      "specialPositionHistogram": {
+        "0": 341,
+        "1": 320,
+        "2": 337,
+        "3": 358,
+        "4": 330,
+        "5": 314
+      },
+      "recipeHistogram": {
+        "matcha>sea_buckthorn": 167,
+        "matcha>karkade": 167,
+        "matcha>milk_oolong": 167,
+        "sea_buckthorn>matcha": 167,
+        "sea_buckthorn>karkade": 167,
+        "sea_buckthorn>milk_oolong": 167,
+        "karkade>matcha": 167,
+        "karkade>sea_buckthorn": 167,
+        "karkade>milk_oolong": 166,
+        "milk_oolong>matcha": 166,
+        "milk_oolong>sea_buckthorn": 166,
+        "milk_oolong>karkade": 166
+      },
+      "baseLengthHistogram": {
+        "0,0,4,4,4,4": 135,
+        "0,4,4,4,4,0": 131,
+        "0,4,4,0,4,4": 140,
+        "4,0,4,4,0,4": 133,
+        "4,0,0,4,4,4": 147,
+        "0,4,4,4,0,4": 143,
+        "4,4,0,0,4,4": 136,
+        "0,4,0,4,4,4": 132,
+        "4,4,0,4,4,0": 144,
+        "4,4,0,4,0,4": 124,
+        "4,4,4,4,0,0": 135,
+        "4,4,4,0,4,0": 139,
+        "4,4,4,0,0,4": 127,
+        "4,0,4,4,4,0": 105,
+        "4,0,4,0,4,4": 129
+      }
+    },
+    {
+      "profile": "L3",
+      "sampleCount": 2000,
+      "distinctSeeds": 2000,
+      "solvable": 0,
+      "unsolvable": 2000,
+      "truncated": 0,
+      "arithmeticSolvable": 0,
+      "canonicalUniqueStarts": 2000,
+      "canonicalVariety200": 1,
+      "baseDepthHistogram": {
+        "10": 390,
+        "11": 499,
+        "12": 580,
+        "13": 395,
+        "14": 136
+      },
+      "baseMinMoves": {
+        "p50": 12,
+        "p95": 14,
+        "max": 14
+      },
+      "solverMs": {
+        "p50": 26.419,
+        "p95": 46.091,
+        "max": 166.534
+      },
+      "visitedStates": {
+        "p50": 543,
+        "p95": 886,
+        "max": 1181
+      },
+      "reverseSolvable": 0,
+      "reverseUnsolvable": 2000,
+      "reverseTruncated": 0,
+      "reverseSolverMs": {
+        "p50": 26.49,
+        "p95": 47.237,
+        "max": 81.626
+      },
+      "reverseVisitedStates": {
+        "p50": 545,
+        "p95": 894,
+        "max": 1178
+      },
+      "specialPositionHistogram": {
+        "0": 341,
+        "1": 320,
+        "2": 337,
+        "3": 358,
+        "4": 330,
+        "5": 314
+      },
+      "recipeHistogram": {
+        "matcha>sea_buckthorn>karkade": 84,
+        "matcha>sea_buckthorn>milk_oolong": 84,
+        "matcha>karkade>sea_buckthorn": 84,
+        "matcha>karkade>milk_oolong": 84,
+        "matcha>milk_oolong>sea_buckthorn": 84,
+        "matcha>milk_oolong>karkade": 84,
+        "sea_buckthorn>matcha>karkade": 84,
+        "sea_buckthorn>matcha>milk_oolong": 84,
+        "sea_buckthorn>karkade>matcha": 83,
+        "sea_buckthorn>karkade>milk_oolong": 83,
+        "sea_buckthorn>milk_oolong>matcha": 83,
+        "sea_buckthorn>milk_oolong>karkade": 83,
+        "karkade>matcha>sea_buckthorn": 83,
+        "karkade>matcha>milk_oolong": 83,
+        "karkade>sea_buckthorn>matcha": 83,
+        "karkade>sea_buckthorn>milk_oolong": 83,
+        "karkade>milk_oolong>matcha": 83,
+        "karkade>milk_oolong>sea_buckthorn": 83,
+        "milk_oolong>matcha>sea_buckthorn": 83,
+        "milk_oolong>matcha>karkade": 83,
+        "milk_oolong>sea_buckthorn>matcha": 83,
+        "milk_oolong>sea_buckthorn>karkade": 83,
+        "milk_oolong>karkade>matcha": 83,
+        "milk_oolong>karkade>sea_buckthorn": 83
+      },
+      "baseLengthHistogram": {
+        "0,0,4,4,4,4": 135,
+        "0,4,4,4,4,0": 131,
+        "0,4,4,0,4,4": 140,
+        "4,0,4,4,0,4": 133,
+        "4,0,0,4,4,4": 147,
+        "0,4,4,4,0,4": 143,
+        "4,4,0,0,4,4": 136,
+        "0,4,0,4,4,4": 132,
+        "4,4,0,4,4,0": 144,
+        "4,4,0,4,0,4": 124,
+        "4,4,4,4,0,0": 135,
+        "4,4,4,0,4,0": 139,
+        "4,4,4,0,0,4": 127,
+        "4,0,4,4,4,0": 105,
+        "4,0,4,0,4,4": 129
+      }
+    }
+  ],
+  "payloadSha256": "3af528654d2ddba629f09132aa0d0dd9e356ae85d92088ade3e1fe5419085f84"
+}
