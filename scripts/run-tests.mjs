@@ -315,6 +315,13 @@ const batches = [
   { name: 'shared-tray stress (200 production seeds)', files: ['tests/shared-tray-stress.test.ts'] },
   { name: 'tea-pair kernel + compatibility (G17 Phase A)', files: ['tests/tea-pair.test.ts'] },
   { name: 'tea-pair production + bank + rollout + view + stress', files: ['tests/tea-pair-production.test.ts'] },
+  {
+    name: 'G24 contract/conservation preflight',
+    files: [
+      'tests/contract-preflight.test.ts',
+      'tests/contract-preflight-existing-mechanics.test.ts',
+    ],
+  },
 ];
 
 function runBatch(batch) {

@@ -25,5 +25,12 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "e2e", "playwright.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "playwright.config.ts",
+    "scripts/dev/contract-preflight.ts",
+    "scripts/dev/lib/contract-preflight-scenarios.ts"
+  ]
 }
