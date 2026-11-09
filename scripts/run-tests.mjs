@@ -322,6 +322,15 @@ const batches = [
       'tests/contract-preflight-existing-mechanics.test.ts',
     ],
   },
+  {
+    name: 'G25 mechanic shootout (research only)',
+    files: [
+      'tests/g25-contract-candidates.test.ts',
+      'tests/g25-mirror-pair.test.ts',
+      'tests/g25-metered-pourer.test.ts',
+      'tests/g25-measuring-bowl.test.ts',
+    ],
+  },
 ];
 
 function runBatch(batch) {
