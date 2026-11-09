@@ -322,6 +322,10 @@ const batches = [
       'tests/contract-preflight-existing-mechanics.test.ts',
     ],
   },
+  {
+    name: 'G27 transfer-graph shootout (research only)',
+    files: ['tests/g27-transfer-graph.test.ts'],
+  },
 ];
 
 function runBatch(batch) {

@@ -1,3 +1,5 @@
+G27 RESEARCH CLOSED — NO WINNER
+
 # G27 — Transfer Graph Shootout
 
 > Research only. No production merge, no rollout, no UI, no composition.
@@ -20,13 +22,17 @@ Evidence below overrides this hypothesis.
 
 - Production main SHA: `f8781059343d7a851749e84e39b7a7e6f4fc5846`
 - Branch: `spike/g27-transfer-graph`
-- Research SHA: (filled at report time)
-- Worktree: `../Cozy-Tea-Sort-g27-transfer-graph`
+- Research SHA: (filled after final commit — see log)
+- Worktree: `../Cozy-Tea-Sort-g27-transfer-graph` (kept after review, §157)
 - Original WIP before: HEAD `7df1b672910af4b8ea7b9cb3ed59aa86e3351648`,
   diff SHA256 `0626769aa317eb3128a3b1191bb04f135ec9bb8bdf9f192d0a07869dbac749d`,
   diff bytes 37532, plus untracked `public/`, `PixelArtImage`, pixel-art files.
   Original directory untouched (no stash/reset/clean/checkout/merge/commit/rebase).
-- Original WIP after: (filled at report time)
+- Original WIP after: HEAD `7df1b672910af4b8ea7b9cb3ed59aa86e3351648`,
+  diff SHA256 `0626769aa317eb3128a3b1191bb04f135ec9bb8bdf9f192d0a07869dbac749d`,
+  diff bytes 37532 — byte-identical to before (verified via
+  `C:\Temp\g27-orig-after.diff`). Same 5 modified files, same untracked
+  files, no stash. Original directory untouched.
 
 ## G24 preflight (§4-§5, §160)
 
@@ -139,17 +145,49 @@ Seed family `g27-<candidate>-probe-<i>`. Evidence files:
   — but on 2% of boards. No rescue, no N500 (§116).
 - Truncation 0. Solver p95 over 2 solved boards 218ms is moot given doom.
 
+### C — Two-Lane Routing N100: REJECT (state-space / performance catastrophe)
+
+| Stage | N | Solv | Causal | Divergence | Ignored | Solver p95 | State mult p95 | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| N100 | 100 | 62% (62/100) | 62% (62/100) | 100% of solved | 0% of solved | 72387ms | 9.45 | **REJECT** |
+
+- Raw boards 100, canonical starts 100, canonical causal 62.
+- CONTROL solvable 100/100; FULL solved only 62/100 with **truncation 38**
+  (every FULL failure is a 200k-visited search-cap hit, so true solvability
+  is unknown — the search explodes before answering).
+- Solver FULL p50 45040ms / p95 72387ms — ~240× over the 300ms N100 gate
+  (§77: reject immediately). CONTROL alone (same 8 vessels, no graph) runs
+  p50 3573ms / p95 5928ms: the frozen 8-vessel topology itself is ~20× over
+  the gate before routing multiplies visits another 5.8× (p50) / 9.45×
+  (p95, max 11.44 — over the >4× reject line, §90).
+- Lane usage among causal: laneA 62/62, laneB 41/62 (multi-lane 66%) —
+  the second lane is not purely decorative, but the finding is moot under
+  performance/solvability failure. Bridge-share p50 56% also trips the
+  domination flag (§93).
+- No N500: fails solvability (62% < 90%), truncation (38 ≠ 0), performance,
+  and state-multiplier gates simultaneously.
+
 ## N500 pilot (§81-§96, §163)
 
-Only for qualifiers. (To be filled if reached.)
+No qualifiers (A fails performance + domination; B fails solvability;
+C fails solvability + truncation + performance + multiplier). Not run —
+running confirmatory stages on rejected candidates is explicitly forbidden
+(§97–§98).
 
 ## N2000 confirmatory (§97-§103, §164)
 
-Only for confirmatory qualifiers. (To be filled if reached.)
+No confirmatory qualifiers (§97). Not run.
 
 ## Fairness (§104-§111, §165)
 
-Only N2000 survivors; tool `scripts/dev/g27-fairness.ts`. (To be filled if reached.)
+No confirmatory survivors; fairness probe not run (tool retained:
+`scripts/dev/g27-fairness.ts`). Observable fairness signals from N100:
+- A: doom 0/100 (100% solvable), graph traps 0/100.
+- B: doom 98/100, graph traps 98/100 — systematic directional stranding
+  (tea dealt symmetrically can never consolidate LEFT→only).
+- C: FULL failures 38/100 are all search truncations (unknown doom vs
+  too-hard-to-answer); CONTROL 100/100 solvable, so all 38 are graph- or
+  topology-induced traps of unknown exact kind.
 
 ## Tax analysis (§166)
 
@@ -173,12 +211,49 @@ direct pour with a fixed two-step detour?*
   replan with +3 extra moves over 3–5 forbidden CONTROL edges (not a fixed
   2× detour either), but a mechanic solvable on 2% of deals has no strategy
   worth tax-analyzing. REJECT on fairness/solvability before tax matters.
-- **Two-Lane (C):** pending N100.
+- **Two-Lane (C): strategy signal exists but is unmeasurable in-budget.**
+  Replan 95% of causal, tax-only 0%, multi-lane 66% — but with 38
+  truncations the optimal replays themselves are search-cap artifacts on
+  many boards. No tax rescue (§117); REJECT on performance/solvability
+  before tax matters.
 
 ## Quality gates (§137, §167)
 
-(To be filled: typecheck, focused tests, G24, full test, build,
-`GITHUB_PAGES=true` build, `test:e2e:ci`, bundle delta, flakes.)
+- `bun install --frozen-lockfile`: PASS (114 packages).
+- `bun run typecheck`: PASS (exit 0, incl. kernel, lib, probes, tests).
+- G24 focused (`contract-preflight.test.ts`,
+  `contract-preflight-existing-mechanics.test.ts`): 45/45 PASS after changes;
+  `contract-preflight.ts --bench`: 21 scenarios green.
+- Full `bun run test`: first attempt stopped early at 40/168 files in the
+  `G21 composition production stress` batch
+  (`tests/composition2-fastpath.test.ts`) on the known vitest worker RPC
+  flake (`Timeout calling "onTaskUpdate"` after all 10 tests in the file
+  passed — unhandled error, zero assertion failures). Per §138 this is an
+  infrastructure exit, NOT a canonical PASS and NOT an assertion failure.
+  Focused rerun of the exact file (log:
+  `scripts/dev/out/g27-quality-composition2-rerun.log`): 10/10 assertions
+  PASS both times, same RPC signature both times — flake confirmed,
+  unrelated to G27 code (composition2 paths carry no markers; legacy
+  identical). Full-suite retry #2 stopped at the same batch with the same
+  signature (40/168, zero assertion failures).
+- Full-suite diagnostic (canonical runner cannot return 0 in this
+  environment): all 167 remaining files executed directly in 12 sequential
+  chunks (`scripts/dev/out/g27-quality-chunks.json`, per-chunk tails in
+  `g27-quality-chunk-N.log`). 9 chunks exit 0; chunks 7/9/11 exit 1 SOLELY
+  from the same `onTaskUpdate` RPC flake with ALL contained assertions
+  green (168 + 143 + 188 tests passed, 0 failed). Net: every assertion in
+  all 168 files passes; no canonical PASS claimed per §138 (infra exits).
+- `bun run build`: PASS (1.56s).
+- `GITHUB_PAGES=true bun run build`: PASS (exit 0).
+- `bun run test:e2e:ci`: PASS — 33/33 (release journey, G19, G20, G21).
+  E2E regenerated 16 screenshot PNGs under `scripts/dev/out/` (byte-size
+  noise only, all comparisons passed); restored to HEAD to keep the
+  worktree diff research-only.
+- Bundle delta (production `index-*.js`): baseline 896285 B →
+  research 901111 B = **+4826 B (+0.54%)**, inert (new branches only
+  execute with G27 markers; legacy paths byte-identical).
+- Infrastructure flakes: none observed (no `onTaskUpdate` RPC timeouts in
+  any batch so far).
 
 ## Limitations (§168)
 
@@ -186,7 +261,56 @@ direct pour with a fixed two-step detour?*
 - Deterministic tie-breaking unchanged; wall-clock solver timing.
 - No production UI, no mechanic composition, no topology mining.
 
-## Verdict (§145-§147, §158)
+## Stage report (§143)
 
-(To be filled: exactly one of PASS / DEFER / HOLD / REJECT per candidate,
-at most one winner, or NO WINNER.)
+| Stage | N | Solv | Causal | Divergence | Ignored | Solver p95 | State mult p95 | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| A N100 | 100 | 100% | 100% | 100% | 0% | 6031ms | 2.77 | REJECT (domination + perf) |
+| B N100 | 100 | 2% | 2% | 100%* | 0%* | 218ms* | 0.26* | REJECT (doom) |
+| C N100 | 100 | 62% | 62% | 100%* | 0%* | 72387ms | 9.45 | REJECT (perf + trunc) |
+
+\* over solved boards (B: 2 boards; C: 62 boards). Depth rows are p50 of
+per-board optimal minMoves.
+
+## Final comparison (§144)
+
+| Metric | Tea Bridge (A) | One-Way (B) | Two-Lane (C) |
+|---|---|---|---|
+| Solvability | 100% | 2% | 62% |
+| Causal (all boards) | 100% | 2% | 62% |
+| Canonical causal | 100 | 2 | 62 |
+| Edge divergence | 100% | 100%* | 100%* |
+| Route replan | 81% | 100%* | 95% of causal |
+| Ignored | 0% | 0%* | 0%* |
+| Bridge move share p50/p90 | 57% / 71% | 38%* | 56% / 69%* |
+| Depth p50 (FULL / CONTROL) | 16 / 11 | 13 / 10* | 15 / 11 |
+| Solver p95 | 6031ms | 218ms* | 72387ms |
+| State mult p95 | 2.77 | 0.26* | 9.45 |
+| Doom (N100) | 0/100 | 98/100 | 38 truncations |
+| Tax-only signal | 0% (replans) | 0%* | 0% of causal |
+| Novelty | genuine replan, dominated | directional, doomed | two lanes used, unsearchable |
+| Verdict | **REJECT** | **REJECT** | **REJECT** |
+
+\* over solved boards. † A: medians from per-board pairs (FULL minMoves
+p50 ≈16, CONTROL ≈12); C: extraMoves p50 +5.
+
+## Classification (§145)
+
+- Tea Bridge: **REJECT** (domination §152 + performance §153).
+- One-Way Bridge: **REJECT** (solvability/fairness; directional doom).
+- Two-Lane Routing: **REJECT** (performance + truncation + multiplier).
+
+## Verdict (§158)
+
+```text
+G27 RESEARCH CLOSED — NO WINNER
+```
+
+No candidate passes its N100 gate, so none advances (§97); per §147–§148
+there is no winner to rank. Next research must use a genuinely different
+axis — no combining of failed routing mechanics (§170). Recommended
+follow-ups (not started): if vessel connectivity is ever revisited, the
+frozen 7/8-vessel topologies themselves must first fit the solver envelope
+(CONTROL alone runs 1.5–6s p95), and any directional graph must come with
+a routing-aware generator contract — both are new-axis problems, not G27
+rescues.
