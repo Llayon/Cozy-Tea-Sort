@@ -567,6 +567,9 @@ export class TeaSortLogic {
 
     const res = applyPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints(), this.blendRecipe);
     if (!res) return null;
+    // G26: authoritative transferred tea comes from the single extraction
+    // plan inside applyPourState (bottom tea for bottom-draw sources).
+    snapshot.move.layer = res.layer;
     this.applyBoardState(res.state);
 
     const sourceUncovered = (this.cups[fromIdx] as Cup).revealTopIfNeeded();

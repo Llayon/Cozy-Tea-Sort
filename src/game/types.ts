@@ -781,6 +781,30 @@ export interface CupConstraint {
    * Static identity only — no ready/locked/chosen-tea state exists.
    */
   steepingFlask?: boolean;
+  /**
+   * G26 RESEARCH ONLY (never production). Bottom-draw vessel: when this
+   * vessel is SOURCE, it transfers its BOTTOM contiguous run instead of the
+   * top run. Static identity only — no progress state.
+   */
+  bottomDraw?: boolean;
+  /**
+   * G26 RESEARCH ONLY (never production). Pair-ready source: this vessel
+   * may SOURCE only while its top contiguous run length is exactly 2.
+   * Static identity only — no progress state.
+   */
+  pairReadySource?: boolean;
+  /**
+   * G26 RESEARCH ONLY (never production). Linked source gate group tying
+   * one source vessel (role 'source') to one valve vessel (role 'valve').
+   * Absent = ordinary vessel.
+   */
+  linkedSourceGroup?: string;
+  /**
+   * G26 RESEARCH ONLY (never production). Role within a linked source
+   * gate group: 'source' (gated, must end empty) or 'valve' (ordinary
+   * normal finality, controls the gate by its emptiness).
+   */
+  linkedSourceRole?: 'source' | 'valve';
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -950,6 +974,11 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
+  // G26 research markers (absent in production; cloned when present).
+  if (c.bottomDraw !== undefined) out.bottomDraw = c.bottomDraw;
+  if (c.pairReadySource !== undefined) out.pairReadySource = c.pairReadySource;
+  if (c.linkedSourceGroup !== undefined) out.linkedSourceGroup = c.linkedSourceGroup;
+  if (c.linkedSourceRole !== undefined) out.linkedSourceRole = c.linkedSourceRole;
   return out;
 }
 
@@ -1002,5 +1031,15 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // derived from layers, never encoded here. Absent/false leaves every
   // legacy key byte-identical.
   const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
+  // G26 research markers (DEV ONLY): absent markers leave legacy keys
+  // byte-identical. Present markers earn distinct suffixes so research
+  // vessels never collapse with ordinary cups, and linked S/V roles stay
+  // distinct from each other.
+  const bottomSuffix = c.bottomDraw === true ? ':BD' : '';
+  const pairReadySuffix = c.pairReadySource === true ? ':PRS' : '';
+  let linkedSuffix = '';
+  if (c.linkedSourceGroup !== undefined || c.linkedSourceRole !== undefined) {
+    linkedSuffix = `:LSG:${String(c.linkedSourceGroup ?? '_')}:${String(c.linkedSourceRole ?? '_')}`;
+  }
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}${bottomSuffix}${pairReadySuffix}${linkedSuffix}`;
 }

@@ -123,6 +123,23 @@ import {
   sharedCapacityTransferLimit,
 } from './sharedCapacity';
 import {
+  bottomLayerOf,
+  bottomRunCountOf,
+  findLinkedValveIndex,
+  hasAnyG26Marker,
+  isBottomDrawMarker,
+  isG26BoardMalformed,
+  isLinkedSourceMarker,
+  isLinkedSourceReady,
+  isPairReadyMarker,
+  isPairReadyNow,
+  isValidBottomDrawConstraint,
+  isValidLinkedSourceConstraint,
+  isValidLinkedValveConstraint,
+  isValidPairReadyConstraint,
+  sourceTransferPlan,
+} from './g26Research';
+import {
   isPairedTeaGoalSatisfied,
   isPairedTeaMemberComplete,
 } from './teaPair';
@@ -266,6 +283,8 @@ export type PourRejectCode =
   | 'source-empty'
   | 'source-sink-only'
   | 'source-steeping-not-ready'
+  | 'source-pair-not-ready'
+  | 'source-linked-not-ready'
   | 'source-frozen'
   | 'source-served'
   | 'target-full'
@@ -374,6 +393,23 @@ export function isCompleteCup(layers: TeaId[]): boolean {
  * rejects them outright).
  */
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  // G26 RESEARCH ONLY: any marked vessel with an invalid standalone shape
+  // never satisfies victory (fail closed). Valid A/B/S fall through to the
+  // generic mustEndEmpty branch (empty only); valid V falls through to
+  // plain-normal finality. Absent markers: legacy path identical.
+  if (
+    c?.bottomDraw === true ||
+    c?.pairReadySource === true ||
+    c?.linkedSourceGroup !== undefined ||
+    c?.linkedSourceRole !== undefined
+  ) {
+    const valid =
+      isValidBottomDrawConstraint(c) ||
+      isValidPairReadyConstraint(c) ||
+      isValidLinkedSourceConstraint(c) ||
+      isValidLinkedValveConstraint(c);
+    if (!valid) return false;
+  }
   // Gauntlet 20: steeping flask must end empty, and a malformed marker must
   // never accidentally satisfy victory (fail closed before any generic
   // must-end-empty branch).
@@ -548,6 +584,70 @@ function teaRejectCodeBetween(
   ) {
     return 'source-steeping-not-ready';
   }
+  // G26 RESEARCH ONLY: derived source-access gates (never stored).
+  // Priority after addressing/role/empty + flask, before capacity/color.
+  // Malformed markers fail closed. Absent markers: legacy path identical.
+  if (
+    srcConstraint?.bottomDraw === true ||
+    srcConstraint?.pairReadySource === true ||
+    srcConstraint?.linkedSourceGroup !== undefined ||
+    srcConstraint?.linkedSourceRole !== undefined
+  ) {
+    const validA = isValidBottomDrawConstraint(srcConstraint);
+    const validB = isValidPairReadyConstraint(srcConstraint);
+    const validS = isValidLinkedSourceConstraint(srcConstraint);
+    const validV = isValidLinkedValveConstraint(srcConstraint);
+    const validCount = [validA, validB, validS, validV].filter(Boolean).length;
+    if (validCount !== 1) return 'color-mismatch';
+    // Valve vessels source under ordinary rules (no gate).
+    if (!validV) {
+      if (validB && topCountOf(source) !== 2) return 'source-pair-not-ready';
+      if (validS && !isLinkedSourceReady(cups, fromIdx, constraints)) {
+        return 'source-linked-not-ready';
+      }
+    }
+    // Research-local standalone: a valid G26 source never interacts with a
+    // production-special vessel (targets/tasting/thermos/teapot/sink/order/
+    // shared/pair/flask). Fail closed on cross-mechanic contact.
+    const dstC = constraints?.[toIdx];
+    if (dstC) {
+      const dstMarked =
+        dstC.bottomDraw === true ||
+        dstC.pairReadySource === true ||
+        dstC.linkedSourceGroup !== undefined ||
+        dstC.linkedSourceRole !== undefined;
+      if (!dstMarked) {
+        const dstSpecial =
+          (dstC.mode ?? 'normal') !== 'normal' ||
+          dstC.targetTeaId !== undefined ||
+          dstC.serveOrder !== undefined ||
+          dstC.sharedCapacityGroup !== undefined ||
+          dstC.pairedTeaGroup !== undefined ||
+          dstC.steepingFlask === true ||
+          cupCapacity(dstC) !== STANDARD_CUP_CAPACITY ||
+          mustEndEmpty(dstC);
+        if (dstSpecial) return 'color-mismatch';
+      }
+    }
+  }
+  // G26 destination guard: receiving INTO a malformed G26 vessel fails
+  // closed; valid research destinations receive under ordinary rules.
+  {
+    const dstConstraint = constraints?.[toIdx];
+    if (
+      dstConstraint?.bottomDraw === true ||
+      dstConstraint?.pairReadySource === true ||
+      dstConstraint?.linkedSourceGroup !== undefined ||
+      dstConstraint?.linkedSourceRole !== undefined
+    ) {
+      const valid =
+        isValidBottomDrawConstraint(dstConstraint) ||
+        isValidPairReadyConstraint(dstConstraint) ||
+        isValidLinkedSourceConstraint(dstConstraint) ||
+        isValidLinkedValveConstraint(dstConstraint);
+      if (!valid) return 'color-mismatch';
+    }
+  }
   // "Full" is relative to the DESTINATION vessel's EFFECTIVE capacity
   // (a 2/2 bowl is full; a 2/2 active cinnamon cup is full).
   const destCap = obstacles
@@ -591,7 +691,14 @@ function teaRejectCodeBetween(
     return 'complete-to-empty';
   }
   if (target.length === 0) return 'ok';
-  return topLayerOf(source) === topLayerOf(target) ? 'ok' : 'color-mismatch';
+  // G26 RESEARCH ONLY: bottom-draw compatibility compares the BOTTOM run
+  // tea, not the top tea. All other vessels compare top tea (legacy).
+  {
+    const plan = sourceTransferPlan(source, constraints?.[fromIdx]);
+    const sourceTea = plan.tea;
+    if (sourceTea === null) return 'color-mismatch';
+    return sourceTea === topLayerOf(target) ? 'ok' : 'color-mismatch';
+  }
 }
 
 /**
@@ -646,8 +753,11 @@ export function unstrainedPourCountState(
   if (slots[fromIdx] != null && slots[toIdx] != null) return 0;
   const source = state.cups[fromIdx] as TeaId[];
   const target = state.cups[toIdx] as TeaId[];
+  // G26 RESEARCH ONLY: bottom-draw bounds by BOTTOM run, not top run.
+  // All other vessels use the legacy top-run bound (identical).
+  const sourceRun = sourceTransferPlan(source, constraints?.[fromIdx]).available;
   let m = Math.min(
-    topCountOf(source),
+    sourceRun,
     effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
   );
   if (m <= 0) return 0;
@@ -730,6 +840,30 @@ export function pourRejectCodeState(
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
 ): PourRejectCode {
+  // G26 RESEARCH ONLY: standalone fail-closed (never stored).
+  // Same-cup/out-of-range priority preserved; G26-involved pours on a
+  // malformed board (production special, dynamic slot, blend, or invalid
+  // static shape) fail closed. Absent markers: no-op, legacy identical.
+  if (hasAnyG26Marker(constraints)) {
+    if (fromIdx === toIdx) return 'same-cup';
+    if (fromIdx < 0 || fromIdx >= state.cups.length) return 'out-of-range';
+    if (toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+    if (isG26BoardMalformed(state, constraints, blendRecipe)) {
+      const fromC = constraints?.[fromIdx];
+      const toC = constraints?.[toIdx];
+      const fromMarked =
+        fromC?.bottomDraw === true ||
+        fromC?.pairReadySource === true ||
+        fromC?.linkedSourceGroup !== undefined ||
+        fromC?.linkedSourceRole !== undefined;
+      const toMarked =
+        toC?.bottomDraw === true ||
+        toC?.pairReadySource === true ||
+        toC?.linkedSourceGroup !== undefined ||
+        toC?.linkedSourceRole !== undefined;
+      if (fromMarked || toMarked) return 'color-mismatch';
+    }
+  }
   // G14 serving-order priority (§36 steps 1–2): addressing, vessel roles,
   // source emptiness, then the served-source lock. A served cup (its order
   // within the derived prefix) can never source again — `source-served`
@@ -912,8 +1046,10 @@ export function pourCountState(
   // into an empty tasting bowl moves exactly 2 layers, never 4; only one
   // layer fits into a cinnamon cup holding one layer.
   const obstacles = normalizeCapacityObstacles(state.capacityObstacles, state.cups.length);
+  // G26 RESEARCH ONLY: bottom-draw bounds by BOTTOM run (single plan truth).
+  const sourceRun = sourceTransferPlan(source, constraints?.[fromIdx]).available;
   let m = Math.min(
-    topCountOf(source),
+    sourceRun,
     effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx]) - target.length,
   );
   // Shared-capacity bound (G16 §§18-19): outside → tray inflow is
@@ -1251,11 +1387,18 @@ export function applyPourState(
   const nextBuds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
   const source = nextCups[fromIdx] as TeaId[];
   const target = nextCups[toIdx] as TeaId[];
-  const layer = topLayerOf(source) as TeaId;
+  // G26 RESEARCH ONLY: single extraction plan truth (no second pour
+  // engine). Bottom-draw removes m BOTTOM layers; all other vessels pop m
+  // TOP layers. Legality above already fixed m via the same plan.
+  const plan = sourceTransferPlan(state.cups[fromIdx] as TeaId[], constraints?.[fromIdx]);
+  const layer = plan.tea as TeaId;
+  if (layer === null || layer === undefined) return null;
+  const isBottom = plan.kind === 'bottom' && isValidBottomDrawConstraint(constraints?.[fromIdx]);
   const honey = nextSink[fromIdx] ?? null;
   const emptiesSource = source.length - m === 0;
   if (honey != null && emptiesSource && nextSink[toIdx] != null) return null;
-  for (let i = 0; i < m; i++) source.pop();
+  if (isBottom) source.splice(0, m);
+  else for (let i = 0; i < m; i++) source.pop();
   const received = strained ? m - 1 : m;
   for (let i = 0; i < received; i++) target.push(layer);
   let caughtTea: TeaId | undefined;
