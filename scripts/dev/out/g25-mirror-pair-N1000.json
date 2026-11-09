@@ -1,0 +1,44 @@
+{
+  "candidate": "mirror-pair",
+  "N": 1000,
+  "solvability": 79.1,
+  "truncation": 0,
+  "depth": {
+    "p50": 13,
+    "p95": 14,
+    "max": 16
+  },
+  "visited": {
+    "p50": 230,
+    "p95": 632,
+    "max": 939
+  },
+  "ms": {
+    "p50": 13,
+    "p95": 41,
+    "max": 65
+  },
+  "canonicalUnique": 1000,
+  "orderActiveRate": 79.1,
+  "orderActiveCount": 791,
+  "canonicalActive": 791,
+  "recipeBuild": 791,
+  "controlDivergence": 79.1,
+  "firstDiff": 612,
+  "interleaving": {
+    "g0": 2037,
+    "g1": 1541,
+    "g2": 598,
+    "g3": 359
+  },
+  "dual": {
+    "alternating": 710,
+    "sequential": 81
+  },
+  "depthDeltaP50": -1,
+  "stateMult": {
+    "p50": 0.5380577427821522,
+    "p90": 1.0444938820912124,
+    "p95": 1.1929824561403508
+  }
+}

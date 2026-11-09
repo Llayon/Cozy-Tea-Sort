@@ -1,0 +1,44 @@
+{
+  "candidate": "measuring-bowl",
+  "N": 1000,
+  "solvability": 100,
+  "truncation": 0,
+  "depth": {
+    "p50": 12,
+    "p95": 14,
+    "max": 15
+  },
+  "visited": {
+    "p50": 1643,
+    "p95": 2890,
+    "max": 3608
+  },
+  "ms": {
+    "p50": 112,
+    "p95": 207,
+    "max": 368
+  },
+  "canonicalUnique": 1000,
+  "causalRate": 1.3,
+  "causalCount": 13,
+  "canonicalCausal": 13,
+  "controlDivergence": 21.4,
+  "firstDiff": 149,
+  "moveShare": {
+    "p50": 0.15384615384615385,
+    "p90": 0.25,
+    "p95": 0.2727272727272727
+  },
+  "extraction": {
+    "p50": 1,
+    "p90": 3,
+    "ge3": 134
+  },
+  "depthDeltaP50": 0,
+  "ignoredRate": 33.6,
+  "stateMult": {
+    "p50": 1.1637860082304528,
+    "p90": 1.3141630901287553,
+    "p95": 1.3920367534456355
+  }
+}

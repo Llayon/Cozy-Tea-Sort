@@ -1,0 +1,39 @@
+{
+  "candidate": "metered-pourer",
+  "N": 1000,
+  "solvability": 100,
+  "truncation": 0,
+  "depth": {
+    "p50": 12,
+    "p95": 14,
+    "max": 16
+  },
+  "visited": {
+    "p50": 1599,
+    "p95": 2801,
+    "max": 3546
+  },
+  "ms": {
+    "p50": 112,
+    "p95": 210,
+    "max": 372
+  },
+  "canonicalUnique": 1000,
+  "causalRate": 3.3,
+  "causalCount": 33,
+  "canonicalCausal": 33,
+  "controlDivergence": 63.5,
+  "firstDiff": 330,
+  "moveShare": {
+    "p50": 0.07142857142857142,
+    "p90": 0.1,
+    "p95": 0.1111111111111111
+  },
+  "depthDeltaP50": 0,
+  "ignoredRate": 41.9,
+  "stateMult": {
+    "p50": 1.1420418516169943,
+    "p90": 1.2105263157894737,
+    "p95": 1.2333696837513632
+  }
+}
