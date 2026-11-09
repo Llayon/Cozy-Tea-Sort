@@ -22,8 +22,11 @@ Evidence below overrides this hypothesis.
 
 - Production main SHA: `f8781059343d7a851749e84e39b7a7e6f4fc5846`
 - Branch: `spike/g27-transfer-graph`
-- Research SHA: `656a14fdd98c6b29aecaa58bc2a5d7dc812c4dc2` (4 commits on
-  `spike/g27-transfer-graph`: screen, probe, verdict — no PR, no merge)
+- Evidence commits on `spike/g27-transfer-graph` (no PR, no merge):
+  `d78c695` screen (kernel + contract screen + 68 witnesses),
+  `530ad68` probe (lib + runners + A/B N100 JSON),
+  `656a14f` verdict data (C N100 JSON + quality evidence + report).
+  Tip holds only report wording fixups beyond these.
 - Worktree: `../Cozy-Tea-Sort-g27-transfer-graph` (kept after review, §157)
 - Original WIP before: HEAD `7df1b672910af4b8ea7b9cb3ed59aa86e3351648`,
   diff SHA256 `0626769aa317eb3128a3b1191bb04f135ec9bb8bdf9f192d0a07869dbac749d`,
