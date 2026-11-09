@@ -28,7 +28,7 @@ describe('g26 linked gate direct witnesses', () => {
   it('S nonempty + V empty => S may source', () => {
     const cups: TeaId[][] = [[A, A], [], [B, B]];
     const constraints = [source(), valve(), ordinary()];
-    expect(pourRejectCodeState({ cups }, 0, 1, constraints)).toBe('ok');
+    expect(pourRejectCodeState({ cups } as never, 0, 1, constraints)).toBe('ok');
     expect(isLinkedSourceReady(cups, 0, constraints)).toBe(true);
   });
 
@@ -36,8 +36,8 @@ describe('g26 linked gate direct witnesses', () => {
     const cups: TeaId[][] = [[A, A], [], [B, B]];
     const constraints = [source(), valve(), ordinary()];
     // Ordinary -> valve is legal (valve is ordinary).
-    expect(pourRejectCodeState({ cups }, 2, 1, constraints)).toBe('ok');
-    const after = applyPourState({ cups }, 2, 1, constraints);
+    expect(pourRejectCodeState({ cups } as never, 2, 1, constraints)).toBe('ok');
+    const after = applyPourState({ cups } as never, 2, 1, constraints);
     expect(after!.state.cups[1]).toEqual([B, B]);
     expect(pourRejectCodeState(after!.state, 0, 2, constraints)).toBe('source-linked-not-ready');
     expect(isLinkedSourceReady(after!.state.cups, 0, constraints)).toBe(false);
@@ -47,10 +47,10 @@ describe('g26 linked gate direct witnesses', () => {
     const cups: TeaId[][] = [[A, A], [B], []];
     const constraints = [source(), valve(), ordinary()];
     // V=[B] nonempty => S locked.
-    expect(pourRejectCodeState({ cups }, 0, 1, constraints)).toBe('source-linked-not-ready');
+    expect(pourRejectCodeState({ cups } as never, 0, 1, constraints)).toBe('source-linked-not-ready');
     // Empty V elsewhere: V [B] -> empty [ ] is legal (top B into empty).
-    expect(pourRejectCodeState({ cups }, 1, 2, constraints)).toBe('ok');
-    const emptied = applyPourState({ cups }, 1, 2, constraints);
+    expect(pourRejectCodeState({ cups } as never, 1, 2, constraints)).toBe('ok');
+    const emptied = applyPourState({ cups } as never, 1, 2, constraints);
     expect(emptied!.state.cups[1]).toEqual([]);
     // V is now empty at index 1; S pours into the empty valve.
     expect(pourRejectCodeState(emptied!.state, 0, 1, constraints)).toBe('ok');
@@ -60,10 +60,10 @@ describe('g26 linked gate direct witnesses', () => {
     const cups: TeaId[][] = [[], [B, B], [B]];
     const constraints = [source(), valve(), ordinary()];
     // Valve sources ordinary top run.
-    expect(pourRejectCodeState({ cups }, 1, 2, constraints)).toBe('ok');
+    expect(pourRejectCodeState({ cups } as never, 1, 2, constraints)).toBe('ok');
     // Valve receives ordinary.
     const cups2: TeaId[][] = [[], [], [B, B]];
-    expect(pourRejectCodeState({ cups: cups2 }, 2, 1, constraints)).toBe('ok');
+    expect(pourRejectCodeState({ cups: cups2 } as never, 2, 1, constraints)).toBe('ok');
   });
 
   it('control divergence: CONTROL sources while FULL blocked', () => {
@@ -71,8 +71,8 @@ describe('g26 linked gate direct witnesses', () => {
     const full = [source(), valve(), ordinary()];
     // CONTROL strips only the linked gate (S keeps mustEndEmpty, V normal).
     const control: CupConstraint[] = [{ mode: 'normal', capacity: 4, mustEndEmpty: true }, { mode: 'normal', capacity: 4 }, ordinary()];
-    expect(pourRejectCodeState({ cups }, 0, 2, full)).toBe('source-linked-not-ready');
-    expect(pourRejectCodeState({ cups }, 0, 2, control)).toBe('ok');
+    expect(pourRejectCodeState({ cups } as never, 0, 2, full)).toBe('source-linked-not-ready');
+    expect(pourRejectCodeState({ cups } as never, 0, 2, control)).toBe('ok');
   });
 
   it('undo restores exact contents and derived gate follows', () => {
@@ -92,7 +92,7 @@ describe('g26 linked gate direct witnesses', () => {
     // Two valves with same group => malformed board => fail closed (color-mismatch).
     const ambiguous: CupConstraint[] = [source(), valve(), valve()];
     expect(findLinkedValveIndex(ambiguous, 0)).toBe(-1);
-    expect(pourRejectCodeState({ cups: [[A], [], []] }, 0, 1, ambiguous)).toBe('color-mismatch');
+    expect(pourRejectCodeState({ cups: [[A], [], []] } as never, 0, 1, ambiguous)).toBe('color-mismatch');
   });
 
   it('canonical audit: S/V roles distinct, marker absent legacy unchanged', () => {
@@ -104,41 +104,41 @@ describe('g26 linked gate direct witnesses', () => {
     expect(sigS).not.toBe(sigV);
     expect(sigS).not.toBe(sigO);
     const cups: TeaId[][] = [[A], [], []];
-    const keyFull = canonicalPuzzleKey({ cups }, [source(), valve(), ordinary()]);
-    const keySwap = canonicalPuzzleKey({ cups }, [valve(), source(), ordinary()]);
+    const keyFull = canonicalPuzzleKey({ cups } as never, [source(), valve(), ordinary()]);
+    const keySwap = canonicalPuzzleKey({ cups } as never, [valve(), source(), ordinary()]);
     void keySwap;
     // Swapping S and V contents changes roles: keys must distinguish positions via signatures.
     // At minimum, linked keys differ from all-ordinary keys.
-    const keyOrd = canonicalPuzzleKey({ cups }, [ordinary(), ordinary(), ordinary()]);
+    const keyOrd = canonicalPuzzleKey({ cups } as never, [ordinary(), ordinary(), ordinary()]);
     expect(keyFull).not.toBe(keyOrd);
   });
 
   it('malformed linked boards fail closed', () => {
     // S without V => malformed standalone => fail closed (color-mismatch).
     expect(
-      pourRejectCodeState({ cups: [[A], [], []] }, 0, 2, [source(), ordinary(), ordinary()]),
+      pourRejectCodeState({ cups: [[A], [], []] } as never, 0, 2, [source(), ordinary(), ordinary()]),
     ).toBe('color-mismatch');
     // Wrong role value.
     const badRole = { mode: 'normal', capacity: 4, mustEndEmpty: true, linkedSourceGroup: 'g', linkedSourceRole: 'boss' } as unknown as CupConstraint;
-    expect(pourRejectCodeState({ cups: [[A], [], []] }, 0, 2, [badRole, valve('g'), ordinary()])).not.toBe('ok');
+    expect(pourRejectCodeState({ cups: [[A], [], []] } as never, 0, 2, [badRole, valve('g'), ordinary()])).not.toBe('ok');
   });
 
   it('empty S keeps source-empty precedence', () => {
     const cups: TeaId[][] = [[], [], []];
-    expect(pourRejectCodeState({ cups }, 0, 2, [source(), valve(), ordinary()])).toBe('source-empty');
+    expect(pourRejectCodeState({ cups } as never, 0, 2, [source(), valve(), ordinary()])).toBe('source-empty');
   });
 
   it('full cycle: V empty -> S usable -> V occupied -> S locked -> V emptied -> S usable', () => {
     const constraints = [source(), valve(), ordinary(), ordinary(), ordinary(), ordinary()];
     let cups: TeaId[][] = [[A, A], [], [B, B], [B, B], [B, B], []];
     // S usable.
-    expect(pourRejectCodeState({ cups }, 0, 5, constraints)).toBe('ok');
+    expect(pourRejectCodeState({ cups } as never, 0, 5, constraints)).toBe('ok');
     // Occupy V.
-    const occupied = applyPourState({ cups }, 2, 1, constraints);
+    const occupied = applyPourState({ cups } as never, 2, 1, constraints);
     expect(occupied).not.toBeNull();
     cups = occupied!.state.cups;
-    expect(pourRejectCodeState({ cups }, 0, 5, constraints)).toBe('source-linked-not-ready');
+    expect(pourRejectCodeState({ cups } as never, 0, 5, constraints)).toBe('source-linked-not-ready');
     // Empty V back into its origin? Move V contents out to empty slot 5 is blocked (S locked, but V itself can source).
-    expect(pourRejectCodeState({ cups }, 1, 5, constraints)).toBe('ok');
+    expect(pourRejectCodeState({ cups } as never, 1, 5, constraints)).toBe('ok');
   });
 });
