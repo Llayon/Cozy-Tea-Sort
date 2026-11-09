@@ -781,6 +781,28 @@ export interface CupConstraint {
    * Static identity only — no ready/locked/chosen-tea state exists.
    */
   steepingFlask?: boolean;
+  /**
+   * G25 RESEARCH ONLY (never production). Metered pourer: when this vessel
+   * is SOURCE, the ordinary maximal transfer is capped to 1 layer.
+   * Static identity only — no progress state.
+   */
+  g25MeteredSource?: boolean;
+  /**
+   * G25 RESEARCH ONLY (never production). Measuring bowl: when this vessel
+   * is DESTINATION, the ordinary maximal transfer is capped to 1 layer.
+   * Static identity only — no progress state.
+   */
+  g25MeteredDestination?: boolean;
+  /**
+   * G25 RESEARCH ONLY (never production). Mirror-pair group id tying two
+   * cap-4 vessels with complementary static recipes. Absent = ordinary.
+   */
+  g25MirrorGroup?: string;
+  /**
+   * G25 RESEARCH ONLY (never production). Per-cup exact final recipe,
+   * bottom-up (e.g. [A,A,B,B]). Progress derives from contents; never stored.
+   */
+  g25MirrorRecipe?: readonly TeaId[];
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -950,6 +972,11 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
+  // G25 research markers (absent in production; cloned when present).
+  if (c.g25MeteredSource !== undefined) out.g25MeteredSource = c.g25MeteredSource;
+  if (c.g25MeteredDestination !== undefined) out.g25MeteredDestination = c.g25MeteredDestination;
+  if (c.g25MirrorGroup !== undefined) out.g25MirrorGroup = c.g25MirrorGroup;
+  if (c.g25MirrorRecipe !== undefined) out.g25MirrorRecipe = [...c.g25MirrorRecipe];
   return out;
 }
 
@@ -1002,5 +1029,14 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // derived from layers, never encoded here. Absent/false leaves every
   // legacy key byte-identical.
   const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
+  // G25 research markers (DEV ONLY): absent markers leave legacy keys
+  // byte-identical. Present markers earn distinct suffixes so research
+  // vessels never collapse with ordinary cups.
+  const g25Suffix =
+    (c.g25MeteredSource === true ? ':G25S' : '') +
+    (c.g25MeteredDestination === true ? ':G25D' : '') +
+    (c.g25MirrorGroup !== undefined || c.g25MirrorRecipe !== undefined
+      ? `:MIR:${String(c.g25MirrorGroup ?? '_')}:${[...(c.g25MirrorRecipe ?? [])].join(',')}`
+      : '');
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}${g25Suffix}`;
 }

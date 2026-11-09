@@ -126,6 +126,13 @@ import {
   isPairedTeaGoalSatisfied,
   isPairedTeaMemberComplete,
 } from './teaPair';
+import {
+  g25BoundTransfer,
+  isG25MirrorPrefix,
+  g25MirrorNextExpected,
+  g25MirrorRemainingRun,
+  isValidG25MirrorConstraint,
+} from './g25Research';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
@@ -374,6 +381,17 @@ export function isCompleteCup(layers: TeaId[]): boolean {
  * rejects them outright).
  */
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  // G25 RESEARCH ONLY: mirror-pair exact recipe. Fail-closed on malformed
+  // markers; absent markers fall through to legacy behavior byte-identical.
+  if (c?.g25MirrorRecipe !== undefined || c?.g25MirrorGroup !== undefined) {
+    if (!isValidG25MirrorConstraint(c)) return false;
+    const recipe = c.g25MirrorRecipe as readonly TeaId[];
+    if (layers.length !== recipe.length) return false;
+    for (let i = 0; i < recipe.length; i++) {
+      if (layers[i] !== recipe[i]) return false;
+    }
+    return true;
+  }
   // Gauntlet 20: steeping flask must end empty, and a malformed marker must
   // never accidentally satisfy victory (fail closed before any generic
   // must-end-empty branch).
@@ -449,6 +467,12 @@ export function isInFinalState(
   teaBud?: TeaBudSlot | undefined | null,
   blendRecipe?: BlendRecipe | undefined | null,
 ): boolean {
+  // G25 RESEARCH ONLY: mirror cups are final iff exact recipe holds.
+  // Non-homogeneous recipes must still count as final; partial prefixes are
+  // never final (outflow stays constructive). Absent markers: legacy path.
+  if (c?.g25MirrorRecipe !== undefined || c?.g25MirrorGroup !== undefined) {
+    return cupEndStateSatisfied(layers, c);
+  }
   // G17 pair members are NEVER locally final, even at 2/2 homogeneous: the
   // partner may still need a different tea, so reopening stays legal and
   // searchable. Goal finality is relational, not per-vessel.
@@ -554,6 +578,23 @@ function teaRejectCodeBetween(
     ? effectiveCupCapacity(constraints?.[toIdx], obstacles[toIdx])
     : cupCapacity(constraints?.[toIdx]);
   if (target.length >= destCap) return 'target-full';
+  // G25 RESEARCH ONLY: mirror-pair destination overrides ordinary color
+  // matching. The destination must currently be a strict prefix of its
+  // static recipe and the incoming top must equal the next expected layer.
+  // This permits the recipe boundary color change (A,A -> B) that ordinary
+  // homogeneous rules would reject. Absent markers: legacy path identical.
+  {
+    const destC = constraints?.[toIdx];
+    if (destC?.g25MirrorRecipe !== undefined || destC?.g25MirrorGroup !== undefined) {
+      if (!isValidG25MirrorConstraint(destC)) return 'color-mismatch';
+      const recipe = destC.g25MirrorRecipe as readonly TeaId[];
+      if (!isG25MirrorPrefix(target, recipe)) return 'color-mismatch';
+      const next = g25MirrorNextExpected(target, recipe);
+      if (next === null) return 'target-full';
+      if (topLayerOf(source) !== next) return 'color-mismatch';
+      return 'ok';
+    }
+  }
   // Meaningless loop: moving a FULL homogeneous cup that already satisfies
   // its own end-state rule into an empty cup of the same identical
   // constraint group. Partial homogeneous stacks are ALWAYS legal here
@@ -663,6 +704,9 @@ export function unstrainedPourCountState(
   // already honey-occupied destination is not a legal ordinary transfer.
   const sink = normalizeSinkingIngredients(state.sinkingIngredients, state.cups.length);
   if (sink[fromIdx] != null && source.length - m === 0 && sink[toIdx] != null) return 0;
+  // G25 RESEARCH ONLY: metered 1-caps + mirror remaining-run cap.
+  // Absent markers: helper returns m unchanged.
+  m = g25BoundTransfer(m, source, target, constraints?.[fromIdx], constraints?.[toIdx]);
   return m;
 }
 
@@ -924,6 +968,8 @@ export function pourCountState(
     m = Math.min(m, sharedBound);
     if (m <= 0) return 0;
   }
+  // G25 RESEARCH ONLY: metered 1-caps + mirror remaining-run cap.
+  m = g25BoundTransfer(m, source, target, constraints?.[fromIdx], constraints?.[toIdx]);
   return m;
 }
 
