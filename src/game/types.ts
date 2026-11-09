@@ -781,6 +781,21 @@ export interface CupConstraint {
    * Static identity only — no ready/locked/chosen-tea state exists.
    */
   steepingFlask?: boolean;
+  /**
+   * G27 RESEARCH ONLY (never production). Static transfer-graph identity:
+   * which vessel-connectivity graph this puzzle uses. Absent = ordinary
+   * fully-connected Water Sort (legacy identical). Present values are
+   * fail-closed validated in `g27Research` ('g27-a' | 'g27-b' | 'g27-c').
+   */
+  transferGraph?: string;
+  /**
+   * G27 RESEARCH ONLY (never production). Static routing role within the
+   * graph named by `transferGraph`. Absent = ordinary vessel. Present
+   * values are fail-closed validated in `g27Research` (A/B:
+   * 'left' | 'right' | 'bridge'; C: 'left-low' | 'left-high' |
+   * 'right-low' | 'right-high' | 'bridgeA' | 'bridgeB').
+   */
+  transferRole?: string;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -940,7 +955,7 @@ export function normalizeCupConstraints(
   return out;
 }
 
-/** Defensive copy of one constraint (all eight semantic fields). */
+/** Defensive copy of one constraint (all semantic fields, incl. G27 research markers). */
 export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   const out: CupConstraint = { mode: c.mode };
   if (c.targetTeaId !== undefined) out.targetTeaId = c.targetTeaId;
@@ -950,6 +965,9 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
+  // G27 research markers (absent in production; cloned when present).
+  if (c.transferGraph !== undefined) out.transferGraph = c.transferGraph;
+  if (c.transferRole !== undefined) out.transferRole = c.transferRole;
   return out;
 }
 
@@ -1002,5 +1020,13 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // derived from layers, never encoded here. Absent/false leaves every
   // legacy key byte-identical.
   const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
+  // G27 research markers (DEV ONLY): absent markers leave legacy keys
+  // byte-identical. Present markers earn a distinct suffix so routing
+  // roles never collapse with ordinary cups (LEFT/RIGHT/BRIDGE and
+  // two-lane roles each stay distinct).
+  let transferSuffix = '';
+  if (c.transferGraph !== undefined || c.transferRole !== undefined) {
+    transferSuffix = `:T${String(c.transferGraph ?? '_')}:${String(c.transferRole ?? '_')}`;
+  }
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}${transferSuffix}`;
 }
