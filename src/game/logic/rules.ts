@@ -126,6 +126,12 @@ import {
   isPairedTeaGoalSatisfied,
   isPairedTeaMemberComplete,
 } from './teaPair';
+import {
+  g29CompatibilityOverride,
+  hasAnyG29Marker,
+  isG29BoardMalformed,
+  isValidG29Special,
+} from './g29Research';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
@@ -275,6 +281,7 @@ export type PourRejectCode =
   | 'target-frozen-needs-hot'
   | 'complete-to-empty'
   | 'color-mismatch'
+  | 'special-malformed'
   | 'serve-order'
   | 'shared-capacity-full'
   | 'strainer-needs-two-layers'
@@ -374,6 +381,13 @@ export function isCompleteCup(layers: TeaId[]): boolean {
  * rejects them outright).
  */
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  // G29 RESEARCH ONLY: any marked vessel with an invalid standalone shape
+  // never satisfies victory (fail closed). Valid specials fall through to
+  // the generic mustEndEmpty branch (empty only). Absent markers: legacy
+  // path identical.
+  if (c?.mixedBuffer === true || c?.twoTeaBuffer !== undefined || c?.differentTeaBuffer === true) {
+    if (!isValidG29Special(c)) return false;
+  }
   // Gauntlet 20: steeping flask must end empty, and a malformed marker must
   // never accidentally satisfy victory (fail closed before any generic
   // must-end-empty branch).
@@ -591,6 +605,20 @@ function teaRejectCodeBetween(
     return 'complete-to-empty';
   }
   if (target.length === 0) return 'ok';
+  // G29 RESEARCH ONLY: one compatibility seam. Ordinary Water Sort
+  // destination color matching with a controlled candidate exception for
+  // the marked special destination only. All structural gates above
+  // (indices, roles, emptiness, readiness, capacity, prune) are untouched —
+  // only the TeaId compatibility stage changes, and only for valid
+  // standalone specials (malformed boards fail closed in
+  // pourRejectCodeState before reaching here).
+  const override = g29CompatibilityOverride(
+    topLayerOf(source) as TeaId,
+    target,
+    constraints?.[toIdx],
+  );
+  if (override === 'accept') return 'ok';
+  if (override === 'reject') return 'color-mismatch';
   return topLayerOf(source) === topLayerOf(target) ? 'ok' : 'color-mismatch';
 }
 
@@ -619,6 +647,8 @@ export function unstrainedPourCountState(
   // Reaction transfer is exactly ONE layer (no top-run, no capacity bound).
   if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
     if (isBlendCompositionBlocked(state, constraints)) return 0;
+    // G29 RESEARCH ONLY: compatibility standalone never composes with blend.
+    if (hasAnyG29Marker(constraints)) return 0;
     // Role/empty preconditions mirror pourRejectCodeState priority.
     if (fromIdx === toIdx) return 0;
     if (fromIdx < 0 || fromIdx >= state.cups.length) return 0;
@@ -730,6 +760,25 @@ export function pourRejectCodeState(
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
 ): PourRejectCode {
+  // G29 RESEARCH ONLY: standalone fail-closed (never stored).
+  // Same-cup/out-of-range priority preserved; G29-involved pours on a
+  // malformed board (production special, dynamic slot, blend, invalid
+  // shape/pair, or wrong special census) fail closed. Absent markers:
+  // no-op, legacy identical.
+  if (hasAnyG29Marker(constraints)) {
+    if (fromIdx === toIdx) return 'same-cup';
+    if (fromIdx < 0 || fromIdx >= state.cups.length) return 'out-of-range';
+    if (toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+    if (isG29BoardMalformed(state, constraints, blendRecipe)) {
+      const fromC = constraints?.[fromIdx];
+      const toC = constraints?.[toIdx];
+      const fromMarked =
+        fromC?.mixedBuffer === true || fromC?.twoTeaBuffer !== undefined || fromC?.differentTeaBuffer === true;
+      const toMarked =
+        toC?.mixedBuffer === true || toC?.twoTeaBuffer !== undefined || toC?.differentTeaBuffer === true;
+      if (fromMarked || toMarked) return 'special-malformed';
+    }
+  }
   // G14 serving-order priority (§36 steps 1–2): addressing, vessel roles,
   // source emptiness, then the served-source lock. A served cup (its order
   // within the derived prefix) can never source again — `source-served`

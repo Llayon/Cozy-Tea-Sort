@@ -781,6 +781,32 @@ export interface CupConstraint {
    * Static identity only — no ready/locked/chosen-tea state exists.
    */
   steepingFlask?: boolean;
+  /**
+   * G29 RESEARCH ONLY (never production). Mixed buffer (candidate A):
+   * this destination accepts ANY TeaId when it has free capacity,
+   * regardless of its current top TeaId. Static identity only.
+   */
+  mixedBuffer?: boolean;
+  /**
+   * G29 RESEARCH ONLY (never production). Two-tea buffer (candidate B):
+   * static unordered pair of TeaIds with mutual cross-color acceptance
+   * (A←B and B←A allowed; all other cross-color pairs ordinary).
+   * No runtime selection — the pair is frozen per board.
+   */
+  twoTeaBuffer?: TwoTeaBufferPair;
+  /**
+   * G29 RESEARCH ONLY (never production). Different-tea buffer
+   * (candidate C): a nonempty destination accepts ONLY a TeaId different
+   * from its current top (same-color receives are rejected). Static
+   * identity only.
+   */
+  differentTeaBuffer?: boolean;
+}
+
+/** Static unordered TeaId pair for the two-tea buffer (G29-B). */
+export interface TwoTeaBufferPair {
+  readonly teaA: TeaId;
+  readonly teaB: TeaId;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -950,6 +976,12 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
+  // G29 research markers (absent in production; cloned when present).
+  if (c.mixedBuffer !== undefined) out.mixedBuffer = c.mixedBuffer;
+  if (c.twoTeaBuffer !== undefined) {
+    out.twoTeaBuffer = { teaA: c.twoTeaBuffer.teaA, teaB: c.twoTeaBuffer.teaB };
+  }
+  if (c.differentTeaBuffer !== undefined) out.differentTeaBuffer = c.differentTeaBuffer;
   return out;
 }
 
@@ -1002,5 +1034,18 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // derived from layers, never encoded here. Absent/false leaves every
   // legacy key byte-identical.
   const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
+  // G29 research markers (DEV ONLY): absent markers leave legacy keys
+  // byte-identical. Present markers earn distinct suffixes so each special
+  // vessel never collapses with ordinary cups or sibling candidates. The
+  // two-tea pair encodes unordered (sorted) so pair A/B == B/A (§58).
+  const mixedSuffix = c.mixedBuffer === true ? ':MB' : '';
+  let twoTeaSuffix = '';
+  if (c.twoTeaBuffer !== undefined) {
+    const a = String(c.twoTeaBuffer.teaA);
+    const b = String(c.twoTeaBuffer.teaB);
+    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    twoTeaSuffix = `:2TB:${lo}+${hi}`;
+  }
+  const diffSuffix = c.differentTeaBuffer === true ? ':DTB' : '';
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}${mixedSuffix}${twoTeaSuffix}${diffSuffix}`;
 }
