@@ -322,6 +322,10 @@ const batches = [
       'tests/contract-preflight-existing-mechanics.test.ts',
     ],
   },
+  {
+    name: 'G29 compatibility shootout (research only)',
+    files: ['tests/g29-compatibility.test.ts'],
+  },
 ];
 
 function runBatch(batch) {
