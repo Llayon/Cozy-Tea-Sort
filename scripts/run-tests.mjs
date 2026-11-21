@@ -322,6 +322,10 @@ const batches = [
       'tests/contract-preflight-existing-mechanics.test.ts',
     ],
   },
+  {
+    name: 'G28 stack-transform shootout (research only)',
+    files: ['tests/g28-stack-transform.test.ts'],
+  },
 ];
 
 function runBatch(batch) {
