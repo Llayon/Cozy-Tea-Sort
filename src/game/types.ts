@@ -781,6 +781,25 @@ export interface CupConstraint {
    * Static identity only — no ready/locked/chosen-tea state exists.
    */
   steepingFlask?: boolean;
+  /**
+   * G28 RESEARCH ONLY (never production). Underpour cup (candidate A):
+   * legally received layers are inserted BELOW existing destination layers
+   * instead of appended on top. Static identity only — no progress state.
+   */
+  underpour?: boolean;
+  /**
+   * G28 RESEARCH ONLY (never production). Reverse-on-receive cup
+   * (candidate B): after every successful legal receive, the entire
+   * resulting destination stack is reversed. Static identity only.
+   */
+  reverseOnReceive?: boolean;
+  /**
+   * G28 RESEARCH ONLY (never production). Full-flip cup (candidate C):
+   * receives normally unless the receive fills the vessel to capacity, in
+   * which case the entire resulting stack is reversed. Static identity
+   * only — no trigger counter is stored; reopening re-arms derivedly.
+   */
+  flipWhenFull?: boolean;
 }
 
 /** Canonical normal-vessel constraint (frozen). */
@@ -950,6 +969,10 @@ export function cloneCupConstraint(c: CupConstraint): CupConstraint {
   if (c.sharedCapacityGroup !== undefined) out.sharedCapacityGroup = c.sharedCapacityGroup;
   if (c.pairedTeaGroup !== undefined) out.pairedTeaGroup = c.pairedTeaGroup;
   if (c.steepingFlask !== undefined) out.steepingFlask = c.steepingFlask;
+  // G28 research markers (absent in production; cloned when present).
+  if (c.underpour !== undefined) out.underpour = c.underpour;
+  if (c.reverseOnReceive !== undefined) out.reverseOnReceive = c.reverseOnReceive;
+  if (c.flipWhenFull !== undefined) out.flipWhenFull = c.flipWhenFull;
   return out;
 }
 
@@ -1002,5 +1025,11 @@ export function cupConstraintSignature(c: CupConstraint): string {
   // derived from layers, never encoded here. Absent/false leaves every
   // legacy key byte-identical.
   const flaskSuffix = c.steepingFlask === true ? `:SF` : '';
-  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}`;
+  // G28 research markers (DEV ONLY): absent markers leave legacy keys
+  // byte-identical. Present markers earn distinct suffixes so each special
+  // vessel never collapses with ordinary cups or sibling candidates.
+  const underpourSuffix = c.underpour === true ? ':UP' : '';
+  const reverseSuffix = c.reverseOnReceive === true ? ':ROR' : '';
+  const flipSuffix = c.flipWhenFull === true ? ':FF' : '';
+  return `${base}${capSuffix}${orderSuffix}${groupSuffix}${pairSuffix}${flaskSuffix}${underpourSuffix}${reverseSuffix}${flipSuffix}`;
 }

@@ -126,6 +126,12 @@ import {
   isPairedTeaGoalSatisfied,
   isPairedTeaMemberComplete,
 } from './teaPair';
+import {
+  g28TransformDestination,
+  hasAnyG28Marker,
+  isG28BoardMalformed,
+  isValidG28Special,
+} from './g28Research';
 
 const PLAIN_NORMAL_CONSTRAINT: CupConstraint = { mode: 'normal' };
 
@@ -275,6 +281,7 @@ export type PourRejectCode =
   | 'target-frozen-needs-hot'
   | 'complete-to-empty'
   | 'color-mismatch'
+  | 'special-malformed'
   | 'serve-order'
   | 'shared-capacity-full'
   | 'strainer-needs-two-layers'
@@ -374,6 +381,13 @@ export function isCompleteCup(layers: TeaId[]): boolean {
  * rejects them outright).
  */
 export function cupEndStateSatisfied(layers: TeaId[], c: CupConstraint | undefined): boolean {
+  // G28 RESEARCH ONLY: any marked vessel with an invalid standalone shape
+  // never satisfies victory (fail closed). Valid specials fall through to
+  // the generic mustEndEmpty branch (empty only). Absent markers: legacy
+  // path identical.
+  if (c?.underpour === true || c?.reverseOnReceive === true || c?.flipWhenFull === true) {
+    if (!isValidG28Special(c)) return false;
+  }
   // Gauntlet 20: steeping flask must end empty, and a malformed marker must
   // never accidentally satisfy victory (fail closed before any generic
   // must-end-empty branch).
@@ -619,6 +633,8 @@ export function unstrainedPourCountState(
   // Reaction transfer is exactly ONE layer (no top-run, no capacity bound).
   if (blendRecipe && isBlendReactionAttempt(state, fromIdx, toIdx, blendRecipe)) {
     if (isBlendCompositionBlocked(state, constraints)) return 0;
+    // G28 RESEARCH ONLY: routing standalone never composes with blend.
+    if (hasAnyG28Marker(constraints)) return 0;
     // Role/empty preconditions mirror pourRejectCodeState priority.
     if (fromIdx === toIdx) return 0;
     if (fromIdx < 0 || fromIdx >= state.cups.length) return 0;
@@ -730,6 +746,25 @@ export function pourRejectCodeState(
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
 ): PourRejectCode {
+  // G28 RESEARCH ONLY: standalone fail-closed (never stored).
+  // Same-cup/out-of-range priority preserved; G28-involved pours on a
+  // malformed board (production special, dynamic slot, blend, invalid
+  // shape, or wrong special census) fail closed. Absent markers: no-op,
+  // legacy identical.
+  if (hasAnyG28Marker(constraints)) {
+    if (fromIdx === toIdx) return 'same-cup';
+    if (fromIdx < 0 || fromIdx >= state.cups.length) return 'out-of-range';
+    if (toIdx < 0 || toIdx >= state.cups.length) return 'out-of-range';
+    if (isG28BoardMalformed(state, constraints, blendRecipe)) {
+      const fromC = constraints?.[fromIdx];
+      const toC = constraints?.[toIdx];
+      const fromMarked =
+        fromC?.underpour === true || fromC?.reverseOnReceive === true || fromC?.flipWhenFull === true;
+      const toMarked =
+        toC?.underpour === true || toC?.reverseOnReceive === true || toC?.flipWhenFull === true;
+      if (fromMarked || toMarked) return 'special-malformed';
+    }
+  }
   // G14 serving-order priority (§36 steps 1–2): addressing, vessel roles,
   // source emptiness, then the served-source lock. A served cup (its order
   // within the derived prefix) can never source again — `source-served`
@@ -1257,7 +1292,11 @@ export function applyPourState(
   if (honey != null && emptiesSource && nextSink[toIdx] != null) return null;
   for (let i = 0; i < m; i++) source.pop();
   const received = strained ? m - 1 : m;
-  for (let i = 0; i < received; i++) target.push(layer);
+  // G28 RESEARCH ONLY: destination stack transform (single apply truth).
+  // Transfer count, source removal and destination legality are frozen
+  // above; only the resulting destination ORDER may differ per the static
+  // marker. Absent/invalid markers reproduce the ordinary append exactly.
+  nextCups[toIdx] = g28TransformDestination(target, layer, received, constraints?.[toIdx]);
   let caughtTea: TeaId | undefined;
   if (strained) {
     nextStrainer.attachedCupIndex = null;
