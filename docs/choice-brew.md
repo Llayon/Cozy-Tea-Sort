@@ -222,11 +222,26 @@ unreachable without strainer+brew composition) required no change.
 - `bun run typecheck`: PASS (exit 0, including after every phase).
 - Focused: domain 28/28, generation 10/10 (incl. post-work ≥ 2 +
   non-incidental pin), progression 11/11, tutorial audit 4/4 — PASS.
-- Canonical `bun run test`: (recording on completion; startup validation
-  clean after registering the Choice Brew batches).
-- `bun run build` / `GITHUB_PAGES=true bun run build`: (recording).
-- `bun run test:e2e:ci`: (recording; pre-existing specs unaffected — no
-  choice-brew level below L1902, bridge autoSolve now contract-aware).
+- Canonical `bun run test`: 170/170 files discovered and assigned.
+  Batches 1–13 PASS clean; batch 14 (G21 composition production stress)
+  10/10 assertions pass but the run hits the known
+  `Timeout calling "onTaskUpdate"` worker RPC flake (twice — once per
+  attempt, zero test failures); batches 15–78 PASS via a resume runner
+  that continues past infra flakes and fails only on real assertion
+  failures (one more RPC flake on batch 70, clean on per-file retry).
+  Total: 170/170 files executed, 0 assertion failures. The canonical
+  command exits 1 solely due to the pre-existing infrastructure flake
+  (same signature on unmodified origin/main) — reported as BLOCKED/INFRA
+  per spec, NOT as a test failure. Focused reruns of the flaked files are
+  green.
+- `bun run build`: PASS (exit 0). Dist 11 files / 1,217,568 bytes, index
+  chunk 914,372 bytes vs origin/main baseline 1,199,383 / 896,285 bytes:
+  +18,185 B total (+1.52%), +18,087 B index (+2.0%). Small additive cost
+  (new domain module + view motif + 18-template bank).
+- `GITHUB_PAGES=true bun run build`: PASS (exit 0).
+- `bun run test:e2e:ci`: PASS 33/33 (release journey L1–L250, G19, G20,
+  G21 — no choice-brew levels below L1998; bridge autoSolve now
+  contract-aware).
 - Independent critic pass: 9/10 (one real find — missing post-work
   assertion in the finalize gate — fixed + pinned by test).
 
