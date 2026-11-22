@@ -11,7 +11,6 @@ import {
 import { g30Constraints } from './g30-milestone-lib.ts';
 import {
   applyPourState,
-  listConstructiveActionsState,
   listLegalMovesState,
 } from '../../src/game/logic/rules.ts';
 import { solvePuzzle } from '../../src/game/logic/solver.ts';
@@ -62,7 +61,7 @@ for (let i = 0; i < N; i++) {
     floatingIngredients: cups.map(() => null),
   };
   const legal = listLegalMovesState(start as never, false, constraints, undefined);
-  const constr = listConstructiveActionsState(start as never, constraints, undefined).filter((a) => a.kind === 'pour');
+  const constr = listLegalMovesState(start as never, true, constraints, undefined);
   const full0 = solvePuzzle(cups, { cupConstraints: constraints, maxVisited: MAXV, brewContract: contract });
   const ctl0 = solvePuzzle(cups, { cupConstraints: constraints, maxVisited: MAXV });
   const fullMin = full0.solvable ? (full0.minMoves as number) : null;
@@ -72,7 +71,6 @@ for (let i = 0; i < N; i++) {
   let fatal = 0;
   let windowTrap = 0;
   for (const m of legal) {
-    if (m.kind !== 'pour') continue;
     const resFull = applyPourState(start, m.from, m.to, constraints, undefined, contract);
     if (!resFull) continue;
     const childFull = solvePuzzle(resFull.state.cups, {
@@ -97,7 +95,7 @@ for (let i = 0; i < N; i++) {
       windowTrap++;
     }
   }
-  legalCounts.push(legal.filter((a) => a.kind === 'pour').length);
+  legalCounts.push(legal.length);
   constrCounts.push(constr.length);
   solvCounts.push(solv);
   optCounts.push(opt);
