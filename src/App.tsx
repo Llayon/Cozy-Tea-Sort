@@ -107,6 +107,7 @@ interface LevelBackupState {
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
   blendRecipe?: import('./game/logic/blendRecipe').BlendRecipe | undefined;
+  choiceBrewContract?: import('./game/logic/choiceBrew').ChoiceBrewContract | undefined | null;
 }
 
 export default function App() {
@@ -226,6 +227,7 @@ export default function App() {
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       blendRecipe: generated.blendRecipe,
+      choiceBrewContract: generated.choiceBrewContract,
     };
 
     return new TeaSortLogic(
@@ -239,6 +241,7 @@ export default function App() {
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       generated.blendRecipe,
+      generated.choiceBrewContract,
     );
   };
 
@@ -319,6 +322,7 @@ export default function App() {
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       blendRecipe: generated.blendRecipe,
+      choiceBrewContract: generated.choiceBrewContract,
     };
 
     const logic = new TeaSortLogic(
@@ -332,6 +336,7 @@ export default function App() {
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       generated.blendRecipe,
+      generated.choiceBrewContract,
     );
     logicRef.current = logic;
 
@@ -611,8 +616,9 @@ export default function App() {
     const restoredObstacles = normalizeCapacityObstacles(backup.capacityObstacles, restoredCups.length);
     const restoredBuds = normalizeTeaBudSlots(backup.teaBudSlots, restoredCups.length);
     const restoredBlend = backup.blendRecipe;
+    const restoredBrew = backup.choiceBrewContract;
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds, restoredBlend);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds, restoredBlend, restoredBrew);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();

@@ -21,6 +21,7 @@
 import {
   CapacityObstacleId,
   CapacityObstacleSlot,
+  ChoiceBrewState,
   CupConstraint,
   FloatingIngredientSlot,
   IceId,
@@ -31,6 +32,7 @@ import {
   TeaBudId,
   TeaBudSlot,
   TeaId,
+  cloneChoiceBrewState,
   cloneCupConstraint,
   cloneStrainerState,
   cupCapacity,
@@ -38,6 +40,7 @@ import {
   isTastingCupConstraint,
   isThermosCupConstraint,
   normalizeCapacityObstacles,
+  normalizeChoiceBrewState,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
   normalizeIceSlots,
@@ -45,6 +48,7 @@ import {
   normalizeStrainerState,
   normalizeTeaBudSlots,
 } from '../types';
+import type { ChoiceBrewContract } from './choiceBrew';
 import {
   applyPlaceStrainerState,
   applyPourState,
@@ -81,6 +85,13 @@ export interface LevelInitialState {
    * When undefined every rule behaves exactly as before (legacy identical).
    */
   blendRecipe?: BlendRecipe | undefined | null;
+  /**
+   * Choice Brew contract (production, optional). Immutable level data.
+   * Absent = ordinary board.
+   */
+  choiceBrewContract?: ChoiceBrewContract | undefined | null;
+  /** Choice Brew initial history stage (production; default 0). */
+  choiceBrewInitialStage?: 0 | 1 | undefined;
 }
 
 export class Cup {
@@ -349,6 +360,7 @@ export interface GameStateSnapshot {
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
+  choiceBrewState?: ChoiceBrewState | undefined;
   action: PuzzleAction;
   move: MoveStep;
 }
@@ -364,6 +376,16 @@ export class TeaSortLogic {
    * as before (legacy identical).
    */
   blendRecipe: BlendRecipe | undefined = undefined;
+  /**
+   * Choice Brew contract (production, optional). Immutable level data — set
+   * at init, never mutated by moves/undo/restart. Absent = ordinary board.
+   */
+  choiceBrewContract: ChoiceBrewContract | undefined = undefined;
+  /**
+   * Choice Brew dynamic history (production, optional). The authoritative
+   * stage, snapshotted for Undo. Absent = no mechanic.
+   */
+  choiceBrewState: ChoiceBrewState | undefined = undefined;
 
   constructor(
     initialCups: TeaId[][] = [],
@@ -376,11 +398,16 @@ export class TeaSortLogic {
     capacityObstacles?: readonly CapacityObstacleSlot[],
     teaBudSlots?: readonly TeaBudSlot[],
     blendRecipe?: BlendRecipe | undefined | null,
+    choiceBrewContract?: ChoiceBrewContract | undefined | null,
+    choiceBrewInitialStage?: 0 | 1 | undefined,
   ) {
     if (initialCups.length > 0) {
-      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots, capacityObstacles, teaBudSlots, blendRecipe);
+      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots, capacityObstacles, teaBudSlots, blendRecipe, choiceBrewContract, choiceBrewInitialStage);
     } else if (blendRecipe) {
       this.blendRecipe = blendRecipe;
+    } else if (choiceBrewContract) {
+      this.choiceBrewContract = choiceBrewContract;
+      this.choiceBrewState = { stage: choiceBrewInitialStage ?? 0 };
     }
   }
 
@@ -395,6 +422,8 @@ export class TeaSortLogic {
     capacityObstacles?: readonly CapacityObstacleSlot[],
     teaBudSlots?: readonly TeaBudSlot[],
     blendRecipe?: BlendRecipe | undefined | null,
+    choiceBrewContract?: ChoiceBrewContract | undefined | null,
+    choiceBrewInitialStage?: 0 | 1 | undefined,
   ) {
     const normalized = normalizeCupConstraints(cupConstraints, state.length);
     const slots = normalizeFloatingIngredients(floatingIngredients, state.length);
@@ -418,6 +447,9 @@ export class TeaSortLogic {
     );
     this.strainer = normalizeStrainerState(strainer);
     this.blendRecipe = blendRecipe ?? undefined;
+    this.choiceBrewContract = choiceBrewContract ?? undefined;
+    this.choiceBrewState =
+      this.choiceBrewContract !== undefined ? { stage: choiceBrewInitialStage ?? 0 } : undefined;
     this.history = [];
     this.movesCount = 0;
   }
@@ -435,6 +467,8 @@ export class TeaSortLogic {
       init.capacityObstacles,
       init.teaBudSlots,
       init.blendRecipe,
+      init.choiceBrewContract,
+      init.choiceBrewInitialStage,
     );
   }
 
@@ -484,6 +518,8 @@ export class TeaSortLogic {
     capacityObstacles: CapacityObstacleSlot[];
     teaBudSlots: TeaBudSlot[];
     blendRecipe?: BlendRecipe | undefined;
+    choiceBrewContract?: ChoiceBrewContract | undefined;
+    choiceBrewState?: ChoiceBrewState | undefined;
   } {
     return {
       cups: this.cups.map((c) => [...c.layers]),
@@ -496,6 +532,10 @@ export class TeaSortLogic {
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
       ...(this.blendRecipe ? { blendRecipe: this.blendRecipe } : {}),
+      ...(this.choiceBrewContract !== undefined ? { choiceBrewContract: this.choiceBrewContract } : {}),
+      ...(this.choiceBrewState !== undefined
+        ? { choiceBrewState: cloneChoiceBrewState(this.choiceBrewState) as ChoiceBrewState }
+        : {}),
     };
   }
 
@@ -503,7 +543,16 @@ export class TeaSortLogic {
     return this.cups.map((c) => c.constraint);
   }
 
-  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState; iceSlots: IceSlot[]; capacityObstacles: CapacityObstacleSlot[]; teaBudSlots: TeaBudSlot[] } {
+  private puzzleState(): {
+    cups: TeaId[][];
+    floatingIngredients: FloatingIngredientSlot[];
+    sinkingIngredients: SinkingIngredientSlot[];
+    strainer: StrainerState;
+    iceSlots: IceSlot[];
+    capacityObstacles: CapacityObstacleSlot[];
+    teaBudSlots: TeaBudSlot[];
+    choiceBrewState?: ChoiceBrewState | undefined;
+  } {
     return {
       cups: this.cups.map((c) => c.layers),
       floatingIngredients: this.floatingIngredients,
@@ -512,10 +561,22 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.choiceBrewState !== undefined
+        ? { choiceBrewState: cloneChoiceBrewState(this.choiceBrewState) as ChoiceBrewState }
+        : {}),
     };
   }
 
-  private applyBoardState(next: { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState; iceSlots: IceSlot[]; capacityObstacles: CapacityObstacleSlot[]; teaBudSlots?: readonly TeaBudSlot[] }): void {
+  private applyBoardState(next: {
+    cups: TeaId[][];
+    floatingIngredients: FloatingIngredientSlot[];
+    sinkingIngredients: SinkingIngredientSlot[];
+    strainer: StrainerState;
+    iceSlots: IceSlot[];
+    capacityObstacles: CapacityObstacleSlot[];
+    teaBudSlots?: readonly TeaBudSlot[];
+    choiceBrewState?: ChoiceBrewState | undefined | null;
+  }): void {
     next.cups.forEach((layers, idx) => {
       const cup = this.cups[idx];
       if (cup) cup.layers = [...layers];
@@ -533,6 +594,12 @@ export class TeaSortLogic {
       cup.teaBud = buds[idx] ?? null;
     });
     this.strainer = normalizeStrainerState(next.strainer);
+    const carried = (next as { choiceBrewState?: ChoiceBrewState | undefined | null }).choiceBrewState;
+    if (carried !== undefined) {
+      this.choiceBrewState = carried === null ? undefined : { stage: carried.stage };
+    } else if (this.choiceBrewContract === undefined) {
+      this.choiceBrewState = undefined;
+    }
   }
 
   canMakeMove(fromIdx: number, toIdx: number): boolean {
@@ -556,6 +623,9 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.choiceBrewState !== undefined
+        ? { choiceBrewState: cloneChoiceBrewState(this.choiceBrewState) as ChoiceBrewState }
+        : {}),
       action: { kind: 'pour', from: fromIdx, to: toIdx },
       move: {
         fromCupIndex: fromIdx,
@@ -565,7 +635,14 @@ export class TeaSortLogic {
       },
     };
 
-    const res = applyPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints(), this.blendRecipe);
+    const res = applyPourState(
+      this.puzzleState(),
+      fromIdx,
+      toIdx,
+      this.boardConstraints(),
+      this.blendRecipe,
+      this.choiceBrewContract,
+    );
     if (!res) return null;
     this.applyBoardState(res.state);
 
@@ -608,6 +685,9 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.choiceBrewState !== undefined
+        ? { choiceBrewState: cloneChoiceBrewState(this.choiceBrewState) as ChoiceBrewState }
+        : {}),
       action: { kind: 'place-strainer', to: toIdx },
       move: { fromCupIndex: -1, toCupIndex: toIdx, layer: this.cups[toIdx]?.topLayer as TeaId, count: 0 },
     };
@@ -638,6 +718,9 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.choiceBrewState !== undefined
+        ? { choiceBrewState: cloneChoiceBrewState(this.choiceBrewState) as ChoiceBrewState }
+        : {}),
       action: { kind: 'release-strainer', to: toIdx },
       move: { fromCupIndex: -1, toCupIndex: toIdx, layer: held, count: 1 },
     };
@@ -667,6 +750,12 @@ export class TeaSortLogic {
       cup.teaBud = buds[idx] ?? null;
     });
     this.strainer = cloneStrainerState(last.strainer);
+    this.choiceBrewState =
+      normalizeChoiceBrewState(last.choiceBrewState) ??
+      (this.choiceBrewContract !== undefined ? { stage: 0 } : undefined);
+    if (last.choiceBrewState === undefined && this.choiceBrewContract === undefined) {
+      this.choiceBrewState = undefined;
+    }
     if (last.action.kind === 'pour' || last.action.kind === 'release-strainer') {
       this.movesCount = Math.max(0, this.movesCount - 1);
     }
@@ -678,7 +767,12 @@ export class TeaSortLogic {
   }
 
   isWon(): boolean {
-    return isPuzzleWonState(this.puzzleState(), this.boardConstraints(), this.blendRecipe);
+    return isPuzzleWonState(
+      this.puzzleState(),
+      this.boardConstraints(),
+      this.blendRecipe,
+      this.choiceBrewContract,
+    );
   }
 
   isDeadlocked(): boolean {

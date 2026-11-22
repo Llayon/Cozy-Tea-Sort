@@ -484,6 +484,12 @@ export interface GeneratedLevel {
    * legacy content stays byte-identical.
    */
   blendRecipe?: BlendRecipe;
+  /**
+   * Static Choice Brew contract (production). Immutable level data — NOT
+   * PuzzleState. Present only on Choice Brew levels; absent everywhere else
+   * so legacy content stays byte-identical.
+   */
+  choiceBrewContract?: import('./choiceBrew').ChoiceBrewContract;
   /** Echo of the seed used, for bug reports / sharing bad puzzles. */
   seed: string;
   /** Solver-verified minimum solution depth. */

@@ -322,6 +322,10 @@ const batches = [
       'tests/contract-preflight-existing-mechanics.test.ts',
     ],
   },
+  {
+    name: 'Choice Brew production domain (G31)',
+    files: ['tests/choice-brew.test.ts'],
+  },
 ];
 
 function runBatch(batch) {

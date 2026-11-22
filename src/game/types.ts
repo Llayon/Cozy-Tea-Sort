@@ -337,6 +337,42 @@ export type TeaBudId = 'tea_bud';
 export type TeaBudSlot = TeaBudId | null;
 
 /**
+ * Choice Brew history (Gauntlet 22 — «Выбор заварки», production).
+ *
+ * Minimal authoritative history state: a single monotonic stage.
+ * - stage 0 = milestone not yet satisfied.
+ * - stage 1 = an allowed full brew has occurred (persists after draining).
+ *
+ * Absent (`undefined`) means NO Choice Brew mechanic (legacy board).
+ * This is part of puzzle state, not a cache: `[] -> AAAA -> []` loses the
+ * fact that AAAA once existed unless stage is stored.
+ */
+export interface ChoiceBrewState {
+  stage: 0 | 1;
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers without the field
+ * synthesize absence (no mechanic). Any present value other than exactly 1
+ * normalizes to stage 0 (fail-closed: malformed stages never count as
+ * satisfied, never advance from an invalid value).
+ */
+export function normalizeChoiceBrewState(
+  s: ChoiceBrewState | undefined | null,
+): ChoiceBrewState | undefined {
+  if (s === undefined || s === null) return undefined;
+  return (s as ChoiceBrewState).stage === 1 ? { stage: 1 } : { stage: 0 };
+}
+
+/** Defensive copy (or absence preservation). */
+export function cloneChoiceBrewState(
+  s: ChoiceBrewState | undefined | null,
+): ChoiceBrewState | undefined {
+  if (s === undefined || s === null) return undefined;
+  return (s as ChoiceBrewState).stage === 1 ? { stage: 1 } : { stage: 0 };
+}
+
+/**
  * Full dynamic puzzle state: tea layers plus independent floating-object
  * positions, sinking-object positions, plus the movable strainer tool.
  * Immutable level data (CupConstraint[], ingredient TYPE metadata, Mystery
@@ -351,6 +387,11 @@ export interface PuzzleState {
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
+  /**
+   * Choice Brew history (production, optional).
+   * Absent = no Choice Brew mechanic (legacy board).
+   */
+  choiceBrewState?: ChoiceBrewState | undefined;
 }
 
 /**
@@ -369,6 +410,11 @@ export interface ReadonlyPuzzleState {
   iceSlots?: readonly IceSlot[] | undefined;
   capacityObstacles?: readonly CapacityObstacleSlot[] | undefined;
   teaBudSlots?: readonly TeaBudSlot[] | undefined;
+  /**
+   * Choice Brew history (production, optional).
+   * Absent = no Choice Brew mechanic (legacy board).
+   */
+  choiceBrewState?: ChoiceBrewState | undefined | null;
 }
 
 /** All-null slots for a vessel count (ordinary old levels). */
@@ -575,6 +621,9 @@ export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
     iceSlots: normalizeIceSlots(state.iceSlots, cups.length),
     capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, cups.length),
     teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, cups.length),
+    ...(state.choiceBrewState !== undefined && state.choiceBrewState !== null
+      ? { choiceBrewState: cloneChoiceBrewState(state.choiceBrewState) as ChoiceBrewState }
+      : {}),
   };
 }
 
