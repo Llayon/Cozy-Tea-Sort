@@ -64,13 +64,25 @@ All green before N100.
 
 See `scripts/dev/out/g30-*-N100.json`.
 
+- A N100 (N=100, bothSolved=100): solvFull 100%, trunc 0, INTEGRATED 31%, REPLAN 76%, TAX_ONLY 0%, roundtrip 13%, late 64% (p50 0.909), postWork 0:54/1:11/2-3:21/4+:14, special p50 35.7%, delta p50 1, solver p95 155ms, stateMult p95 1.28. Gates pass (solv>=90, trunc0, p95<=300, integOrReplan>=10%, tax<80%).
+- B N100 (N=100, bothSolved=100): solvFull 100%, INTEGRATED 48%, REPLAN 77%, TAX 0%, roundtrip 2%, incidental 2%, late 43% (p50 0.769), postWork 0:30/1:18/2-3:26/4+:26, special p50 33.3%, delta 1, solver p95 ~148ms. Gates pass.
+- C N100 (N=100, bothSolved=100): solvFull 100%, INTEGRATED 2%, REPLAN 82%, TAX 0%, seqRitual 58%, late(first) 11% (p50_1 0.692, p50_2 0.929), interStage median 1, postWork 0:92/1:6/2-3:2/4+:0, special p50 46.2%, delta 3, solver p95 176ms, stateMult p95 1.49. Gates pass (replan>=10%), advances to N500 despite weak integration.
+
 ## 7. N500 pilot
 
 See `scripts/dev/out/g30-*-N500.json`.
 
+- A N500 (N=500, bothSolved=500): solv 100%, INTEGRATED 35.2% (req >=25% pass), REPLAN 77.6% (req >=15% pass), TAX 0% (req <50% pass), roundtrip 11.2%, late 59.6% (p50 0.857), postWork 0:233/1:73/2-3:106/4+:88, special p50 35.7%, delta 1, solver p95 138ms, stateMult p95 1.31. byTarget balanced (125 each; integ 40-48, replan 93-104). Qualifies for N2000. Timing red flag (p50 0.857 >0.70, late 60% >40%).
+- B N500 (N=500, bothSolved=500): solv 100%, INTEGRATED 44.8% (req >=20% pass), REPLAN 77.8% (req >=15% pass), TAX 0% (pass), incidental 1.8% (req <60% pass, pref <40% pass), late 47% (p50 0.80), postWork 0:159/1:90/2-3:116/4+:135, special p50 35.7%, delta 1, solver p95 154ms, stateMult p95 1.39. byPair balanced (83-84 each; integ 32-42, incid 0-5). Qualifies.
+- C N500 (N=500, bothSolved=500): solv 100%, INTEGRATED 2% (req >=20% FAIL), REPLAN 83% (pass), TAX 0% (pass), seqRitual 59%, interStage median 1 (req >=2 FAIL), postWork 0:461/1:28/2-3:11/4+:0, special p50 46.2%, delta 3, solver p95 170ms, stateMult p95 1.44. byOrder uniformly weak (integ 0-2 per order). FAILS N500 gates — rejected for N2000, no tuning.
+
 ## 8. N2000 confirmatory
 
 Only qualifiers (A/B). See outputs.
+
+- A N2000 (N=2000, bothSolved=2000): solv 100% (req >=95%, pref >=98% pass), INTEGRATED 35.65% (req >=25% pass; pref >=40% fail), REPLAN 78.2% (req >=15% pass; pref >=30% pass), TAX 0% (req <50% pass; pref <25% pass), roundtrip 9.45%, late 59.65% (p50 0.857; healthy pref p50<0.70 fail, late<40% fail), postWork 0:948/1:268/2-3:440/4+:344, special p50 35.7% (pref <35% marginal fail; p90 45.5% <55% pass), delta p50 1, solver p95 162ms (req <=250 pass), stateMult p95 1.32 (req <2.5 pass), max 1.92. byTarget balanced (500 each; integ 165-189, replan 380-398). Canonical strong: 713 integrated + 1564 replan (>=100 pass).
+- B N2000 (N=2000, bothSolved=2000): solv 100% (req >=95%, pref >=98% pass), INTEGRATED 44.85% (req >=20% pass), REPLAN 76.9% (pass), TAX 0% (req <50% pass), roundtrip 1.95%, incidental 1.45% (req <60% pass), late 48.15% (p50 0.80; healthy pref p50<0.70 fail, late<40% fail but less severe than A), postWork 0:665/1:333/2-3:516/4+:486 (50.1% >=2 vs A 39.2%), special p50 35.7% (marginal; p90 44.4% pass), delta p50 1, solver p95 180ms (req <=250 pass), stateMult p95 1.38 (pass), max 1.91. byPair balanced (333-334 each; integ 133-163, incid 3-9). Canonical strong: 897 integrated + 1538 replan (>=100 pass).
+- C N2000: not run (rejected at N500, per §92 no running rejected).
 
 ## 9. Fairness (50 boards, confirmatory survivors only)
 
