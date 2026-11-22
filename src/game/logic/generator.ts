@@ -4274,14 +4274,23 @@ function finalizeCandidate(
       teaBudSlots: [...buds],
       choiceBrewState: { stage: 0 },
     };
-    for (const a of brewSolution) {
+    let firstBrewDepth: number | null = null;
+    for (let aIdx = 0; aIdx < brewSolution.length; aIdx++) {
+      const a = brewSolution[aIdx] as SolverAction;
       const res = applyPuzzleActionState(brewReplay, a, normalized, undefined, choiceBrewContract);
       if (!res) return null;
       brewReplay = res.state;
+      if (firstBrewDepth === null && (brewReplay.choiceBrewState?.stage ?? 0) === 1) {
+        firstBrewDepth = aIdx + 1;
+      }
     }
     if (!isPuzzleWonState(brewReplay, normalized, undefined, choiceBrewContract)) return null;
-    if ((brewReplay.choiceBrewState?.stage ?? 0) !== 1) return null;
+    if ((brewReplay.choiceBrewState?.stage ?? 0) !== 1 || firstBrewDepth === null) return null;
     if ((brewReplay.cups[choiceBrewContract.vesselIndex] ?? []).length !== 0) return null;
+    // Anti-ritual: the milestone must leave at least two ordinary moves of
+    // post-work (bank evidence minimum is 7). A fill-and-immediately-drain
+    // ceremony never ships, even when solvable.
+    if ((brewSolved.minMoves as number) - firstBrewDepth < 2) return null;
     if (stats) stats.solverCalls++;
     const brewControl = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,

@@ -12,6 +12,7 @@ import {
 } from '../src/game/logic/choiceBrewTemplates';
 import { isValidChoiceBrewContract } from '../src/game/logic/choiceBrew';
 import { generateLevel, validateLevelStructure } from '../src/game/logic/generator';
+import { applyPuzzleActionState } from '../src/game/logic/rules';
 import { applySolutionState, solvePuzzle } from '../src/game/logic/solver';
 import { isPuzzleWonState } from '../src/game/logic/rules';
 
@@ -141,6 +142,51 @@ describe('choice brew generation fast path', () => {
     ).toThrow();
   });
 
+  it('generated levels integrate the milestone (post-work >= 2, non-incidental)', () => {
+    const seeds = ['cb-pw-1', 'cb-pw-2', 'cb-pw-3'];
+    for (const seed of seeds) {
+      const lvl = generateLevel(req(), seed);
+      const c = lvl.choiceBrewContract;
+      expect(c).toBeDefined();
+      if (!c) continue;
+      const full = solvePuzzle(lvl.cups, { cupConstraints: lvl.cupConstraints, choiceBrewContract: c });
+      expect(full.solvable).toBe(true);
+      let st = {
+        cups: lvl.cups.map((x) => [...x]),
+        floatingIngredients: lvl.cups.map(() => null),
+        choiceBrewState: { stage: 0 as const },
+      };
+      let triggerAt: number | null = null;
+      const sol = (full.solution ?? []) as Array<{ kind: string; from?: number; to?: number }>;
+      sol.forEach((a, i) => {
+        const res = applyPuzzleActionState(st as never, a as never, lvl.cupConstraints, undefined, c);
+        expect(res).not.toBeNull();
+        if (res) st = res.state as never;
+        if (triggerAt === null && ((st as unknown as { choiceBrewState?: { stage: number } }).choiceBrewState?.stage ?? 0) === 1) {
+          triggerAt = i + 1;
+        }
+      });
+      expect(triggerAt).not.toBeNull();
+      const post = sol.filter(
+        (a, i) => (i as number) >= (triggerAt as number) && a.kind === 'pour' && a.from !== c.vesselIndex && a.to !== c.vesselIndex,
+      ).length;
+      expect(post, `${seed} post-milestone ordinary moves`).toBeGreaterThanOrEqual(2);
+      // Non-incidental: CONTROL optimum must not trigger the milestone.
+      const ctl = solvePuzzle(lvl.cups, { cupConstraints: lvl.cupConstraints });
+      expect(ctl.solvable).toBe(true);
+      let cst = {
+        cups: lvl.cups.map((x) => [...x]),
+        floatingIngredients: lvl.cups.map(() => null),
+        choiceBrewState: { stage: 0 as const },
+      };
+      for (const a of (ctl.solution ?? []) as Array<{ kind: string }>) {
+        const res = applyPuzzleActionState(cst as never, a as never, lvl.cupConstraints, undefined, c);
+        if (!res) break;
+        cst = res.state as never;
+        expect(((cst as unknown as { choiceBrewState?: { stage: number } }).choiceBrewState?.stage ?? 0)).toBe(0);
+      }
+    }
+  });
   it('validateLevelStructure requires contract iff requested', () => {
     const lvl = generateLevel(req(), 'cb-struct-1');
     const noContract = { ...lvl, choiceBrewContract: undefined };
