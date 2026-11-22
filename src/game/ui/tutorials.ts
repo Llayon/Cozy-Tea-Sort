@@ -268,7 +268,7 @@ export const TUTORIALS: readonly TutorialDefinition[] = [
   },
   {
     id: 'choiceBrew',
-    level: 1902,
+    level: 1998,
     bannerId: 'choice-brew-tutorial-hint',
     mechanic: 'choiceBrew',
     concept: 'either of two marked teas fully brewed once, vessel still ends empty',

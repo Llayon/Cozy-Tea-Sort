@@ -30,7 +30,7 @@ const EXPECTED: Record<string, number> = {
   teaPair: 250,
   steepingFlask: 558,
   steepingFlaskSharedTray: 874,
-  choiceBrew: 1902,
+  choiceBrew: 1998,
 };
 
 const REPEAT_LEVELS = [7, 11, 19, 22, 27, 30, 35, 38, 43, 46, 51, 54, 59, 62, 70, 78, 86, 94, 102, 110, 234, 242, 330, 670, 986];

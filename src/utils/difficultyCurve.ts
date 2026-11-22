@@ -259,18 +259,18 @@ export const CHALLENGE_DECK_V4_LENGTH = CHALLENGE_DECK_V4.length;
  * Rollout V5 (Gauntlet 22): introduces Choice Brew at the first challenge
  * boundary after the frozen V4 horizon (10 exact V4 decks, L782–L1901, plus
  * the pinned G21 snapshot through L1600 — all untouched). Same 28-slot /
- * 112-level cadence: the newcomer debuts at slot 0 (first exposure L1902),
- * the version-agnostic flask recurrence moves to slot 24 (displacing the
- * second familiar lemon there; lemon still recurs at slot 7), and the V4
- * winner composition stays at slot 23 so the 874+112k combo grid holds for
- * every level 1–10000. Choice Brew appears once per 112 levels (rare cadence,
- * like the flask debut); second exposure is the next deck (L2014).
+ * 112-level cadence: the newcomer takes slot 24 (first exposure L1998;
+ * displaces the second familiar lemon there, which still recurs at slot 7
+ * so its max gap stays exactly 112). The flask keeps slot 0 and the V4
+ * winner composition stays at slot 23, so every existing recurrence grid
+ * (flask 112, combos 874+112k) holds for levels 1–10000. Choice Brew appears
+ * once per 112 levels initially (rare cadence, like the flask debut);
+ * second exposure is the next deck (L2110).
  */
 export const ROLLOUT_V5_FIRST_CHALLENGE_LEVEL = 1902;
 
 export const CHALLENGE_DECK_V5: readonly MechanicPlan[] = CHALLENGE_DECK_V4.map((plan, i) => {
-  if (i === 0) return { ...CLEAN, choiceBrew: true };
-  if (i === 24) return { ...CLEAN, steepingFlask: true };
+  if (i === 24) return { ...CLEAN, choiceBrew: true };
   return { ...plan };
 });
 
@@ -1078,7 +1078,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasMysteryLayer = false;
     hasSourceOnlyTeapot = false;
     phaseSubtitle = 'Выбор заварки • 2 подходящих чая';
-    if (levelNum === ROLLOUT_V5_FIRST_CHALLENGE_LEVEL) {
+    if (levelNum === 1998) {
       colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
     } else {
       const quads: Array<[TeaId, TeaId, TeaId, TeaId]> = [

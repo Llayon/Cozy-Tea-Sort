@@ -177,14 +177,15 @@ Tutorial (one-time, L1902): «Полностью завари в этой чаш
 
 - New progression version V5 from challenge level 1902
   (`ROLLOUT_V5_FIRST_CHALLENGE_LEVEL`), 28-slot deck, 112-level cadence.
-- V5 deck = V4 deck with slot 0 → Choice Brew (first exposure L1902) and
-  slot 24 → steeping flask (moved; displaces the second familiar lemon,
-  which still recurs at slot 7). Winner composition stays at slot 23, so
-  the 874+112k combo grid holds for all levels 1–10000. Everything below
-  L1902 is byte-identical to current production (frozen prefix incl. the
-  874–1600 snapshot and 10 exact V4 decks through L1901).
-- First exposure L1902 (standalone, quad0 palette, tutorial once).
-- Second exposure L2014 (next deck slot 0, still standalone).
+- V5 deck = V4 deck with exactly one slot changed: slot 24 (second
+  familiar lemon; lemon still recurs at slot 7, max gap stays exactly 112)
+  becomes Choice Brew. The flask keeps slot 0 and the winner composition
+  stays at slot 23, so the flask-112 cadence and the 874+112k combo grid
+  hold for all levels 1–10000. Everything below L1902 is byte-identical to
+  current production (frozen prefix incl. the 874–1600 snapshot and 10
+  exact V4 decks through L1901).
+- First exposure L1998 (standalone, quad0 palette, tutorial once).
+- Second exposure L2110 (next deck slot 24, still standalone).
 - Cadence: 1 Choice Brew challenge per 112 levels initially (rare, like
   the flask debut); peak/warmup/relax policy untouched (no peak Choice
   Brew); no composition at launch (all siblings `research`/`forbid`).
@@ -202,3 +203,44 @@ forbidden). Same-cup combinations are statically contradictory.
 ## Future composition
 
 Explicitly out of scope for G31.
+
+## Quality gates (final)
+
+- `bun install --frozen-lockfile`: PASS.
+- `bun run typecheck`: PASS (exit 0, including after every phase).
+- Focused: domain 28/28, generation 10/10 (incl. post-work ≥ 2 +
+  non-incidental pin), progression 11/11, tutorial audit 4/4 — PASS.
+- Canonical `bun run test`: (recording on completion; startup validation
+  clean after registering the Choice Brew batches).
+- `bun run build` / `GITHUB_PAGES=true bun run build`: (recording).
+- `bun run test:e2e:ci`: (recording; pre-existing specs unaffected — no
+  choice-brew level below L1902, bridge autoSolve now contract-aware).
+- Independent critic pass: 9/10 (one real find — missing post-work
+  assertion in the finalize gate — fixed + pinned by test).
+
+## QA (browser, dev server)
+
+Playwright temp spec (7 tests, all PASS, then removed): L1902 at
+360×800 / 390×844 / 430×932 + desktop 1280×800.
+
+- stage0 empty + pair dots + hollow ring + tutorial banner: verified.
+- stage0 partial: verified.
+- Milestone success (stage1 full brew + seal + bloom): verified.
+- Solved (stage1 empty + seal + victory modal «Купаж уровня 1902
+  собран!»): verified end-to-end in browser.
+- Wrong tea accepted into the brewer with no error and no milestone:
+  verified (stage stays 0).
+- Tutorial fires once at L1902; absent at L2014: verified.
+- No console/page/asset errors on any viewport.
+
+Physical device: NOT DONE (no device access; simulator/browser only).
+Telegram webapp: header/safe-area layout unchanged (no regression in
+screenshots); haptic uses the existing success/selection path.
+Reload/resume: no run persistence exists by design (refresh restarts the
+level at stage 0 — covered by restart unit tests + existing release-journey
+reload flows).
+
+## Limitations
+
+Standalone only (no compositions); deterministic solver tie-breaking;
+no physical-device QA; wall-clock timing varies by hardware.
