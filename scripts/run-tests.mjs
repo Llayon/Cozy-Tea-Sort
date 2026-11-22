@@ -322,6 +322,14 @@ const batches = [
       'tests/contract-preflight-existing-mechanics.test.ts',
     ],
   },
+  {
+    name: 'G30 temporal milestone direct witnesses (research-only)',
+    files: [
+      'tests/g30-brew-once.test.ts',
+      'tests/g30-choice-brew.test.ts',
+      'tests/g30-brew-sequence.test.ts',
+    ],
+  },
 ];
 
 function runBatch(batch) {

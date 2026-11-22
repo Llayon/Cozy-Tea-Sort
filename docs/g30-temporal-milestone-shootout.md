@@ -68,7 +68,13 @@ See `scripts/dev/out/g30-*-N100.json`.
 - B N100 (N=100, bothSolved=100): solvFull 100%, INTEGRATED 48%, REPLAN 77%, TAX 0%, roundtrip 2%, incidental 2%, late 43% (p50 0.769), postWork 0:30/1:18/2-3:26/4+:26, special p50 33.3%, delta 1, solver p95 ~148ms. Gates pass.
 - C N100 (N=100, bothSolved=100): solvFull 100%, INTEGRATED 2%, REPLAN 82%, TAX 0%, seqRitual 58%, late(first) 11% (p50_1 0.692, p50_2 0.929), interStage median 1, postWork 0:92/1:6/2-3:2/4+:0, special p50 46.2%, delta 3, solver p95 176ms, stateMult p95 1.49. Gates pass (replan>=10%), advances to N500 despite weak integration.
 
-## 7. N500 pilot
+## 6b. N100 table (§133)
+
+| Candidate | Solv | Integrated | Replan | Tax-only | milestone p50 | p95 solver | State mult | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Brew Once (N=100) | 100% | 31% | 76% | 0% | 0.909 | 155ms | p95 1.28 | advance (gates pass; late-ritual flag) |
+| Choice Brew (N=100) | 100% | 48% | 77% | 0% | 0.769 | ~148ms | TBD | advance (gates pass) |
+| Brew Sequence (N=100) | 100% | 2% | 82% | 0% | 0.692 → 0.929 | 176ms | p95 1.49 | advance on replan gate; weak integration noted |
 
 See `scripts/dev/out/g30-*-N500.json`.
 
@@ -86,16 +92,61 @@ Only qualifiers (A/B). See outputs.
 
 ## 9. Fairness (50 boards, confirmatory survivors only)
 
-See fairness runs.
+Deterministic family `g30-fair-<i>`, FULL solver (brew-aware, stage carried into children).
+
+- A fairness (N=50): legal root med 8 p90 8, constructive med 8 p90 8, solvable med 8 p90 8, optimal med 3, fatal med 0 p90 0, doom 0/50, windowTrap boards 0/50 (totalTraps 0).
+- B fairness (N=50): legal med 8 p90 8, constructive med 8 p90 8, solvable med 8 p90 8, optimal med 4, fatal med 0 p90 0, doom 0/50, windowTrap boards 0/50 (totalTraps 0).
+
+Both meet preferred (doom 0/50) and hard review (doom ≤2). No opaque missable windows detected (CONTROL-optimal → FULL-fatal traps = 0).
 
 ## 10. Tax analysis
 
 Mandatory answer: did milestone change the sorting plan, or was it ceremony?
 
+Classifier (conservative per §107): `F_filt`/`C_filt` = FULL/CONTROL pour sequences with milestone-vessel touches removed; TAX_ONLY requires exact `F_filt == C_filt` AND excursion contiguous (≤1 gap). INTEGRATED requires all four §61 conditions (pre-cleanup, postWork ≥2, non-roundtrip reintegration, diverged). REPLAN = diverged. Unproven cases → unknown (not inflated).
+
+- A N2000: TAX_ONLY 0%, INTEGRATED 35.65%, REPLAN 78.2%, roundtrip 9.45%, delta p50 1, milestone p50 0.857 (LATE 59.65%), postWork 0:948/1:268/2-3:440/4+:344 (≥2: 39.2%), special p50 35.7%. Unknown ≈ 64% (mostly diverged-but-not-fully-integrated or same-plan-distributed-buffer). Late + weak post-work = ritual-tax red flag for the majority; strong integration proven for ~36%.
+- B N2000: TAX_ONLY 0%, INTEGRATED 44.85%, REPLAN 76.9%, roundtrip 1.95%, incidental 1.45%, delta p50 1, milestone p50 0.80 (LATE 48.15%), postWork 0:665/1:333/2-3:516/4+:486 (≥2: 50.1%), special p50 35.7%. Unknown ≈ 55%. Ceremony minority; planning proven for ~45%.
+- B incidental (§167): CONTROL-optimal replay triggers the allowed pair on only 1.45% of boards — the objective is not decorative; the player must plan which of the two to brew.
+- C: SEQUENCE_RITUAL 59%, inter-stage median 1, postWork 92% zero — dominant back-to-back ritual; rejected.
+
 ## 11. Quality gates
 
-To be reported explicitly.
+- `bun install --frozen-lockfile`: PASS (114 packages).
+- `bun run typecheck`: PASS (exit 0, before and after kernel).
+- Focused G24 (`contract-preflight*.test.ts`): PASS before (45 tests) and after (with G30 direct: 111 tests total).
+- Focused G30 direct: PASS (66 tests, 22 per candidate).
+- Canonical full unit command (`bun run test`): BLOCKED/INFRA — 170 files registered (incl. new research-only G30 batch); run executed 14/77 batches (40 files, all green) then stopped at batch 14 (`G21 composition production stress`, `composition2-fastpath.test.ts` 10/10 passed on both attempts) on the known `Timeout calling "onTaskUpdate"` RPC flake twice in a row (spec §149). Assertions completed: all executed tests passed; no assertion failures. Focused rerun of the flaked file: PASS 10/10. G30 batch (77th) not reached in the full run; focused G30 run: 66/66 PASS. NOT claimed as canonical PASS (exit code 1, infra).
+- `bun run build`: PASS (exit 0).
+- `GITHUB_PAGES=true bun run build`: PASS (exit 0).
+- `bun run test:e2e:ci`: PASS (33/33).
+- Bundle delta: origin/main baseline dist 11 files / 1,199,383 bytes (index 896,285 bytes) vs G30 worktree 11 files / 1,203,735 bytes (index 900,539 bytes): **+4,352 bytes total (+0.36%), index +4,254 bytes (+0.47%)**. Additive kernel only (new `brewMilestone` module + optional params, no UI/production template/generator changes); production behavior without contract is byte-identical per legacy-freeze tests.
 
 ## 12. Limitations
 
 Fixed topology, no composition, deterministic solver tie-breaking, wall-clock timing, no UI/production templates/topology mining.
+
+## 13. Final comparison (N2000 A/B, N500 C)
+| Metric | Brew Once (A) | Choice Brew (B) | Brew Sequence (C) |
+|---|---:|---:|---:|
+| Solvability | 100% (2000/2000) | 100% (2000/2000) | 100% (500/500) |
+| Integrated | 35.65% | 44.85% | 2% |
+| Replan | 78.2% | 76.9% | 83% |
+| Tax-only | 0% (conservative) | 0% (conservative) | 0% (conservative) |
+| Roundtrip ritual | 9.45% | 1.95% | n/a (sequenceRitual 59%) |
+| Incidental (B) | — | 1.45% | — |
+| Milestone timing p50 | 0.857 | 0.80 | 0.714 → 0.933 |
+| Late milestone | 59.65% | 48.15% | 15.6% (first) |
+| Post-milestone work ≥2 | 39.2% | 50.1% | 2.2% (post); inter-stage med 1 |
+| Special touch p50 | 35.7% | 35.7% | 46.2% |
+| Depth delta p50 | 1 | 1 | 3 |
+| Solver p95 | 162ms | 180ms | 170ms (N500) |
+| State mult p95 | 1.32 | 1.38 | 1.44 (N500) |
+| Doom | 0/50 | 0/50 | not run (rejected) |
+| Window traps | 0/50 | 0/50 | not run |
+| Target distribution | balanced (165–189 integ/target) | balanced (133–163 integ/pair) | uniformly weak (0–2/order) |
+| Verdict | HOLD/REJECT (timing) | WINNER candidate | REJECT |
+
+Classification: A `HOLD` (passes hard gates incl. confirmatory integ/replan/tax/solv/fairness/perf, but fails healthy timing p50<0.70 + late<40% with 61% postWork ≤1 — late-ritual tax pattern per §143/§64); B `PASS` (passes all hard gates + healthy B profile §141; timing over preferred but B profile has no timing gate, ritual/incidental minimal, planning proven); C `REJECT` (fails N500 integ + inter-stage gates, dominant sequence ritual).
+
+Winner ranking (§138): replan ~tie (A +1.3pp) → integration B+9pp → tax tie → ritual B (5x lower roundtrip) → solv tie → fairness B (optimal 4 vs 3, traps tie) → perf A marginally → mult A marginally → explainability/simplicity A marginally. Primary planning/ritual axes dominate: **Choice Brew ranks first**.
