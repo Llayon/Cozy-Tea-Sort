@@ -31,12 +31,15 @@ import {
   TeaBudId,
   TeaBudSlot,
   TeaId,
+  BrewMilestoneState,
+  cloneBrewMilestoneState,
   cloneCupConstraint,
   cloneStrainerState,
   cupCapacity,
   emptyStrainerState,
   isTastingCupConstraint,
   isThermosCupConstraint,
+  normalizeBrewMilestoneState,
   normalizeCapacityObstacles,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
@@ -45,6 +48,7 @@ import {
   normalizeStrainerState,
   normalizeTeaBudSlots,
 } from '../types';
+import type { BrewMilestoneContract } from './brewMilestone';
 import {
   applyPlaceStrainerState,
   applyPourState,
@@ -81,6 +85,13 @@ export interface LevelInitialState {
    * When undefined every rule behaves exactly as before (legacy identical).
    */
   blendRecipe?: BlendRecipe | undefined | null;
+  /**
+   * G30 temporal milestone contract (research-only, optional).
+   * Absent = legacy/CONTROL (no history bit).
+   */
+  brewContract?: BrewMilestoneContract | undefined | null;
+  /** G30 initial history stage (research-only; default 0). */
+  brewInitialStage?: number | undefined;
 }
 
 export class Cup {
@@ -349,6 +360,7 @@ export interface GameStateSnapshot {
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
+  brewMilestone?: BrewMilestoneState | undefined;
   action: PuzzleAction;
   move: MoveStep;
 }
@@ -364,6 +376,14 @@ export class TeaSortLogic {
    * as before (legacy identical).
    */
   blendRecipe: BlendRecipe | undefined = undefined;
+  /**
+   * G30 temporal milestone contract (research-only, optional).
+   * Immutable level data — set at init, never mutated by moves/undo/restart
+   * (only the dynamic stage changes). Absent = legacy/CONTROL.
+   */
+  brewContract: BrewMilestoneContract | undefined = undefined;
+  /** G30 dynamic history stage (authoritative, snapshotted for Undo). */
+  brewMilestone: BrewMilestoneState | undefined = undefined;
 
   constructor(
     initialCups: TeaId[][] = [],
@@ -376,11 +396,16 @@ export class TeaSortLogic {
     capacityObstacles?: readonly CapacityObstacleSlot[],
     teaBudSlots?: readonly TeaBudSlot[],
     blendRecipe?: BlendRecipe | undefined | null,
+    brewContract?: BrewMilestoneContract | undefined | null,
+    brewInitialStage?: number | undefined,
   ) {
     if (initialCups.length > 0) {
-      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots, capacityObstacles, teaBudSlots, blendRecipe);
+      this.initFromState(initialCups, hiddenCounts, cupConstraints, floatingIngredients, strainer, sinkingIngredients, iceSlots, capacityObstacles, teaBudSlots, blendRecipe, brewContract, brewInitialStage);
     } else if (blendRecipe) {
       this.blendRecipe = blendRecipe;
+    } else if (brewContract) {
+      this.brewContract = brewContract;
+      this.brewMilestone = { stage: brewInitialStage ?? 0 };
     }
   }
 
@@ -395,6 +420,8 @@ export class TeaSortLogic {
     capacityObstacles?: readonly CapacityObstacleSlot[],
     teaBudSlots?: readonly TeaBudSlot[],
     blendRecipe?: BlendRecipe | undefined | null,
+    brewContract?: BrewMilestoneContract | undefined | null,
+    brewInitialStage?: number | undefined,
   ) {
     const normalized = normalizeCupConstraints(cupConstraints, state.length);
     const slots = normalizeFloatingIngredients(floatingIngredients, state.length);
@@ -418,6 +445,9 @@ export class TeaSortLogic {
     );
     this.strainer = normalizeStrainerState(strainer);
     this.blendRecipe = blendRecipe ?? undefined;
+    this.brewContract = brewContract ?? undefined;
+    this.brewMilestone =
+      this.brewContract !== undefined ? { stage: brewInitialStage ?? 0 } : undefined;
     this.history = [];
     this.movesCount = 0;
   }
@@ -435,6 +465,8 @@ export class TeaSortLogic {
       init.capacityObstacles,
       init.teaBudSlots,
       init.blendRecipe,
+      init.brewContract,
+      init.brewInitialStage,
     );
   }
 
@@ -484,6 +516,8 @@ export class TeaSortLogic {
     capacityObstacles: CapacityObstacleSlot[];
     teaBudSlots: TeaBudSlot[];
     blendRecipe?: BlendRecipe | undefined;
+    brewContract?: BrewMilestoneContract | undefined;
+    brewMilestone?: BrewMilestoneState | undefined;
   } {
     return {
       cups: this.cups.map((c) => [...c.layers]),
@@ -496,6 +530,10 @@ export class TeaSortLogic {
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
       ...(this.blendRecipe ? { blendRecipe: this.blendRecipe } : {}),
+      ...(this.brewContract !== undefined ? { brewContract: this.brewContract } : {}),
+      ...(this.brewMilestone !== undefined
+        ? { brewMilestone: cloneBrewMilestoneState(this.brewMilestone) as BrewMilestoneState }
+        : {}),
     };
   }
 
@@ -503,7 +541,16 @@ export class TeaSortLogic {
     return this.cups.map((c) => c.constraint);
   }
 
-  private puzzleState(): { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState; iceSlots: IceSlot[]; capacityObstacles: CapacityObstacleSlot[]; teaBudSlots: TeaBudSlot[] } {
+  private puzzleState(): {
+    cups: TeaId[][];
+    floatingIngredients: FloatingIngredientSlot[];
+    sinkingIngredients: SinkingIngredientSlot[];
+    strainer: StrainerState;
+    iceSlots: IceSlot[];
+    capacityObstacles: CapacityObstacleSlot[];
+    teaBudSlots: TeaBudSlot[];
+    brewMilestone?: BrewMilestoneState | undefined;
+  } {
     return {
       cups: this.cups.map((c) => c.layers),
       floatingIngredients: this.floatingIngredients,
@@ -512,10 +559,22 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.brewMilestone !== undefined
+        ? { brewMilestone: cloneBrewMilestoneState(this.brewMilestone) as BrewMilestoneState }
+        : {}),
     };
   }
 
-  private applyBoardState(next: { cups: TeaId[][]; floatingIngredients: FloatingIngredientSlot[]; sinkingIngredients: SinkingIngredientSlot[]; strainer: StrainerState; iceSlots: IceSlot[]; capacityObstacles: CapacityObstacleSlot[]; teaBudSlots?: readonly TeaBudSlot[] }): void {
+  private applyBoardState(next: {
+    cups: TeaId[][];
+    floatingIngredients: FloatingIngredientSlot[];
+    sinkingIngredients: SinkingIngredientSlot[];
+    strainer: StrainerState;
+    iceSlots: IceSlot[];
+    capacityObstacles: CapacityObstacleSlot[];
+    teaBudSlots?: readonly TeaBudSlot[];
+    brewMilestone?: BrewMilestoneState | undefined | null;
+  }): void {
     next.cups.forEach((layers, idx) => {
       const cup = this.cups[idx];
       if (cup) cup.layers = [...layers];
@@ -533,6 +592,13 @@ export class TeaSortLogic {
       cup.teaBud = buds[idx] ?? null;
     });
     this.strainer = normalizeStrainerState(next.strainer);
+    const carried = (next as { brewMilestone?: BrewMilestoneState | undefined | null }).brewMilestone;
+    if (carried !== undefined) {
+      this.brewMilestone =
+        carried === null ? undefined : { stage: (carried as BrewMilestoneState).stage };
+    } else if (this.brewContract === undefined) {
+      this.brewMilestone = undefined;
+    }
   }
 
   canMakeMove(fromIdx: number, toIdx: number): boolean {
@@ -556,6 +622,9 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.brewMilestone !== undefined
+        ? { brewMilestone: cloneBrewMilestoneState(this.brewMilestone) as BrewMilestoneState }
+        : {}),
       action: { kind: 'pour', from: fromIdx, to: toIdx },
       move: {
         fromCupIndex: fromIdx,
@@ -565,7 +634,14 @@ export class TeaSortLogic {
       },
     };
 
-    const res = applyPourState(this.puzzleState(), fromIdx, toIdx, this.boardConstraints(), this.blendRecipe);
+    const res = applyPourState(
+      this.puzzleState(),
+      fromIdx,
+      toIdx,
+      this.boardConstraints(),
+      this.blendRecipe,
+      this.brewContract,
+    );
     if (!res) return null;
     this.applyBoardState(res.state);
 
@@ -608,6 +684,9 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.brewMilestone !== undefined
+        ? { brewMilestone: cloneBrewMilestoneState(this.brewMilestone) as BrewMilestoneState }
+        : {}),
       action: { kind: 'place-strainer', to: toIdx },
       move: { fromCupIndex: -1, toCupIndex: toIdx, layer: this.cups[toIdx]?.topLayer as TeaId, count: 0 },
     };
@@ -638,6 +717,9 @@ export class TeaSortLogic {
       iceSlots: this.iceSlots,
       capacityObstacles: this.capacityObstacles,
       teaBudSlots: this.teaBudSlots,
+      ...(this.brewMilestone !== undefined
+        ? { brewMilestone: cloneBrewMilestoneState(this.brewMilestone) as BrewMilestoneState }
+        : {}),
       action: { kind: 'release-strainer', to: toIdx },
       move: { fromCupIndex: -1, toCupIndex: toIdx, layer: held, count: 1 },
     };
@@ -667,6 +749,14 @@ export class TeaSortLogic {
       cup.teaBud = buds[idx] ?? null;
     });
     this.strainer = cloneStrainerState(last.strainer);
+    this.brewMilestone =
+      normalizeBrewMilestoneState(last.brewMilestone) ??
+      (this.brewContract !== undefined ? { stage: 0 } : undefined);
+    // Absent snapshot milestone with absent contract stays absent; an
+    // explicit stage is restored exactly (Undo timeline reversal).
+    if (last.brewMilestone === undefined && this.brewContract === undefined) {
+      this.brewMilestone = undefined;
+    }
     if (last.action.kind === 'pour' || last.action.kind === 'release-strainer') {
       this.movesCount = Math.max(0, this.movesCount - 1);
     }
@@ -678,7 +768,12 @@ export class TeaSortLogic {
   }
 
   isWon(): boolean {
-    return isPuzzleWonState(this.puzzleState(), this.boardConstraints(), this.blendRecipe);
+    return isPuzzleWonState(
+      this.puzzleState(),
+      this.boardConstraints(),
+      this.blendRecipe,
+      this.brewContract,
+    );
   }
 
   isDeadlocked(): boolean {

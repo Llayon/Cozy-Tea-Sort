@@ -337,6 +337,45 @@ export type TeaBudId = 'tea_bud';
 export type TeaBudSlot = TeaBudId | null;
 
 /**
+ * G30 temporal brew-milestone history (research-only).
+ *
+ * Minimal authoritative history state: a single monotonic stage.
+ * - Brew Once / Choice Brew: stage 0 = not reached, 1 = reached.
+ * - Brew Sequence: stage 0 = waiting A, 1 = A reached waiting B, 2 = complete.
+ *
+ * Absent (`undefined`) means NO G30 mechanic (legacy board, CONTROL).
+ * Present means history-dependent objective is active. This is part of
+ * puzzle state, not a cache: `[] -> AAAA -> []` loses the fact that AAAA
+ * once existed unless stage is stored.
+ */
+export interface BrewMilestoneState {
+  stage: number;
+}
+
+/**
+ * Backwards-compatible normalization: legacy callers without the field
+ * synthesize absence (no mechanic). When present, the stage is preserved
+ * exactly (clamped to integer; validation of range lives in the
+ * brew-milestone kernel, never here, so legacy keys stay byte-identical).
+ */
+export function normalizeBrewMilestoneState(
+  s: BrewMilestoneState | undefined | null,
+): BrewMilestoneState | undefined {
+  if (s === undefined || s === null) return undefined;
+  const stage = (s as BrewMilestoneState).stage;
+  if (!Number.isInteger(stage)) return { stage: 0 };
+  return { stage };
+}
+
+/** Defensive copy (or absence preservation). */
+export function cloneBrewMilestoneState(
+  s: BrewMilestoneState | undefined | null,
+): BrewMilestoneState | undefined {
+  if (s === undefined || s === null) return undefined;
+  return { stage: (s as BrewMilestoneState).stage };
+}
+
+/**
  * Full dynamic puzzle state: tea layers plus independent floating-object
  * positions, sinking-object positions, plus the movable strainer tool.
  * Immutable level data (CupConstraint[], ingredient TYPE metadata, Mystery
@@ -351,6 +390,11 @@ export interface PuzzleState {
   iceSlots: IceSlot[];
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
+  /**
+   * G30 temporal history (research-only, optional).
+   * Absent = no milestone mechanic (legacy/CONTROL).
+   */
+  brewMilestone?: BrewMilestoneState | undefined;
 }
 
 /**
@@ -369,6 +413,11 @@ export interface ReadonlyPuzzleState {
   iceSlots?: readonly IceSlot[] | undefined;
   capacityObstacles?: readonly CapacityObstacleSlot[] | undefined;
   teaBudSlots?: readonly TeaBudSlot[] | undefined;
+  /**
+   * G30 temporal history (research-only, optional).
+   * Absent = no milestone mechanic (legacy/CONTROL).
+   */
+  brewMilestone?: BrewMilestoneState | undefined | null;
 }
 
 /** All-null slots for a vessel count (ordinary old levels). */
@@ -575,6 +624,9 @@ export function clonePuzzleState(state: ReadonlyPuzzleState): PuzzleState {
     iceSlots: normalizeIceSlots(state.iceSlots, cups.length),
     capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, cups.length),
     teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, cups.length),
+    ...(state.brewMilestone !== undefined && state.brewMilestone !== null
+      ? { brewMilestone: cloneBrewMilestoneState(state.brewMilestone) as BrewMilestoneState }
+      : {}),
   };
 }
 
