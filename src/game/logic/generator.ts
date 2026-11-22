@@ -142,6 +142,18 @@ import {
   instantiateTargetTemplate,
 } from './targetTemplates';
 import {
+  CHOICE_BREW_DEPTH_ACCEPT,
+  CHOICE_BREW_FALLBACK_TEMPLATE_ID,
+  CHOICE_BREW_TEMPLATE_ATTEMPTS,
+  CHOICE_BREW_TEMPLATE_BANK,
+  instantiateChoiceBrewTemplate,
+} from './choiceBrewTemplates';
+import {
+  advanceChoiceBrewState,
+  isValidChoiceBrewContract,
+  type ChoiceBrewContract,
+} from './choiceBrew';
+import {
   SINK_TEMPLATE_ATTEMPTS,
   SINK_TEMPLATE_BANK,
   SinkTemplateKind,
@@ -284,7 +296,7 @@ import {
   sharedCapacityOccupancy,
   validateSharedCapacityConstraints,
 } from './sharedCapacity';
-import { validateMechanicCombination, validateSharedTrayCombination, validateSteepingFlaskCombination, validateTeaPairCombination } from './mechanicCompatibility';
+import { validateChoiceBrewCombination, validateMechanicCombination, validateSharedTrayCombination, validateSteepingFlaskCombination, validateTeaPairCombination } from './mechanicCompatibility';
 import {
   depthDistance,
   RhythmPhase,
@@ -433,6 +445,17 @@ export interface GenerateRequest {
    * every sibling special is rejected loudly.
    */
   steepingFlaskCount?: number;
+  /**
+   * Number of Choice Brew vessels requested (Gauntlet 22 — «Выбор заварки»).
+   * 0 = classic level; 1 = exactly one standalone normal cap4 /
+   * must-end-empty brewing vessel with an unordered allowed tea pair inside
+   * the CB topology (4c/6v, lengths 4,4,4,4,0,0). The vessel starts empty;
+   * the milestone is history (full homogeneous pair tea at least once).
+   * Production supports only 0/1; every sibling special is rejected loudly.
+   * The static pair is derived deterministically from the template/seed at
+   * instantiation time (never pre-filtered by solver outcome).
+   */
+  choiceBrewCount?: number;
 }
 
 export interface GeneratedLevel {
@@ -632,6 +655,13 @@ export function requestedTeaPairCount(req: GenerateRequest): number {
 /** Requested steeping-flask count, normalized (default 0, clamped >= 0). */
 export function requestedSteepingFlaskCount(req: GenerateRequest): number {
   const v = (req as GenerateRequest).steepingFlaskCount ?? 0;
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.floor(v));
+}
+
+/** Requested Choice Brew vessel count, normalized (default 0, clamped >= 0). */
+export function requestedChoiceBrewCount(req: GenerateRequest): number {
+  const v = (req as GenerateRequest).choiceBrewCount ?? 0;
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.floor(v));
 }
@@ -1370,6 +1400,109 @@ export function validateSteepingFlaskRequest(req: GenerateRequest): void {
   for (const t of palette) {
     if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
       throw new Error(`validateSteepingFlaskRequest: reaction ID ${t} not eligible for flask`);
+    }
+  }
+  if (requestedChoiceBrewCount(req) > 0) {
+    throw new Error('validateSteepingFlaskRequest: flask + choice brew is out of scope (both standalone)');
+  }
+}
+
+/**
+ * Fail-fast request validation for Choice Brew (programming errors, not
+ * generation luck). Production supports exactly the standalone interaction:
+ * choiceBrewCount 1 inside the CB topology (numColors 4, nominal emptyCups
+ * 2 → 6 vessels, lengths 4,4,4,4,0,0), no Mystery/teapot/targets/sink/
+ * tasting/lemon/honey/strainer/frozen/thermos/cinnamon/tea-bud/blend/
+ * serving-order/shared-tray/tea-pair/flask. Only 0 or 1 supported. The
+ * active palette must carry 4 eligible legacy teas and no reaction IDs.
+ * The allowed pair is fixed at instantiation (template/seed), never
+ * selected from solver outcome.
+ */
+export function validateChoiceBrewRequest(req: GenerateRequest): void {
+  const raw = (req as GenerateRequest).choiceBrewCount ?? 0;
+  if (raw === 0) return;
+  if (!Number.isInteger(raw) || raw !== 1) {
+    throw new Error(`validateChoiceBrewRequest: choiceBrewCount ${String(raw)} unsupported (production 0 or 1)`);
+  }
+  const comboReasons = validateChoiceBrewCombination({
+    choiceBrew: true,
+    servingOrder: requestedServeOrderCount(req) > 0,
+    mystery: req.hasMysteryLayer === true,
+    tastingCount: requestedTastingCupCount(req),
+    honey: requestedSinkingIngredient(req) !== undefined,
+    strainer: requestedHasStrainer(req),
+    blend: requestedBlendRecipeId(req) !== undefined,
+    sharedTray: requestedSharedTrayCount(req) > 0,
+    teaPair: requestedTeaPairCount(req) > 0,
+    steepingFlask: requestedSteepingFlaskCount(req) > 0,
+  });
+  if (comboReasons.length > 0) {
+    throw new Error(`validateChoiceBrewRequest: ${comboReasons.join('; ')}`);
+  }
+  if (req.numColors !== 4 || req.emptyCups !== 2 || requestedSourceOnlyCount(req) !== 0) {
+    throw new Error(
+      'validateChoiceBrewRequest: choice brew requires 4 colors, 6 vessels, 2 nominal empties, no teapot',
+    );
+  }
+  if (req.hasMysteryLayer) {
+    throw new Error('validateChoiceBrewRequest: choice brew + mystery is out of scope');
+  }
+  if (requestedTargetTeas(req).length > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + targets is out of scope');
+  }
+  if (requestedSinkOnlyCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + sink-only is out of scope');
+  }
+  if (requestedTastingCupCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + tasting bowl is out of scope');
+  }
+  if (requestedFloatingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateChoiceBrewRequest: choice brew + ${requestedFloatingIngredient(req)} is out of scope`,
+    );
+  }
+  if (requestedSinkingIngredient(req) !== undefined) {
+    throw new Error(
+      `validateChoiceBrewRequest: choice brew + ${requestedSinkingIngredient(req)} is out of scope`,
+    );
+  }
+  if (requestedHasStrainer(req)) {
+    throw new Error('validateChoiceBrewRequest: choice brew + strainer is out of scope');
+  }
+  if (requestedFrozenCupCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + frozen cup is out of scope');
+  }
+  if (requestedThermosCupCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + thermos is out of scope');
+  }
+  if (requestedCinnamonCupCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + cinnamon is out of scope');
+  }
+  if (requestedTeaBudCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + tea bud is out of scope');
+  }
+  if (requestedBlendRecipeId(req) !== undefined) {
+    throw new Error('validateChoiceBrewRequest: choice brew + blend is forbidden (chemistry stays standalone)');
+  }
+  if (requestedServeOrderCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + serving order is out of scope');
+  }
+  if (requestedSharedTrayCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + shared tray is out of scope');
+  }
+  if (requestedTeaPairCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + tea pair is out of scope');
+  }
+  if (requestedSteepingFlaskCount(req) > 0) {
+    throw new Error('validateChoiceBrewRequest: choice brew + steeping flask is out of scope (both standalone)');
+  }
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) {
+    throw new Error('validateChoiceBrewRequest: palette must carry exactly 4 teas');
+  }
+  for (const t of palette) {
+    if (t === 'black_tea' || t === 'milk' || t === 'milk_tea') {
+      throw new Error(`validateChoiceBrewRequest: reaction ID ${t} not eligible for choice brew`);
     }
   }
 }
@@ -2948,6 +3081,7 @@ function finalizeCandidate(
   iceSlots?: readonly IceSlot[],
   capacityObstacles?: readonly CapacityObstacleSlot[],
   teaBudSlots?: readonly TeaBudSlot[],
+  choiceBrewContract?: ChoiceBrewContract,
 ): GeneratedLevel | null {
   const normalized: CupConstraint[] = cupConstraints.map(cloneCupConstraint);
   if (normalized.length !== cups.length) return null; // K
@@ -3068,6 +3202,30 @@ function finalizeCandidate(
       (c, i) => c.mode === 'normal' && !isSteepingFlaskConstraint(c) && (cups[i] as TeaId[]).length === 0,
     ).length;
     if (ordinaryEmpty < 1 && requestedSharedTrayCount(req) !== 1) return null;
+  }
+  // Choice Brew structural invariant: exactly one valid brewing vessel
+  // (normal/cap4/mustEndEmpty, explicit capacity), starts empty, hides
+  // nothing, no sibling special anywhere, one ordinary empty buffer, and a
+  // valid static contract carried iff requested.
+  const wantBrew = requestedChoiceBrewCount(req);
+  if (wantBrew === 0 && choiceBrewContract !== undefined) return null;
+  if (wantBrew > 0) {
+    if (wantBrew > 1) return null;
+    if (choiceBrewContract === undefined) return null;
+    if (!isValidChoiceBrewContract(choiceBrewContract, normalized)) return null;
+    if (wantTargets.length > 0 || wantSink > 0 || wantTasting > 0) return null;
+    if (requestedFloatingIngredient(req) !== undefined || requestedSinkingIngredient(req) !== undefined) return null;
+    if (requestedHasStrainer(req) || requestedFrozenCupCount(req) > 0 || requestedThermosCupCount(req) > 0) return null;
+    if (requestedCinnamonCupCount(req) > 0 || requestedTeaBudCount(req) > 0 || requestedBlendRecipeId(req) !== undefined) return null;
+    if (requestedServeOrderCount(req) > 0 || requestedSharedTrayCount(req) > 0 || requestedTeaPairCount(req) > 0) return null;
+    if (requestedSteepingFlaskCount(req) > 0) return null;
+    if (hiddenCounts.some((h) => (h ?? 0) !== 0)) return null;
+    const brewCup = cups[choiceBrewContract.vesselIndex] as TeaId[];
+    if (!brewCup || brewCup.length !== 0) return null;
+    const brewOrdinaryEmpty = normalized.filter(
+      (c, i) => c.mode === 'normal' && !mustEndEmpty(c) && (cups[i] as TeaId[]).length === 0,
+    ).length;
+    if (brewOrdinaryEmpty < 1) return null;
   }
   // AN: every vessel holds at most ITS OWN capacity (tasting: 2).
   for (let i = 0; i < cups.length; i++) {
@@ -3458,7 +3616,7 @@ function finalizeCandidate(
   }
   if (isWonState(cups, normalized)) return null; // D
   if (isPuzzleWonState({ cups, floatingIngredients: slots, sinkingIngredients: sinkSlots, strainer: strainerState, iceSlots: ice, capacityObstacles: obstacles, teaBudSlots: buds }, normalized)) return null; // D (lemon/honey/strainer/ice/cinnamon/bud-aware)
-  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0 && requestedSharedTrayCount(req) === 0 && requestedTeaPairCount(req) === 0) {
+  if (!wantStrainer && wantHoney === undefined && wantFrozen === 0 && wantThermos === 0 && wantCinnamon === 0 && wantBud === 0 && requestedBlendRecipeId(req) === undefined && requestedServeOrderCount(req) === 0 && requestedSharedTrayCount(req) === 0 && requestedTeaPairCount(req) === 0 && requestedChoiceBrewCount(req) === 0) {
     if (stats) stats.solverCalls++;
     const solved = solvePuzzle(cups, {
       maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
@@ -4074,6 +4232,96 @@ function finalizeCandidate(
       if (!validateLevelStructure(level, req).ok) return null;
       return level;
     }
+  }
+  // Choice Brew production gate: FULL history-aware solve + CONTROL sanity
+  // + replay wins + milestone actually triggers + vessel ends empty + depth
+  // band + non-incidental (CONTROL optimal replay must not trigger it).
+  if (requestedChoiceBrewCount(req) > 0) {
+    if (choiceBrewContract === undefined) return null;
+    if (!isValidChoiceBrewContract(choiceBrewContract, normalized)) return null;
+    if (stats) stats.solverCalls++;
+    const brewSolved = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      choiceBrewContract,
+    });
+    if (!brewSolved.solvable || brewSolved.truncated) return null;
+    if (brewSolved.minMoves === undefined) return null;
+    if (
+      brewSolved.minMoves < CHOICE_BREW_DEPTH_ACCEPT.min ||
+      brewSolved.minMoves > CHOICE_BREW_DEPTH_ACCEPT.max
+    ) {
+      return null;
+    }
+    const brewSolution = (brewSolved.solution ?? []) as SolverAction[];
+    let brewReplay: {
+      cups: TeaId[][];
+      floatingIngredients: FloatingIngredientSlot[];
+      sinkingIngredients: SinkingIngredientSlot[];
+      strainer: StrainerState;
+      iceSlots: IceSlot[];
+      capacityObstacles: CapacityObstacleSlot[];
+      teaBudSlots: TeaBudSlot[];
+      choiceBrewState?: { stage: 0 | 1 };
+    } = {
+      cups: cups.map((c) => [...c]),
+      floatingIngredients: [...slots],
+      sinkingIngredients: [...sinkSlots],
+      strainer: normalizeStrainerState(strainerState),
+      iceSlots: [...ice],
+      capacityObstacles: [...obstacles],
+      teaBudSlots: [...buds],
+      choiceBrewState: { stage: 0 },
+    };
+    for (const a of brewSolution) {
+      const res = applyPuzzleActionState(brewReplay, a, normalized, undefined, choiceBrewContract);
+      if (!res) return null;
+      brewReplay = res.state;
+    }
+    if (!isPuzzleWonState(brewReplay, normalized, undefined, choiceBrewContract)) return null;
+    if ((brewReplay.choiceBrewState?.stage ?? 0) !== 1) return null;
+    if ((brewReplay.cups[choiceBrewContract.vesselIndex] ?? []).length !== 0) return null;
+    if (stats) stats.solverCalls++;
+    const brewControl = solvePuzzle(cups, {
+      maxVisited: SOLVER_BUDGET_PER_CANDIDATE,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+    });
+    if (!brewControl.solvable || brewControl.truncated) return null;
+    let controlReplay: typeof brewReplay = {
+      cups: cups.map((c) => [...c]),
+      floatingIngredients: [...slots],
+      sinkingIngredients: [...sinkSlots],
+      strainer: normalizeStrainerState(strainerState),
+      iceSlots: [...ice],
+      capacityObstacles: [...obstacles],
+      teaBudSlots: [...buds],
+      choiceBrewState: { stage: 0 },
+    };
+    for (const a of ((brewControl.solution ?? []) as SolverAction[])) {
+      const res = applyPuzzleActionState(controlReplay, a, normalized, undefined, choiceBrewContract);
+      if (!res) return null;
+      controlReplay = res.state;
+      if ((controlReplay.choiceBrewState?.stage ?? 0) === 1) return null;
+    }
+    const brewLevel: GeneratedLevel = {
+      cups,
+      hiddenCounts,
+      cupConstraints: normalized,
+      floatingIngredients: slots,
+      sinkingIngredients: sinkSlots,
+      strainer: strainerState,
+      iceSlots: ice,
+      capacityObstacles: obstacles,
+      teaBudSlots: buds,
+      choiceBrewContract,
+      seed,
+      minMoves: brewSolved.minMoves,
+      visitedStates: brewSolved.visitedStates,
+    };
+    if (!validateLevelStructure(brewLevel, req).ok) return null;
+    return brewLevel;
   }
   // BP–CA: strainer production gate (rescued necessity standard).
   if (stats) stats.solverCalls++;
@@ -4971,6 +5219,7 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
   validateServeOrderRequest(req);
   validateTeaPairRequest(req);
   validateSteepingFlaskRequest(req);
+  validateChoiceBrewRequest(req);
   const stats = opts.stats;
   const wantSourceOnly = requestedSourceOnlyCount(req);
   const wantTargets = requestedTargetTeas(req);
@@ -5056,6 +5305,50 @@ export function fallbackLevel(req: GenerateRequest, opts: GenerateOptions = {}):
         const constraints = defaultCupConstraints(inst.cups.length);
         constraints[inst.flaskSlot] = cloneCupConstraint(STEEPING_FLASK_CONSTRAINT);
         shapeEntries.push({ cups: inst.cups, constraints });
+      }
+    }
+  }
+  // Dedicated Choice Brew fallback (identity role mapping — recorded depth
+  // holds modulo TeaRole tie-breaking; finalize re-validates with the static
+  // contract, never a blind emit).
+  if (requestedChoiceBrewCount(req) > 0) {
+    const tpl =
+      CHOICE_BREW_TEMPLATE_BANK.find((t) => t.id === CHOICE_BREW_FALLBACK_TEMPLATE_ID) ??
+      CHOICE_BREW_TEMPLATE_BANK[0];
+    if (tpl) {
+      const palette = req.colors.slice(0, req.numColors);
+      if (palette.length === req.numColors) {
+        const inst = instantiateChoiceBrewTemplate(tpl, [...palette]);
+        const constraints = defaultCupConstraints(inst.cups.length);
+        constraints[inst.brewVesselIndex] = {
+          mode: 'normal',
+          capacity: STANDARD_CUP_CAPACITY,
+          mustEndEmpty: true,
+        };
+        const contract: ChoiceBrewContract = {
+          vesselIndex: inst.brewVesselIndex,
+          allowedTeas: [inst.allowedTeas[0] as TeaId, inst.allowedTeas[1] as TeaId],
+        };
+        const level = finalizeCandidate(
+          req,
+          inst.cups,
+          inst.cups.map(() => 0),
+          `${tag}#choice-brew-fallback:${tpl.id}`,
+          constraints,
+          stats,
+          emptyFloatingIngredients(inst.cups.length),
+          undefined,
+          emptySinkingIngredients(inst.cups.length),
+          emptyIceSlots(inst.cups.length),
+          emptyCapacityObstacles(inst.cups.length),
+          emptyTeaBudSlots(inst.cups.length),
+          contract,
+        );
+        if (level) {
+          if (stats) stats.usedFallback = true;
+          return level;
+        }
+        throw new Error('fallbackLevel: choice brew identity fallback failed validation');
       }
     }
   }
@@ -6635,6 +6928,85 @@ function generateFromSteepingFlaskTemplateBank(
   return null;
 }
 
+export type ChoiceBrewTemplateKind = 'choice-brew';
+
+export function choiceBrewTemplateKindFor(req: GenerateRequest): ChoiceBrewTemplateKind | null {
+  if (requestedChoiceBrewCount(req) !== 1) return null;
+  if (requestedTargetTeas(req).length > 0) return null;
+  if (requestedSinkOnlyCount(req) > 0) return null;
+  if (requestedTastingCupCount(req) > 0) return null;
+  if (requestedFloatingIngredient(req) !== undefined) return null;
+  if (requestedSinkingIngredient(req) !== undefined) return null;
+  if (requestedHasStrainer(req)) return null;
+  if (requestedFrozenCupCount(req) > 0) return null;
+  if (requestedThermosCupCount(req) > 0) return null;
+  if (requestedCinnamonCupCount(req) > 0) return null;
+  if (requestedTeaBudCount(req) > 0) return null;
+  if (requestedBlendRecipeId(req) !== undefined) return null;
+  if (requestedServeOrderCount(req) > 0) return null;
+  if (requestedSharedTrayCount(req) > 0) return null;
+  if (requestedTeaPairCount(req) > 0) return null;
+  if (requestedSteepingFlaskCount(req) > 0) return null;
+  if (req.numColors === 4 && req.emptyCups === 2 && !req.hasMysteryLayer && requestedSourceOnlyCount(req) === 0) {
+    return 'choice-brew';
+  }
+  return null;
+}
+
+/**
+ * Bounded Choice Brew fast path (production): seeded bank choice → seeded
+ * full permutation of palette roles (a bijection) → static brewing-vessel
+ * constraint + deterministic pair → one finalized validation. At most
+ * CHOICE_BREW_TEMPLATE_ATTEMPTS validations, never a 150-deal scan.
+ */
+function generateFromChoiceBrewTemplateBank(
+  req: GenerateRequest,
+  seedStr: string,
+  rng: Rng,
+  stats?: GenerateStats,
+): GeneratedLevel | null {
+  const kind = choiceBrewTemplateKindFor(req);
+  if (!kind) return null;
+  const bank = CHOICE_BREW_TEMPLATE_BANK;
+  if (bank.length === 0) return null;
+  const palette = req.colors.slice(0, req.numColors);
+  if (palette.length !== req.numColors) return null;
+  for (let a = 0; a < CHOICE_BREW_TEMPLATE_ATTEMPTS; a++) {
+    if (stats) stats.templateAttempts++;
+    const tpl = bank[Math.floor(rng() * bank.length)] as (typeof bank)[number];
+    const order = [...palette];
+    shuffleInPlace(rng, order);
+    const inst = instantiateChoiceBrewTemplate(tpl, order);
+    const constraints: CupConstraint[] = defaultCupConstraints(inst.cups.length);
+    constraints[inst.brewVesselIndex] = {
+      mode: 'normal',
+      capacity: STANDARD_CUP_CAPACITY,
+      mustEndEmpty: true,
+    };
+    const contract: ChoiceBrewContract = {
+      vesselIndex: inst.brewVesselIndex,
+      allowedTeas: [inst.allowedTeas[0] as TeaId, inst.allowedTeas[1] as TeaId],
+    };
+    const level = finalizeCandidate(
+      req,
+      inst.cups,
+      inst.cups.map(() => 0),
+      `${seedStr}#choice-brew:${tpl.id}`,
+      constraints,
+      stats,
+      emptyFloatingIngredients(inst.cups.length),
+      undefined,
+      emptySinkingIngredients(inst.cups.length),
+      emptyIceSlots(inst.cups.length),
+      emptyCapacityObstacles(inst.cups.length),
+      emptyTeaBudSlots(inst.cups.length),
+      contract,
+    );
+    if (level) return level;
+  }
+  return null;
+}
+
 export function thermosTemplateKindFor(req: GenerateRequest): ThermosTemplateKind | null {
   if (requestedThermosCupCount(req) !== 1) return null;
   if (requestedTargetTeas(req).length > 0) return null;
@@ -6794,6 +7166,7 @@ export function generateLevel(
   validateServeOrderRequest(req);
   validateTeaPairRequest(req);
   validateSteepingFlaskRequest(req);
+  validateChoiceBrewRequest(req);
   const maxRetries = opts.maxRetries ?? GENERATOR_MAX_RETRIES;
   const stats = opts.stats;
   const seedStr = String(seed);
@@ -6898,6 +7271,14 @@ export function generateLevel(
   // bounded attempts, never a 150-deal scan.
   if (steepingFlaskTemplateKindFor(req) !== null) {
     const fast = generateFromSteepingFlaskTemplateBank(req, seedStr, rng, stats);
+    if (fast) return fast;
+    return fallbackLevel(req, { stats });
+  }
+
+  // Canonical Choice Brew configs skip the random scan entirely (production):
+  // bounded bank attempts, never a 150-deal scan.
+  if (choiceBrewTemplateKindFor(req) !== null) {
+    const fast = generateFromChoiceBrewTemplateBank(req, seedStr, rng, stats);
     if (fast) return fast;
     return fallbackLevel(req, { stats });
   }
@@ -7218,6 +7599,37 @@ export function validateLevelStructure(
     }
     if (hasServeOrder(constraints) || hasPairedTea(constraints) || hasSharedCapacity(constraints) === false) {
       reasons.push('flask-tray must keep both static identities and no third composition');
+    }
+  }
+  const wantBrewVs = requestedChoiceBrewCount(req);
+  const gotBrewContract = level.choiceBrewContract !== undefined && level.choiceBrewContract !== null;
+  if ((wantBrewVs > 0) !== gotBrewContract) {
+    reasons.push(`expected choice brew contract iff requested (want ${wantBrewVs}, got contract ${gotBrewContract})`);
+  }
+  if (wantBrewVs > 0) {
+    if (wantBrewVs > 1) reasons.push(`choice brew production max one, got ${wantBrewVs}`);
+    const bc = level.choiceBrewContract as ChoiceBrewContract | undefined;
+    if (bc === undefined) {
+      reasons.push('choice brew request has no static contract');
+    } else if (!isValidChoiceBrewContract(bc, constraints)) {
+      reasons.push('choice brew contract malformed for level constraints');
+    } else {
+      if ((level.cups[bc.vesselIndex] as TeaId[] | undefined)?.length !== 0) {
+        reasons.push('brewing vessel must start empty');
+      }
+      if ((level.hiddenCounts[bc.vesselIndex] ?? 0) !== 0) {
+        reasons.push('brewing vessel must not hide mystery');
+      }
+      const brewOrdinaryEmpty = constraints.filter(
+        (c, i) => c?.mode === 'normal' && !mustEndEmpty(c) && (level.cups[i] as TeaId[]).length === 0,
+      ).length;
+      if (brewOrdinaryEmpty < 1) {
+        reasons.push('choice brew requires one ordinary empty buffer');
+      }
+      const brewShape = level.cups.map((c) => c.length).sort((a, b) => a - b);
+      if (JSON.stringify(brewShape) !== JSON.stringify([0, 0, 4, 4, 4, 4])) {
+        reasons.push(`choice brew topology must be 4,4,4,4,0,0, got ${brewShape.join(',')}`);
+      }
     }
   }
   level.cups.forEach((cup, i) => {

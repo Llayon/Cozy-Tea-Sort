@@ -51,7 +51,8 @@ export type CompositionMechanicId =
   | 'blend'
   | 'sharedTray'
   | 'teaPair'
-  | 'steepingFlask';
+  | 'steepingFlask'
+  | 'choiceBrew';
 
 export type CompatibilityVerdict = 'allow' | 'forbid' | 'research';
 
@@ -205,6 +206,55 @@ const POLICY: Record<string, MechanicCompatibility> = {
     sameCup: 'forbid',
     reason: 'steeping flask + tea pair is unproven (G20 production is standalone)',
   },
+  // Choice Brew (production, standalone). The milestone is a history
+  // commitment on one dedicated vessel; every sibling special on the same
+  // level is unproven, and every same-cup combination contradicts the
+  // brewing vessel's exact static shape.
+  'choiceBrew+steepingFlask': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + steeping flask is unproven (both standalone)',
+  },
+  'choiceBrew+teaPair': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + tea pair is unproven (both standalone)',
+  },
+  'choiceBrew+sharedTray': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + shared tray is unproven (both standalone)',
+  },
+  'choiceBrew+servingOrder': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + serving order is unproven (both standalone)',
+  },
+  'choiceBrew+mystery': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + mystery is unproven (both standalone)',
+  },
+  'choiceBrew+tasting': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'different must-end-empty vessel roles; no proven composition',
+  },
+  'choiceBrew+honey': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + honey is unproven (both standalone)',
+  },
+  'choiceBrew+strainer': {
+    sameLevel: 'research',
+    sameCup: 'forbid',
+    reason: 'choice brew + strainer is unproven (both standalone)',
+  },
+  'blend+choiceBrew': {
+    sameLevel: 'forbid',
+    sameCup: 'forbid',
+    reason: 'choice brew + blend is forbidden (chemistry stays standalone)',
+  },
 };
 
 /**
@@ -341,6 +391,47 @@ export function validateTeaPairCombination(flags: {
       reasons.push('tea pair + blend is forbidden (G17 §60; chemistry stays standalone)');
     } else {
       reasons.push(`tea pair + ${p} is out of scope (G17 production is standalone)`);
+    }
+  }
+  return reasons;
+}
+
+/**
+ * Validate a Choice Brew request class (production, pure, no RNG/mutation).
+ * Choice Brew ships STANDALONE: every sibling composition mechanic fails
+ * closed here (blend explicitly forbidden). Non-composition siblings
+ * (ice/thermos/cinnamon/tea-bud/lemon/teapot/sink/targets/mystery-details)
+ * are rejected by the dedicated Choice Brew request validator.
+ */
+export function validateChoiceBrewCombination(flags: {
+  choiceBrew: boolean;
+  servingOrder: boolean;
+  mystery: boolean;
+  tastingCount: number;
+  honey: boolean;
+  strainer: boolean;
+  blend: boolean;
+  sharedTray: boolean;
+  teaPair: boolean;
+  steepingFlask: boolean;
+}): string[] {
+  const reasons: string[] = [];
+  if (!flags.choiceBrew) return reasons;
+  const partners: string[] = [];
+  if (flags.servingOrder) partners.push('serving order');
+  if (flags.mystery) partners.push('mystery');
+  if (flags.tastingCount > 0) partners.push('tasting');
+  if (flags.honey) partners.push('honey');
+  if (flags.strainer) partners.push('strainer');
+  if (flags.blend) partners.push('blend');
+  if (flags.sharedTray) partners.push('shared tray');
+  if (flags.teaPair) partners.push('tea pair');
+  if (flags.steepingFlask) partners.push('steeping flask');
+  for (const p of partners) {
+    if (p === 'blend') {
+      reasons.push('choice brew + blend is forbidden (chemistry stays standalone)');
+    } else {
+      reasons.push(`choice brew + ${p} is out of scope (production is standalone)`);
     }
   }
   return reasons;
