@@ -168,7 +168,7 @@ before solving — never selected from solver outcome (§56, §109).
 - No text-only pair: dots use the teas' own liquid colors, shape-coded
   (dots vs seal ring) beyond color alone.
 
-Tutorial (one-time, L1902): «Полностью завари в этой чаше один из двух
+Tutorial (one-time, L1998): «Полностью завари в этой чаше один из двух
 отмеченных чаёв. Заваривание засчитается — потом чай можно переливать
 дальше, но к концу чаша должна остаться пустой.» Subtitle:
 «Выбор заварки • 2 подходящих чая».
@@ -204,6 +204,18 @@ forbidden). Same-cup combinations are statically contradictory.
 
 Explicitly out of scope for G31.
 
+## Independent review (pre-merge critic)
+
+10-point adversarial pass over history loss, canonical merging, prune
+correctness, save/reload, pair desync, chosenTea, rollout freeze, bank
+curation, roundtrip gating, composition leaks: 9/10 PASS. One real find —
+the production finalize gate enforced non-incidental but not post-work,
+so a 1-move fill-and-drain ritual could pass. Fixed: the gate now requires
+`FULL minMoves − firstBrewDepth ≥ 2` (bank evidence minimum is 7), pinned
+by a deterministic 3-seed generation test. Other notes (dead 2-cup
+pseudo-state helpers with zero callers; release-into-full-pair edge
+unreachable without strainer+brew composition) required no change.
+
 ## Quality gates (final)
 
 - `bun install --frozen-lockfile`: PASS.
@@ -220,17 +232,19 @@ Explicitly out of scope for G31.
 
 ## QA (browser, dev server)
 
-Playwright temp spec (7 tests, all PASS, then removed): L1902 at
-360×800 / 390×844 / 430×932 + desktop 1280×800.
+Playwright temp specs (all PASS, then removed): pilot on L1902 (7 tests,
+360/390/430 + desktop — motif rendering verified on the pre-fix deck)
+superseded by the shipped-configuration run on the true debut L1998
+(390px + desktop, 2 tests).
 
-- stage0 empty + pair dots + hollow ring + tutorial banner: verified.
-- stage0 partial: verified.
-- Milestone success (stage1 full brew + seal + bloom): verified.
-- Solved (stage1 empty + seal + victory modal «Купаж уровня 1902
-  собран!»): verified end-to-end in browser.
-- Wrong tea accepted into the brewer with no error and no milestone:
-  verified (stage stays 0).
-- Tutorial fires once at L1902; absent at L2014: verified.
+- stage0 empty + pair dots + hollow ring + tutorial banner: verified
+  (L1998).
+- stage0 partial and wrong tea accepted with no error and no milestone
+  (stage stays 0): verified (L1998).
+- Milestone success (stage1 full brew + seal + bloom): verified (L1998).
+- Solved (stage1 empty + seal + victory modal «Купаж уровня 1998 собран!
+  ... за 12 ходов»): verified end-to-end in browser.
+- Tutorial fires once at L1998; absent at L2110: verified.
 - No console/page/asset errors on any viewport.
 
 Physical device: NOT DONE (no device access; simulator/browser only).
