@@ -82,26 +82,122 @@ without the validation in `isValidChoiceBrewContract`.
 
 ## Generator
 
-(TODO Phase 4–6: topology, bank, pair permutation, attempts, fallback,
-200-seed metrics.)
+Frozen topology CB: 4 colors × 4 units, 6 vessels `4,4,4,4,0,0` — one empty
+brewing vessel (index 4) + one ordinary empty (index 5).
+
+- Curated bank `src/game/logic/choiceBrewTemplates.ts`: 18 templates
+  (3 per unordered role-pair × 6 pairs), role-based `c0..c3` over the
+  sorted palette so TeaRole permutations preserve structure. Curated from
+  G30 confirmatory evidence (integrated, non-ritual, non-incidental,
+  post-work ≥ 2); every template replays to a win with the milestone
+  triggered on the identity instantiation (depth 10–15, stageMove 2–4).
+- Instantiation: seeded bank pick → seeded full palette permutation
+  (bijection roles→teas) → static constraint + deterministic pair
+  (`order[roleA], order[roleB]`); no solver-outcome-dependent pair choice.
+- Production gate per candidate (`finalizeCandidate`): valid contract,
+  vessel starts empty, ordinary empty buffer kept, FULL history-aware solve
+  (budget 120k, depth band 8–18), replay wins + stage triggers + vessel ends
+  empty, CONTROL solvable + CONTROL-optimal replay does NOT trigger
+  (non-incidental). Fallback: identity instantiation of `choice-brew-01`,
+  else loud error (never a silent wrong-mechanic level).
+- Attempts: max 6 bank validations per level (never a 150-deal scan).
+
+200-seed production sample (4 palettes × 50 seeds, direct requests):
+
+```text
+success 200/200, fallback 0, truncation 0, replayFail 0, pairWrong 0,
+stageWrong 0, bothSolved 200
+depth p50 11 / p90 14 / max 15
+solver p50 69ms / p95 144ms (target p95 ≤250, preferred ≤200)
+visited p50 1671 / p95 3242
+attempts p50 1 / p95 1 / max 1
+distinctRoots 186/200
+pair spread: 17 tea-pairs, max 19/200 (9.5%) — no dominance
+FULL−CONTROL delta p50 +1
+special touch p50 0.29 / p95 0.36 (envelope preferred ≤38%)
+stage timing p50 0.27 / p90 0.36 (early integration, not late ritual)
+postWork ≥2: 100% · replan heuristic 100% · taxOnly 0 · incidental 0 ·
+roundtrip heuristic 0
+state multiplier p50 1.43 / p90 1.44 / p95 1.50 / max 1.56, ≥2.0×: 0
+(envelope p95 <2.5, warning >2.0)
+```
+
+All §176 hard gates and §178 preferred targets pass with wide margins.
+(Tax/integration heuristics here are the conservative G30-style
+classifiers; the bank itself was curated with G30 INTEGRATED boards.)
 
 ## Pair assignment
 
-(TODO: deterministic selection from seed/template/TeaRole permutation.)
+Deterministic from seed → template → TeaRole permutation. The bank holds
+exactly 3 templates per unordered role-pair; fast-path picks uniformly
+(`rng`), so role-pairs are covered by construction. Tea-pair spread is
+reported per sample (17 combos observed, none dominant). Pair is fixed
+before solving — never selected from solver outcome (§56, §109).
 
 ## UX states
 
-(TODO Phase 7: vessel identity, pair indicators, stage visuals, tutorial.)
+| State | Pair markers | Completion marker | Can receive | Can source | Can win |
+|---|---|---|---|---|---|
+| stage0 empty | yes (two dots) | no (hollow ring) | yes | n/a | no |
+| stage0 partial | yes | no (hollow ring) | yes | yes | no |
+| stage0 full wrong tea | yes | no (hollow ring) | full | yes | no |
+| stage0 full pair tea | yes | transition bloom | full | yes | no |
+| stage1 partial | yes (dimmed) | yes (gold seal) | yes | yes | no |
+| stage1 empty | yes (dimmed) | yes (gold seal) | yes | n/a | maybe if others done |
+| stage1 final solved | yes (dimmed) | yes (gold seal) | — | — | yes |
+
+- Vessel identity: copper rim band on the brewing vessel (distinct from the
+  flask carafe, tasting bowl, thermos).
+- Pair indicators: two persistent tea-color dots on the glass, always
+  visible (never modal-only, never text-only). Retained dimmed after stage1
+  (no layout jump).
+- Stage 0: hollow copper ring joining the dots — restrained, no lock icon,
+  no red/error state, no disabled appearance. Vessel fully usable.
+- Stage 1: filled gold seal + check tick + halo + steam tick — persistent
+  completion, visible with the vessel empty. Does not imply "finished, do
+  not touch" (no lock affordance; tea keeps flowing).
+- Transition: one 600ms steam shimmer + reveal sparkles + existing
+  success sound/haptic, fired only on the actual 0→1 transition
+  (`choiceBrewCompleted` presentation metadata from `makeMove`, never
+  stored, never replayed on reload/later full pair tea/undo snapshots).
+- Wrong tea: accepted under ordinary Water Sort rules; no error, no grey
+  affordance (pair describes the milestone, not pouring legality).
+- No per-vessel screen-reader labels exist in the current game (same for
+  flask/pair/tray); the mechanic subtitle + tutorial copy carry semantics.
+- No new persistent particles; seal is static cheap vector drawing.
+- No text-only pair: dots use the teas' own liquid colors, shape-coded
+  (dots vs seal ring) beyond color alone.
+
+Tutorial (one-time, L1902): «Полностью завари в этой чаше один из двух
+отмеченных чаёв. Заваривание засчитается — потом чай можно переливать
+дальше, но к концу чаша должна остаться пустой.» Subtitle:
+«Выбор заварки • 2 подходящих чая».
 
 ## Rollout
 
-(TODO Phase 8: V5 boundary, first/second exposure, cadence, freeze.)
+- New progression version V5 from challenge level 1902
+  (`ROLLOUT_V5_FIRST_CHALLENGE_LEVEL`), 28-slot deck, 112-level cadence.
+- V5 deck = V4 deck with slot 0 → Choice Brew (first exposure L1902) and
+  slot 24 → steeping flask (moved; displaces the second familiar lemon,
+  which still recurs at slot 7). Winner composition stays at slot 23, so
+  the 874+112k combo grid holds for all levels 1–10000. Everything below
+  L1902 is byte-identical to current production (frozen prefix incl. the
+  874–1600 snapshot and 10 exact V4 decks through L1901).
+- First exposure L1902 (standalone, quad0 palette, tutorial once).
+- Second exposure L2014 (next deck slot 0, still standalone).
+- Cadence: 1 Choice Brew challenge per 112 levels initially (rare, like
+  the flask debut); peak/warmup/relax policy untouched (no peak Choice
+  Brew); no composition at launch (all siblings `research`/`forbid`).
+- Determinism: same level+seed+version → same board/pair (seeded bank +
+  permutation; pinned by tests).
+- Long-run: combo grid verified to L10000; boundary levels deterministic.
 
 ## Compatibility
 
 Choice Brew ships standalone. It registers in
 `mechanicCompatibility.ts` as `research`/`forbid` against every sibling
-special (sameLevel research/unsupported, sameCup forbid).
+special (sameLevel research/unsupported, sameCup forbid; blend explicitly
+forbidden). Same-cup combinations are statically contradictory.
 
 ## Future composition
 

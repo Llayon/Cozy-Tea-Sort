@@ -536,7 +536,7 @@ export default function App() {
             }
             return null;
           },
-          async autoSolve(): Promise<{ ok: boolean; moves: number; reason?: string }> {
+          async autoSolve(options?: { stopWhenBrewed?: boolean }): Promise<{ ok: boolean; moves: number; reason?: string }> {
             const active = logicRef.current;
             const activeView = viewRef.current;
             if (!active || !activeView) return { ok: false, moves: 0, reason: 'not-ready' };
@@ -551,6 +551,7 @@ export default function App() {
               capacityObstacles: st.capacityObstacles,
               teaBudSlots: st.teaBudSlots,
               blendRecipe: active.blendRecipe,
+              choiceBrewContract: active.choiceBrewContract,
               maxVisited: 120_000,
               maxDepth: 60,
             });
@@ -572,9 +573,10 @@ export default function App() {
               bridge.tapCup(action.from);
               bridge.tapCup(action.to);
               await waitIdle();
+              if (options?.stopWhenBrewed && active.choiceBrewState?.stage === 1) break;
               if (active.isWon()) break;
             }
-            return { ok: active.isWon(), moves: active.movesCount };
+            return { ok: options?.stopWhenBrewed ? (active.choiceBrewState?.stage ?? 0) === 1 : active.isWon(), moves: active.movesCount };
           },
         };
         (window as unknown as { __cozyTeaQa?: typeof qaBridge }).__cozyTeaQa = qaBridge;

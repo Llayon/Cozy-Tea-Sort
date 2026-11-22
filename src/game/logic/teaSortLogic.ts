@@ -611,7 +611,7 @@ export class TeaSortLogic {
   makeMove(
     fromIdx: number,
     toIdx: number,
-  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata; serveCompleted?: number | null; sharedCapacityLimited?: boolean } | null {
+  ): { move: MoveStep; sourceUncovered: boolean; strained: boolean; caughtTea?: TeaId; floatingIngredientMoved?: FloatingIngredientSlot; sinkingIngredientMoved?: SinkingIngredientSlot; iceMelted?: IceId; capacityObstacleRemoved?: CapacityObstacleId; teaBudBloomed?: TeaBudId | null; reaction?: BlendReactionMetadata; serveCompleted?: number | null; sharedCapacityLimited?: boolean; choiceBrewCompleted?: boolean } | null {
     if (!this.canMakeMove(fromIdx, toIdx)) return null;
 
     const snapshot: GameStateSnapshot = {
@@ -644,7 +644,11 @@ export class TeaSortLogic {
       this.choiceBrewContract,
     );
     if (!res) return null;
+    const brewPrevStage = this.choiceBrewState?.stage ?? 0;
     this.applyBoardState(res.state);
+    const brewNextStage = this.choiceBrewState?.stage ?? 0;
+    const choiceBrewCompleted =
+      this.choiceBrewContract !== undefined && brewPrevStage === 0 && brewNextStage === 1;
 
     const sourceUncovered = (this.cups[fromIdx] as Cup).revealTopIfNeeded();
     snapshot.move.count = res.transferred;
@@ -663,6 +667,7 @@ export class TeaSortLogic {
       reaction: res.reaction,
       serveCompleted: res.serveCompleted ?? null,
       sharedCapacityLimited: res.sharedCapacityLimited,
+      ...(choiceBrewCompleted ? { choiceBrewCompleted: true as const } : {}),
     };
   }
 
