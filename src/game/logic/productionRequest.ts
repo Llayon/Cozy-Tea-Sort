@@ -31,6 +31,7 @@ export function generateRequestForLevelConfig(cfg: LevelConfig): GenerateRequest
     teaPairCount: cfg.hasTeaPair ? 1 : 0,
     // Keep legacy request payloads byte-identical: field absent unless active.
     ...(cfg.hasSteepingFlask ? { steepingFlaskCount: 1 } : {}),
+    ...(cfg.hasChoiceBrew ? { choiceBrewCount: 1 } : {}),
     targetTeaIds: [...cfg.targetTeaIds],
     phase: cfg.phase,
   };

@@ -32,7 +32,8 @@ export type TutorialId =
   | 'sharedTray'
   | 'teaPair'
   | 'steepingFlask'
-  | 'steepingFlaskSharedTray';
+  | 'steepingFlaskSharedTray'
+  | 'choiceBrew';
 
 export interface TutorialTone {
   background: string;
@@ -71,6 +72,7 @@ const TONE = {
   serving: { background: '#232A1E', border: '#5A6B4E', text: '#DCE8C8', icon: '#B8C898' },
   teaPair: { background: '#2B2020', border: '#7A4E58', text: '#F2D8DE', icon: '#D8A0AC' },
   steeping: { background: '#1B2830', border: '#3E5A68', text: '#C9E4F0', icon: '#8AC9E8' },
+  choiceBrew: { background: '#201812', border: '#6B4E30', text: '#EED9AE', icon: '#C89A5E' },
 } as const satisfies Record<string, TutorialTone>;
 
 export const TUTORIALS: readonly TutorialDefinition[] = [
@@ -263,6 +265,16 @@ export const TUTORIALS: readonly TutorialDefinition[] = [
     text: 'На подносе по-прежнему всего 6 мест. Из заварочной колбы можно переливать только когда она полная.',
     tone: TONE.steeping,
     matches: (c) => c.hasSteepingFlask === true && c.hasSharedTray === true,
+  },
+  {
+    id: 'choiceBrew',
+    level: 1902,
+    bannerId: 'choice-brew-tutorial-hint',
+    mechanic: 'choiceBrew',
+    concept: 'either of two marked teas fully brewed once, vessel still ends empty',
+    text: 'Полностью завари в этой чаше один из двух отмеченных чаёв. Заваривание засчитается — потом чай можно переливать дальше, но к концу чаша должна остаться пустой.',
+    tone: TONE.choiceBrew,
+    matches: (c) => c.hasChoiceBrew === true,
   },
 ];
 

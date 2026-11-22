@@ -30,6 +30,7 @@ const EXPECTED: Record<string, number> = {
   teaPair: 250,
   steepingFlask: 558,
   steepingFlaskSharedTray: 874,
+  choiceBrew: 1902,
 };
 
 const REPEAT_LEVELS = [7, 11, 19, 22, 27, 30, 35, 38, 43, 46, 51, 54, 59, 62, 70, 78, 86, 94, 102, 110, 234, 242, 330, 670, 986];
@@ -40,10 +41,10 @@ function wordCount(text: string): number {
 
 describe('G18 tutorial registry', () => {
   it('has exactly one first-exposure definition per shipped mechanic cue', () => {
-    expect(TUTORIALS).toHaveLength(19);
-    expect(new Set(TUTORIALS.map((t) => t.id)).size).toBe(19);
-    expect(new Set(TUTORIALS.map((t) => t.bannerId)).size).toBe(19);
-    expect(new Set(TUTORIALS.map((t) => t.concept)).size).toBe(19);
+    expect(TUTORIALS).toHaveLength(20);
+    expect(new Set(TUTORIALS.map((t) => t.id)).size).toBe(20);
+    expect(new Set(TUTORIALS.map((t) => t.bannerId)).size).toBe(20);
+    expect(new Set(TUTORIALS.map((t) => t.concept)).size).toBe(20);
     for (const [id, level] of Object.entries(EXPECTED)) {
       const t = tutorialById(id as never);
       expect(t.level, `${id} first exposure`).toBe(level);
