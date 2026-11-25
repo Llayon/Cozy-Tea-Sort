@@ -80,6 +80,8 @@ export interface LevelConfig {
   hasTeaPair?: boolean;
   /** True when this level includes the steeping flask (Gauntlet 20, F0 4,4,4,4,0,0 topology). */
   hasSteepingFlask?: boolean;
+  /** True when this level includes the Choice Brew vessel (Gauntlet 22, CB 4,4,4,4,0,0 topology). */
+  hasChoiceBrew?: boolean;
   /**
    * Floating ingredient active on this level (Gauntlet 5). `undefined` =
    * classic level. Deterministic per level: reshuffling keeps the lemon

@@ -71,6 +71,8 @@ export const PAIR_BOWL_BODY_H = 84;
 
 /** Synchronized matched-pair steam flourish (~300–450ms, one ticker). */
 export const PAIR_MATCH_FLOURISH_MS = 360;
+/** Choice Brew completion bloom: single positive pulse on the 0 -> 1 transition. */
+export const BREW_BLOOM_MS = 600;
 
 /** Standard liquid slot height for tall vessels (4 slots fill the body). */
 const STANDARD_SLOT_H = 29;
@@ -1298,6 +1300,12 @@ export class CupView {
   /** Steeping-flask open/partial/ready cue (G20, derived every redraw). */
   flaskGraphics: Graphics;
   /**
+   * Choice Brew motif layer (production): copper rim band + two persistent
+   * pair medallions + stage ring/seal. Driven solely by the static contract
+   * + stage passed by the view — never view-owned history.
+   */
+  brewGraphics: Graphics;
+  /**
    * Attached-tool marker (Gauntlet 6 §35): small brass mesh drawn over the
    * host rim when `logic.strainerState` says the EMPTY tool is attached
    * here. Owned by the strainer flow, never a parallel attached flag —
@@ -1750,6 +1758,16 @@ export class CupView {
     this.flaskGraphics = new Graphics();
     this.flaskGraphics.eventMode = 'none';
     this.cupBodyContainer.addChild(this.flaskGraphics);
+
+    // Choice Brew motif (production): copper rim band (vessel identity) +
+    // two persistent pair medallions + stage ring/seal, derived only from
+    // the static contract + stage passed by the view (never view-owned
+    // history). Above the liquid so it stays readable on any tea, below the
+    // strainer marker. Never intercepts pointer (eventMode none). Ordinary
+    // vessels clear the layer (byte-identical rendering).
+    this.brewGraphics = new Graphics();
+    this.brewGraphics.eventMode = 'none';
+    this.cupBodyContainer.addChild(this.brewGraphics);
 
     this.strainerGraphics = new Graphics();
     this.strainerGraphics.eventMode = 'none';
@@ -2434,6 +2452,49 @@ export class CupView {
           alpha: 0.55,
         });
       }
+    }
+  }
+
+  /**
+   * Choice Brew motif (production): copper rim band marks the brewing
+   * vessel; two persistent tea-color medallions mark the allowed pair;
+   * stage 0 shows a restrained hollow ring ("not yet brewed"), stage 1 a
+   * filled gold seal with a steam tick ("brewed", persists after draining).
+   * The vessel stays fully usable in both stages — nothing here suggests a
+   * lock, and wrong-tea contents never show an error. Pair identity is
+   * shape + color (two dots vs seal ring), never text. Null brewer clears
+   * the layer so ordinary vessels render byte-identically.
+   */
+  renderBrewMotif(brewer: { pair: readonly [TeaId, TeaId]; stage: 0 | 1 } | null) {
+    const g = this.brewGraphics;
+    g.clear();
+    if (!brewer) return;
+    const w = this.width;
+    const copper = 0xc8905e;
+    // Vessel identity: restrained copper rim band.
+    g.roundRect(6, 1, w - 12, 5, 2.5).fill({ color: copper, alpha: 0.9 });
+    // Pair medallions: persistent, above the liquid line.
+    const [teaA, teaB] = brewer.pair;
+    const cy = 24;
+    const r = 6;
+    const dim = brewer.stage === 1 ? 0.55 : 1;
+    g.circle(w / 2 - 8.5, cy, r).fill({ color: TEA_TYPES[teaA].colorNum, alpha: dim });
+    g.circle(w / 2 - 8.5, cy, r).stroke({ width: 1.3, color: 0xfff6ea, alpha: 0.85 });
+    g.circle(w / 2 + 8.5, cy, r).fill({ color: TEA_TYPES[teaB].colorNum, alpha: dim });
+    g.circle(w / 2 + 8.5, cy, r).stroke({ width: 1.3, color: 0xfff6ea, alpha: 0.85 });
+    if (brewer.stage === 1) {
+      // Completed seal: soft halo + filled gold disc + check tick.
+      // Dominant over (but never removing) the dimmed pair markers.
+      g.circle(w / 2, cy + 20, 11).fill({ color: 0xffe9a8, alpha: 0.22 });
+      g.circle(w / 2, cy + 20, 6.5).fill({ color: 0xe8b45e, alpha: 0.95 });
+      g.circle(w / 2, cy + 20, 6.5).stroke({ width: 1.4, color: 0xfff3d0, alpha: 0.9 });
+      g.moveTo(w / 2 - 3.2, cy + 20)
+        .lineTo(w / 2 - 0.6, cy + 22.6)
+        .lineTo(w / 2 + 3.4, cy + 16.8)
+        .stroke({ width: 1.8, color: 0x5a3410, alpha: 0.9 });
+    } else {
+      // Not yet brewed: restrained hollow ring joining both medallions.
+      g.ellipse(w / 2, cy, 17, 9.5).stroke({ width: 1.2, color: copper, alpha: 0.8 });
     }
   }
 
@@ -3944,6 +4005,7 @@ export class TeaSortView {
           res.reaction ?? null,
           res.serveCompleted ?? null,
           pairMatchedTea,
+          res.choiceBrewCompleted ?? false,
         );
       }
     } else {
@@ -4236,6 +4298,20 @@ export class TeaSortView {
         // Legacy per-cup layer always cleared; the shared tray is drawn
         // once for the group below.
         view.renderTrayMotif(undefined, 0);
+        // Choice Brew motif: derived from the authoritative static contract
+        // + history stage (never view-owned). Non-brewing vessels clear the
+        // layer, so ordinary levels render byte-identically.
+        try {
+          const brewContract = this.logic.choiceBrewContract;
+          const brewStage = this.logic.choiceBrewState?.stage ?? 0;
+          if (brewContract && idx === brewContract.vesselIndex) {
+            view.renderBrewMotif({ pair: brewContract.allowedTeas, stage: brewStage });
+          } else {
+            view.renderBrewMotif(null);
+          }
+        } catch {
+          view.renderBrewMotif(null);
+        }
       }
     });
     this.refreshSharedTray();
@@ -4567,6 +4643,7 @@ export class TeaSortView {
     reaction: BlendReactionMetadata | null = null,
     serveCompleted: number | null = null,
     pairMatchedTea: TeaId | null = null,
+    choiceBrewCompleted: boolean = false,
   ) {
     this.isAnimating = true;
     // Derived pair accent updates immediately with the post-move model (no
@@ -4929,6 +5006,34 @@ export class TeaSortView {
         await this.wait(PAIR_MATCH_FLOURISH_MS);
       } catch {
         // Failure path: logic already matched; just redraw below.
+      } finally {
+        this.renderAllCups();
+      }
+    }
+
+    // Choice Brew completion bloom (production): the completing pour has
+    // landed and logic stage is 1, so the brewing vessel releases one short
+    // steam shimmer + reveal sparkles (~600ms). Part of THIS pour — same
+    // single ticker, same isAnimating lock, never a second onMoveComplete.
+    // The event fires only on the actual 0 -> 1 transition (presentation
+    // metadata from makeMove); it never replays on reload, later full pair
+    // tea, or undo-to-stage1 snapshots. The persistent seal itself is drawn
+    // by renderBrewMotif from authoritative stage (see renderAllCups).
+    if (choiceBrewCompleted) {
+      try {
+        const brewVessel = this.logic.choiceBrewContract?.vesselIndex ?? -1;
+        const mv = this.cupViews[brewVessel];
+        if (mv) {
+          this.spawnSteamFromCup(mv, '#E8B45E');
+          this.spawnSteamFromCup(mv, '#FFE9A8');
+          const p = this.iceStagePoint(mv, this.logic.cups[brewVessel]?.layers.length ?? 0);
+          this.triggerRevealSparkles(p.x, p.y);
+        }
+        audioSynth.playReveal();
+        telegram.hapticSuccess();
+        await this.wait(BREW_BLOOM_MS);
+      } catch {
+        // Failure path: logic already advanced; just redraw below.
       } finally {
         this.renderAllCups();
       }

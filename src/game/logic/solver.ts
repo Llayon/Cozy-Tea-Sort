@@ -32,6 +32,7 @@ import {
   normalizeStrainerState,
   normalizeTeaBudSlots,
 } from '../types';
+import type { ChoiceBrewContract } from './choiceBrew';
 import {
   applyPour,
   applyPourState,
@@ -83,6 +84,14 @@ export interface SolverOptions {
    * canonical keys do NOT repeat it per node.
    */
   blendRecipe?: BlendRecipe | undefined | null;
+  /**
+   * Choice Brew contract (production, optional).
+   * Absent = ordinary board (no history bit, byte-identical keys).
+   * Present = history-aware search from the initial stage.
+   */
+  choiceBrewContract?: ChoiceBrewContract | undefined | null;
+  /** Choice Brew initial history stage (production; default 0). */
+  choiceBrewInitialStage?: 0 | 1 | undefined;
 }
 
 const DEFAULT_MAX_VISITED = 200_000;
@@ -96,6 +105,8 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     ? normalizeCupConstraints(opts.cupConstraints, cups.length)
     : undefined;
   const blendRecipe = opts.blendRecipe ?? undefined;
+  const choiceBrewContract = opts.choiceBrewContract ?? undefined;
+  const choiceBrewInitialStage = opts.choiceBrewInitialStage ?? 0;
 
   const start: PuzzleState = {
     cups: cups.map((c) => [...c]),
@@ -105,9 +116,12 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
     iceSlots: normalizeIceSlots(opts.iceSlots, cups.length),
     capacityObstacles: normalizeCapacityObstacles(opts.capacityObstacles, cups.length),
     teaBudSlots: normalizeTeaBudSlots(opts.teaBudSlots, cups.length),
+    ...(choiceBrewContract !== undefined && choiceBrewContract !== null
+      ? { choiceBrewState: { stage: choiceBrewInitialStage } }
+      : {}),
   };
 
-  if (isPuzzleWonState(start, constraints, blendRecipe)) {
+  if (isPuzzleWonState(start, constraints, blendRecipe, choiceBrewContract)) {
     return { solvable: true, minMoves: 0, visitedStates: 1, solution: [], totalActions: 0, placementCount: 0, releaseCount: 0, strainedPourCount: 0 };
   }
 
@@ -144,7 +158,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
   };
   pushBack({ state: start, cost: 0, path: [] });
 
-  const startKey = canonicalPuzzleKey(start, constraints);
+  const startKey = canonicalPuzzleKey(start, constraints, choiceBrewContract);
   const dist = new Map<string, number>();
   dist.set(startKey, 0);
 
@@ -153,7 +167,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
       return { solvable: false, visitedStates: dist.size, truncated: true };
     }
     const node = popFront() as DequeNode;
-    const nodeKey = canonicalPuzzleKey(node.state, constraints);
+    const nodeKey = canonicalPuzzleKey(node.state, constraints, choiceBrewContract);
     const best = dist.get(nodeKey);
     if (best === undefined || node.cost !== best) continue;
     if (node.cost >= maxDepth) continue;
@@ -163,9 +177,9 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
       const stepCost = puzzleActionCost(a);
       const nextCost = node.cost + stepCost;
       if (stepCost > 0 && nextCost > maxDepth) continue;
-      const res = applyPuzzleActionState(node.state, a, constraints, blendRecipe);
+      const res = applyPuzzleActionState(node.state, a, constraints, blendRecipe, choiceBrewContract);
       if (!res) continue;
-      const key = canonicalPuzzleKey(res.state, constraints);
+      const key = canonicalPuzzleKey(res.state, constraints, choiceBrewContract);
       const known = dist.get(key);
       if (known !== undefined && nextCost >= known) continue;
       dist.set(key, nextCost);
@@ -191,7 +205,7 @@ export function solvePuzzle(cups: TeaId[][], opts: SolverOptions = {}): SolverRe
         };
       }
 
-      if (isPuzzleWonState(res.state, constraints, blendRecipe)) {
+      if (isPuzzleWonState(res.state, constraints, blendRecipe, choiceBrewContract)) {
         const solution = returnSolution ? [...node.path, step] : undefined;
         const placementCount = solution ? solution.filter((s) => s.kind === 'place-strainer').length : 0;
         const releaseCount = solution ? solution.filter((s) => s.kind === 'release-strainer').length : 0;
@@ -244,6 +258,7 @@ export function applySolutionState(
   solution: ReadonlyArray<SolverAction | SolverMove>,
   cupConstraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
+  choiceBrewContract?: ChoiceBrewContract | undefined | null,
 ): PuzzleState | null {
   let board: PuzzleState = {
     cups: state.cups.map((c) => [...c]),
@@ -253,11 +268,16 @@ export function applySolutionState(
     iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
     capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
     teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
+    ...(state.choiceBrewState !== undefined && state.choiceBrewState !== null
+      ? { choiceBrewState: { stage: (state.choiceBrewState as { stage: 0 | 1 }).stage } }
+      : choiceBrewContract !== undefined && choiceBrewContract !== null
+        ? { choiceBrewState: { stage: 0 as const } }
+        : {}),
   };
   for (const step of solution) {
     const kind = (step as SolverAction).kind;
     if (kind === 'place-strainer' || kind === 'release-strainer' || kind === 'pour') {
-      const res = applyPuzzleActionState(board, step as SolverAction, cupConstraints, blendRecipe);
+      const res = applyPuzzleActionState(board, step as SolverAction, cupConstraints, blendRecipe, choiceBrewContract);
       if (!res) return null;
       void isHomogeneous;
       board = res.state;
@@ -265,7 +285,7 @@ export function applySolutionState(
     }
     const legacy = step as SolverMove;
     if (typeof legacy.from === 'number' && typeof legacy.to === 'number') {
-      const res = applyPourState(board, legacy.from, legacy.to, cupConstraints, blendRecipe);
+      const res = applyPourState(board, legacy.from, legacy.to, cupConstraints, blendRecipe, choiceBrewContract);
       if (!res) return null;
       void isHomogeneous;
       board = res.state;

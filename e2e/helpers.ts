@@ -29,6 +29,8 @@ export interface QaState {
   capacityObstacles: Array<string | null>;
   teaBudSlots: Array<string | null>;
   blendRecipe?: { id: string } | null;
+  choiceBrewContract?: { vesselIndex: number; allowedTeas: readonly [string, string] } | null;
+  choiceBrewState?: { stage: 0 | 1 } | null;
 }
 
 export interface IssueCollector {

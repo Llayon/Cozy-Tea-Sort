@@ -107,6 +107,7 @@ interface LevelBackupState {
   capacityObstacles: CapacityObstacleSlot[];
   teaBudSlots: TeaBudSlot[];
   blendRecipe?: import('./game/logic/blendRecipe').BlendRecipe | undefined;
+  choiceBrewContract?: import('./game/logic/choiceBrew').ChoiceBrewContract | undefined | null;
 }
 
 export default function App() {
@@ -226,6 +227,7 @@ export default function App() {
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       blendRecipe: generated.blendRecipe,
+      choiceBrewContract: generated.choiceBrewContract,
     };
 
     return new TeaSortLogic(
@@ -239,6 +241,7 @@ export default function App() {
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       generated.blendRecipe,
+      generated.choiceBrewContract,
     );
   };
 
@@ -319,6 +322,7 @@ export default function App() {
       capacityObstacles: normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       teaBudSlots: normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       blendRecipe: generated.blendRecipe,
+      choiceBrewContract: generated.choiceBrewContract,
     };
 
     const logic = new TeaSortLogic(
@@ -332,6 +336,7 @@ export default function App() {
       normalizeCapacityObstacles(generated.capacityObstacles, generated.cups.length),
       normalizeTeaBudSlots(generated.teaBudSlots, generated.cups.length),
       generated.blendRecipe,
+      generated.choiceBrewContract,
     );
     logicRef.current = logic;
 
@@ -531,7 +536,7 @@ export default function App() {
             }
             return null;
           },
-          async autoSolve(): Promise<{ ok: boolean; moves: number; reason?: string }> {
+          async autoSolve(options?: { stopWhenBrewed?: boolean }): Promise<{ ok: boolean; moves: number; reason?: string }> {
             const active = logicRef.current;
             const activeView = viewRef.current;
             if (!active || !activeView) return { ok: false, moves: 0, reason: 'not-ready' };
@@ -546,6 +551,7 @@ export default function App() {
               capacityObstacles: st.capacityObstacles,
               teaBudSlots: st.teaBudSlots,
               blendRecipe: active.blendRecipe,
+              choiceBrewContract: active.choiceBrewContract,
               maxVisited: 120_000,
               maxDepth: 60,
             });
@@ -567,9 +573,10 @@ export default function App() {
               bridge.tapCup(action.from);
               bridge.tapCup(action.to);
               await waitIdle();
+              if (options?.stopWhenBrewed && active.choiceBrewState?.stage === 1) break;
               if (active.isWon()) break;
             }
-            return { ok: active.isWon(), moves: active.movesCount };
+            return { ok: options?.stopWhenBrewed ? (active.choiceBrewState?.stage ?? 0) === 1 : active.isWon(), moves: active.movesCount };
           },
         };
         (window as unknown as { __cozyTeaQa?: typeof qaBridge }).__cozyTeaQa = qaBridge;
@@ -611,8 +618,9 @@ export default function App() {
     const restoredObstacles = normalizeCapacityObstacles(backup.capacityObstacles, restoredCups.length);
     const restoredBuds = normalizeTeaBudSlots(backup.teaBudSlots, restoredCups.length);
     const restoredBlend = backup.blendRecipe;
+    const restoredBrew = backup.choiceBrewContract;
 
-    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds, restoredBlend);
+    logicRef.current.initFromState(restoredCups, restoredHidden, restoredConstraints, restoredSlots, restoredStrainer, restoredSinking, restoredIce, restoredObstacles, restoredBuds, restoredBlend, restoredBrew);
     viewRef.current.logic = logicRef.current;
     viewRef.current.setSkin(equippedSkinRef.current);
     viewRef.current.resetLevel();

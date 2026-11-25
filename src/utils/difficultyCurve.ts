@@ -69,6 +69,8 @@ export interface MechanicPlan {
   teaPair: boolean;
   /** Gauntlet 20 derived source-readiness flask (optional keeps legacy plans byte-identical). */
   steepingFlask?: boolean;
+  /** Gauntlet 22 history-dependent Choice Brew vessel (optional keeps legacy plans byte-identical). */
+  choiceBrew?: boolean;
 }
 
 const CLEAN: MechanicPlan = { teapot: false, targets: false, sink: false, tasting: false, lemon: false, strainer: false, honey: false, frozen: false, thermos: false, cinnamon: false, teaBloom: false, blend: false, servingOrder: false, sharedTray: false, teaPair: false };
@@ -252,6 +254,27 @@ export const CHALLENGE_DECK_V4: readonly MechanicPlan[] = [
 ];
 
 export const CHALLENGE_DECK_V4_LENGTH = CHALLENGE_DECK_V4.length;
+
+/**
+ * Rollout V5 (Gauntlet 22): introduces Choice Brew at the first challenge
+ * boundary after the frozen V4 horizon (10 exact V4 decks, L782–L1901, plus
+ * the pinned G21 snapshot through L1600 — all untouched). Same 28-slot /
+ * 112-level cadence: the newcomer takes slot 24 (first exposure L1998;
+ * displaces the second familiar lemon there, which still recurs at slot 7
+ * so its max gap stays exactly 112). The flask keeps slot 0 and the V4
+ * winner composition stays at slot 23, so every existing recurrence grid
+ * (flask 112, combos 874+112k) holds for levels 1–10000. Choice Brew appears
+ * once per 112 levels initially (rare cadence, like the flask debut);
+ * second exposure is the next deck (L2110).
+ */
+export const ROLLOUT_V5_FIRST_CHALLENGE_LEVEL = 1902;
+
+export const CHALLENGE_DECK_V5: readonly MechanicPlan[] = CHALLENGE_DECK_V4.map((plan, i) => {
+  if (i === 24) return { ...CLEAN, choiceBrew: true };
+  return { ...plan };
+});
+
+export const CHALLENGE_DECK_V5_LENGTH = CHALLENGE_DECK_V5.length;
 
 /**
  * Pinned rollout 1–16 (Gauntlets 0–2, behaviorally frozen):
@@ -575,6 +598,18 @@ export function challengeMechanicPlanV4(levelNum: number): MechanicPlan {
   return { ...(CHALLENGE_DECK_V4[index % CHALLENGE_DECK_V4_LENGTH] as MechanicPlan) };
 }
 
+/** Rollout V5 challenge policy: explicit 28-slot deck from L1902. */
+export function challengeMechanicPlanV5(levelNum: number): MechanicPlan {
+  const offset = levelNum - ROLLOUT_V5_FIRST_CHALLENGE_LEVEL;
+  if (!Number.isInteger(levelNum) || offset < 0 || offset % 4 !== 0) {
+    throw new Error(
+      `challengeMechanicPlanV5 expects a V5 challenge level (1902 + 4n), got ${levelNum}`,
+    );
+  }
+  const index = offset / 4;
+  return { ...(CHALLENGE_DECK_V5[index % CHALLENGE_DECK_V5_LENGTH] as MechanicPlan) };
+}
+
 /**
  * Mechanic plan for any level: pinned table for 1–112, pinned first
  * exposures at 162/242/250/330, then the versioned deterministic rotation.
@@ -607,7 +642,10 @@ export function mechanicPlanForLevel(levelNum: number): MechanicPlan {
   if (cycleIndex === 0 || cycleIndex === 3) return { ...CLEAN };
   if (cycleIndex === 1) {
     // Version boundaries are explicit: V1 <=330, V2 334..554, V3 558..778,
-    // V4 from 782.
+    // V4 782..1901, V5 from 1902.
+    if (levelNum >= ROLLOUT_V5_FIRST_CHALLENGE_LEVEL) {
+      return challengeMechanicPlanV5(levelNum);
+    }
     if (levelNum >= ROLLOUT_V4_FIRST_CHALLENGE_LEVEL) {
       return challengeMechanicPlanV4(levelNum);
     }
@@ -740,6 +778,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
   const hasSharedTray = plan.sharedTray === true;
   const hasTeaPair = plan.teaPair === true;
   const hasSteepingFlask = plan.steepingFlask === true;
+  const hasChoiceBrew = plan.choiceBrew === true;
   // Tight G6 topology override (§24): strainer levels use exactly one
   // ordinary empty vessel (challenge 4c/5v, peak 5c/6v) instead of the
   // ordinary 2-empty layout. Vessel counts stay capped for mobile rows.
@@ -1030,6 +1069,28 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     }
   }
 
+  // Choice Brew standalone enforcement: CB topology (4c/6v, lengths
+  // 4,4,4,4,0,0, brewing vessel + one ordinary empty), no Mystery, no
+  // teapot. Palette is four eligible legacy teas (never reaction IDs).
+  if (hasChoiceBrew) {
+    numColors = 4;
+    emptyCups = 2;
+    hasMysteryLayer = false;
+    hasSourceOnlyTeapot = false;
+    phaseSubtitle = 'Выбор заварки • 2 подходящих чая';
+    if (levelNum === 1998) {
+      colors = ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'];
+    } else {
+      const quads: Array<[TeaId, TeaId, TeaId, TeaId]> = [
+        ['matcha', 'sea_buckthorn', 'karkade', 'milk_oolong'],
+        ['lavender', 'saffron', 'buckwheat', 'matcha'],
+        ['karkade', 'milk_oolong', 'lavender', 'sea_buckthorn'],
+        ['saffron', 'buckwheat', 'matcha', 'karkade'],
+      ];
+      colors = [...(quads[Math.floor(levelNum / 4) % quads.length] as [TeaId, TeaId, TeaId, TeaId])];
+    }
+  }
+
   // Reward checks
   let rewardRecipeId: TeaId | undefined;
   if (levelNum === 1) rewardRecipeId = 'matcha';
@@ -1068,6 +1129,7 @@ export function getLevelConfig(levelNum: number): LevelConfig {
     hasSharedTray,
     hasTeaPair,
     hasSteepingFlask,
+    hasChoiceBrew,
     floatingIngredient,
     sinkingIngredient,
     targetTeaIds,

@@ -83,6 +83,7 @@ import {
   TeaBudId,
   TeaBudSlot,
   TeaId,
+  cloneChoiceBrewState,
   cupCapacity,
   cupConstraintSignature,
   effectiveCupCapacity,
@@ -95,6 +96,7 @@ import {
   isValidSteepingFlaskConstraint,
   mustEndEmpty,
   normalizeCapacityObstacles,
+  normalizeChoiceBrewState,
   normalizeCupConstraints,
   normalizeFloatingIngredients,
   normalizeIceSlots,
@@ -102,6 +104,13 @@ import {
   normalizeStrainerState,
   normalizeTeaBudSlots,
 } from '../types';
+import {
+  advanceChoiceBrewState,
+  choiceBrewContractSignature,
+  isChoiceBrewSatisfied,
+  isValidChoiceBrewContract,
+  type ChoiceBrewContract,
+} from './choiceBrew';
 import {
   BlendReactionMetadata,
   BlendRecipe,
@@ -1191,6 +1200,7 @@ export function applyPourState(
   toIdx: number,
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
+  choiceBrewContract?: ChoiceBrewContract | undefined | null,
 ): PourStateResult | null {
   if (!canPourState(state, fromIdx, toIdx, constraints, blendRecipe)) return null;
   // Serving-order metadata (G14 §§32-33, UX only): derived prefix before
@@ -1228,8 +1238,24 @@ export function applyPourState(
       { cups: nextCups, floatingIngredients: nextSlots },
       constraints,
     );
+    // Choice Brew + blend is an unsupported composition — never advance
+    // history here (fail closed, preserve incoming stage exactly).
+    const nextBrewReaction = choiceBrewContract
+      ? cloneChoiceBrewState(normalizeChoiceBrewState(state.choiceBrewState))
+      : normalizeChoiceBrewState(state.choiceBrewState) !== undefined
+        ? cloneChoiceBrewState(normalizeChoiceBrewState(state.choiceBrewState))
+        : undefined;
     return {
-      state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
+      state: {
+        cups: nextCups,
+        floatingIngredients: nextSlots,
+        sinkingIngredients: nextSink,
+        strainer: nextStrainer,
+        iceSlots: nextIce,
+        capacityObstacles: nextObstacles,
+        teaBudSlots: nextBuds,
+        ...(nextBrewReaction !== undefined ? { choiceBrewState: nextBrewReaction } : {}),
+      },
       transferred: 1,
       received: 0,
       layer: sourceReactant,
@@ -1324,8 +1350,33 @@ export function applyPourState(
       if (m < ordinaryM) sharedCapacityLimited = true;
     }
   }
+  // Choice Brew history: single authoritative seam. Tea-state transition
+  // above is identical to the no-mechanic transition; only history may
+  // differ. Blend + Choice Brew is an unsupported composition — preserve
+  // without advancing (fail closed).
+  const hasBrew = choiceBrewContract !== undefined && choiceBrewContract !== null;
+  const incomingBrew = normalizeChoiceBrewState(state.choiceBrewState);
+  let nextBrew: { stage: 0 | 1 } | undefined;
+  if (hasBrew && blendRecipe && isValidBlendRecipe(blendRecipe)) {
+    nextBrew = incomingBrew !== undefined ? { stage: incomingBrew.stage } : { stage: 0 };
+  } else if (hasBrew) {
+    nextBrew = advanceChoiceBrewState(incomingBrew, nextCups, choiceBrewContract, constraints);
+  } else if (incomingBrew !== undefined) {
+    nextBrew = { stage: incomingBrew.stage };
+  } else {
+    nextBrew = undefined;
+  }
   return {
-    state: { cups: nextCups, floatingIngredients: nextSlots, sinkingIngredients: nextSink, strainer: nextStrainer, iceSlots: nextIce, capacityObstacles: nextObstacles, teaBudSlots: nextBuds },
+    state: {
+      cups: nextCups,
+      floatingIngredients: nextSlots,
+      sinkingIngredients: nextSink,
+      strainer: nextStrainer,
+      iceSlots: nextIce,
+      capacityObstacles: nextObstacles,
+      teaBudSlots: nextBuds,
+      ...(nextBrew !== undefined ? { choiceBrewState: nextBrew } : {}),
+    },
     transferred: m,
     received,
     layer,
@@ -1396,6 +1447,7 @@ export function applyPlaceStrainerState(
   constraints?: readonly CupConstraint[],
 ): PuzzleState | null {
   if (!canPlaceStrainerState(state, toIdx, constraints)) return null;
+  const brew = normalizeChoiceBrewState(state.choiceBrewState);
   return {
     cups: state.cups.map((c) => [...c]),
     floatingIngredients: normalizeFloatingIngredients(state.floatingIngredients, state.cups.length),
@@ -1404,6 +1456,7 @@ export function applyPlaceStrainerState(
     iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
     capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
     teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
+    ...(brew !== undefined ? { choiceBrewState: cloneChoiceBrewState(brew) as { stage: 0 | 1 } } : {}),
   };
 }
 
@@ -1457,6 +1510,7 @@ export function applyReleaseStrainerState(
   const held = s.heldTea as TeaId;
   const nextCups = state.cups.map((c) => [...c]);
   (nextCups[toIdx] as TeaId[]).push(held);
+  const brew = normalizeChoiceBrewState(state.choiceBrewState);
   return {
     state: {
       cups: nextCups,
@@ -1466,6 +1520,7 @@ export function applyReleaseStrainerState(
       iceSlots: normalizeIceSlots(state.iceSlots, state.cups.length),
       capacityObstacles: normalizeCapacityObstacles(state.capacityObstacles, state.cups.length),
       teaBudSlots: normalizeTeaBudSlots(state.teaBudSlots, state.cups.length),
+      ...(brew !== undefined ? { choiceBrewState: cloneChoiceBrewState(brew) as { stage: 0 | 1 } } : {}),
     },
     layer: held,
   };
@@ -1573,6 +1628,7 @@ export function applyPuzzleActionState(
   action: PuzzleAction,
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
+  choiceBrewContract?: ChoiceBrewContract | undefined | null,
 ): ApplyPuzzleActionResult | null {
   if (isPlaceStrainerAction(action)) {
     const next = applyPlaceStrainerState(state, action.to, constraints);
@@ -1584,7 +1640,7 @@ export function applyPuzzleActionState(
     if (!res) return null;
     return { state: res.state, transferred: 1, received: 1, layer: res.layer, strained: false };
   }
-  const res = applyPourState(state, action.from, action.to, constraints, blendRecipe);
+  const res = applyPourState(state, action.from, action.to, constraints, blendRecipe, choiceBrewContract);
   if (!res) return null;
   return {
     state: res.state,
@@ -1775,7 +1831,20 @@ export function isPuzzleWonState(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
   blendRecipe?: BlendRecipe | undefined | null,
+  choiceBrewContract?: ChoiceBrewContract | undefined | null,
 ): boolean {
+  // Choice Brew (production): with a contract, victory requires BOTH
+  // ordinary production victory AND the satisfied milestone. Malformed
+  // contracts, blend+brew compositions, or history without a contract fail
+  // closed. Absent contract + absent history = legacy identical.
+  const hasBrewContract = choiceBrewContract !== undefined && choiceBrewContract !== null;
+  const hasBrewState = normalizeChoiceBrewState(state.choiceBrewState) !== undefined;
+  if (hasBrewContract) {
+    if (blendRecipe && isValidBlendRecipe(blendRecipe)) return false;
+    if (!isValidChoiceBrewContract(choiceBrewContract, constraints)) return false;
+  } else if (hasBrewState) {
+    return false;
+  }
   if (!teaWonState(state.cups, constraints)) return false;
   // G16 shared-capacity validity (§34): any group occupancy exceeding its
   // limit fails closed (malformed/manual states that bypass legal moves).
@@ -1808,6 +1877,10 @@ export function isPuzzleWonState(
   if (obstacles.some((slot) => slot !== null)) return false;
   const buds = normalizeTeaBudSlots(state.teaBudSlots, state.cups.length);
   if (buds.some((slot) => slot !== null)) return false;
+  if (hasBrewContract) {
+    const brew = normalizeChoiceBrewState(state.choiceBrewState);
+    if (!isChoiceBrewSatisfied(brew, choiceBrewContract, constraints)) return false;
+  }
   return true;
 }
 
@@ -2160,7 +2233,7 @@ function groupedTeaBudKey(
     .join('||');
 }
 
-export function canonicalPuzzleKey(
+function canonicalPuzzleKeyBase(
   state: ReadonlyPuzzleState,
   constraints?: readonly CupConstraint[],
 ): string {
@@ -2285,4 +2358,29 @@ export function canonicalPuzzleKey(
     (idx) => (strainer.attachedCupIndex === idx ? 'STR' : '_'),
     constraints,
   );
+}
+
+/**
+ * Choice Brew canonical key (production extension).
+ *
+ * - No Choice Brew contract AND no history in state → byte-identical legacy
+ *   base (production freeze).
+ * - Otherwise appends `||CB:<pairSig>:<stage>` where pairSig is the
+ *   order-normalized static pair and stage the monotonic history. Same cups
+ *   with stage0 ≠ stage1 key differently; different pairs key differently.
+ *   The brewing vessel is already isolated in its own constraint-signature
+ *   group (unique mustEndEmpty), so no vessel permutation crosses it.
+ */
+export function canonicalPuzzleKey(
+  state: ReadonlyPuzzleState,
+  constraints?: readonly CupConstraint[],
+  choiceBrewContract?: ChoiceBrewContract | undefined | null,
+): string {
+  const base = canonicalPuzzleKeyBase(state, constraints);
+  const brew = normalizeChoiceBrewState(state.choiceBrewState);
+  const hasBrew = choiceBrewContract !== undefined && choiceBrewContract !== null;
+  if (!hasBrew && brew === undefined) return base;
+  const stage = brew?.stage ?? 0;
+  const sig = hasBrew ? choiceBrewContractSignature(choiceBrewContract as ChoiceBrewContract) : 'NONE';
+  return `${base}||CB:${sig}:${String(stage)}`;
 }
